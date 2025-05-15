@@ -1,23 +1,38 @@
 ﻿using ConsoleAppFramework;
+using Git.Remote.Taut;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using ZLogger;
 
 ConsoleApp.Version = "alpha-0.0.1";
 
-var app = ConsoleApp.Create();
-app.Add<MyCommands>();
+var app = ConsoleApp
+    .Create()
+    .ConfigureEmptyConfiguration(config =>
+    {
+        config.AddEnvironmentVariables();
+    })
+    .ConfigureLogging(
+        (config, logging) =>
+        {
+            logging.ClearProviders();
+
+            logging.AddZLoggerConsole(options =>
+            {
+                // log all to standard error
+                options.LogToStandardErrorThreshold = LogLevel.Trace;
+            });
+
+            if (config.GetGitRemoteTautTrace())
+            {
+                logging.SetMinimumLevel(LogLevel.Trace);
+            }
+            else
+            {
+                logging.SetMinimumLevel(LogLevel.Information);
+            }
+        }
+    );
+
+app.Add<Commands>();
 app.Run(args);
-
-public class MyCommands
-{
-    /// <summary>Root command test.</summary>
-    [Command("")]
-    public void Root() => Console.WriteLine("git-remote-taut");
-
-    /// <summary>Display message.</summary>
-    /// <param name="msg">Message to show.</param>
-    public void Echo(string msg) => Console.WriteLine(msg);
-
-    /// <summary>Sum parameters.</summary>
-    /// <param name="x">left value.</param>
-    /// <param name="y">right value.</param>
-    public void Sum(int x, int y) => Console.WriteLine(x + y);
-}
