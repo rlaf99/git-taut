@@ -4,6 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
+const string commandName = "git-remote-taut";
+
 ConsoleApp.Version = "alpha-0.0.1";
 
 var app = ConsoleApp
@@ -21,6 +23,24 @@ var app = ConsoleApp
             {
                 // log all to standard error
                 options.LogToStandardErrorThreshold = LogLevel.Trace;
+
+                options.UsePlainTextFormatter(formatter =>
+                {
+                    formatter.SetPrefixFormatter(
+                        $"{0} {1}[{2:short}]\t",
+                        (in MessageTemplate template, in LogInfo info) =>
+                            template.Format(
+                                info.Timestamp.Local.ToString("hh:mm:ss.ffffff"),
+                                commandName,
+                                info.LogLevel
+                            )
+                    );
+
+                    formatter.SetExceptionFormatter(
+                        (writer, ex) =>
+                            Utf8StringInterpolation.Utf8String.Format(writer, $"{ex.Message}")
+                    );
+                });
             });
 
             if (config.GetGitRemoteTautTrace())
@@ -34,5 +54,5 @@ var app = ConsoleApp
         }
     );
 
-app.Add<Commands>();
+app.Add<GitRemoteHelper>();
 app.Run(args);
