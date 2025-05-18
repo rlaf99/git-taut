@@ -1,6 +1,7 @@
 ﻿using ConsoleAppFramework;
 using Git.Remote.Taut;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
@@ -13,6 +14,10 @@ var app = ConsoleApp
     .ConfigureEmptyConfiguration(config =>
     {
         config.AddEnvironmentVariables();
+    })
+    .ConfigureServices(services =>
+    {
+        services.AddSingleton<GitCli>();
     })
     .ConfigureLogging(
         (config, logging) =>

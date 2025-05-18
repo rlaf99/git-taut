@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using ConsoleAppFramework;
 using Microsoft.Extensions.Configuration;
@@ -12,6 +11,8 @@ static class KnownEnvironVars
     internal const string GitDir = "GIT_DIR";
 
     internal const string GitRemoteTautTrace = "GIT_REMOTE_TAUT_TRACE";
+
+    internal const string GitAlternateObjectDirectories = "GIT_ALTERNATE_OBJECT_DIRECTORIES";
 }
 
 internal static class ConfigurationExtensions
@@ -33,7 +34,7 @@ internal static class ConfigurationExtensions
     }
 }
 
-class GitRemoteHelper(ILogger<GitRemoteHelper> logger)
+partial class GitRemoteHelper(GitCli gitCli, ILogger<GitRemoteHelper> logger)
 {
     // for pushing
     const string capPush = "push";
@@ -53,23 +54,94 @@ class GitRemoteHelper(ILogger<GitRemoteHelper> logger)
     const string cmdFetch = "fetch";
     const string cmdOption = "option";
 
-    const string optVerbosity = "verbosity";
-    int _verbosity = 1;
-
-    const string optProgress = "progress";
-    bool _showProgress = false;
-
-    const string optCloning = "cloning";
-    bool _isCloning = false;
-
+    const string objectsDirname = "objects";
     const string tautDirName = "taut";
+}
 
-    // bool _checkConnectivity = false;
-    // bool _forceUpdate = false;
+partial class GitRemoteHelper
+{
+    class Options(ILogger<GitRemoteHelper> logger)
+    {
+        const string optVerbosity = "verbosity";
+        int _verbosity = 1;
 
+        const string optProgress = "progress";
+        bool _showProgress = false;
+
+        const string optCloning = "cloning";
+        bool _isCloning = false;
+
+        const string optCheckConnectivity = "check-connectivity";
+        bool _checkConnectivity = false;
+
+        const string optForce = "force";
+        bool _forceUpdate = false;
+
+        internal void HandleNameValue(string nameValue)
+        {
+            bool GetBooleanValue(string opt)
+            {
+                return nameValue[(opt.Length + 1)..] == "true";
+            }
+
+            void LogUpdate<TValue>(string opt, TValue value)
+            {
+                logger.ZLogTrace($"Set option '{opt}' to {value}");
+            }
+
+            if (nameValue.StartsWith(optVerbosity))
+            {
+                if (int.TryParse(nameValue[(optVerbosity.Length + 1)..], out var value))
+                {
+                    _verbosity = value;
+                    LogUpdate(optVerbosity, value);
+                    Console.WriteLine("ok");
+                }
+                else
+                {
+                    Console.WriteLine("error falied to parse the value");
+                }
+            }
+            else if (nameValue.StartsWith(optProgress))
+            {
+                _showProgress = GetBooleanValue(optProgress);
+                LogUpdate(optProgress, _showProgress);
+                Console.WriteLine("ok");
+            }
+            else if (nameValue.StartsWith(optCloning))
+            {
+                _isCloning = GetBooleanValue(optCloning);
+                LogUpdate(optCloning, _isCloning);
+                Console.WriteLine("ok");
+            }
+            else if (nameValue.StartsWith(optCheckConnectivity))
+            {
+                _checkConnectivity = GetBooleanValue(optCheckConnectivity);
+                LogUpdate(optCheckConnectivity, _checkConnectivity);
+                Console.WriteLine("ok");
+            }
+            else if (nameValue.StartsWith(optForce))
+            {
+                _forceUpdate = GetBooleanValue("force");
+                LogUpdate(optForce, _forceUpdate);
+                Console.WriteLine("ok");
+            }
+            else
+            {
+                Console.WriteLine("unsupported");
+            }
+        }
+    }
+
+    readonly Options _options = new(logger);
+}
+
+partial class GitRemoteHelper
+{
     string _remote = default!;
     string _address = default!;
     string _gitDir = default!;
+    string _gitObjectsDir = default!;
     string _tautDir = default!;
 
     /// <summary>
@@ -104,57 +176,45 @@ class GitRemoteHelper(ILogger<GitRemoteHelper> logger)
                 Console.WriteLine(capCheckConnectivity);
                 Console.WriteLine(capOption);
                 Console.WriteLine();
-
-                continue;
             }
-
-            if (line == cmdList)
+            else if (line == cmdList)
             {
                 logger.ZLogTrace($"Command '{cmdList}' received");
 
                 HandleGitCmdList();
-                continue;
             }
-
-            if (line == cmdListForPush)
+            else if (line == cmdListForPush)
             {
                 logger.ZLogTrace($"Command '{cmdListForPush}' received");
 
                 Console.Error.WriteLine("Not implemented");
                 Environment.Exit(1);
-
-                continue;
             }
-
-            if (line == cmdPush)
+            else if (line == cmdPush)
             {
                 logger.LogTrace("Command '{0}' received", cmdPush);
 
                 Console.Error.WriteLine("Not implemented");
                 Environment.Exit(1);
-
-                continue;
             }
-
-            if (line.StartsWith(cmdFetch))
+            else if (line.StartsWith(cmdFetch))
             {
-                logger.LogTrace("Command '{0}' received", cmdFetch);
+                logger.ZLogTrace($"Received Command '{line}'");
 
                 Console.Error.WriteLine("Not implemented");
                 Environment.Exit(1);
-
-                continue;
             }
-
-            if (line.StartsWith(cmdOption))
+            else if (line.StartsWith(cmdOption))
             {
+                logger.ZLogTrace($"Received Command '{line}'");
+
                 var nameValue = line[cmdOption.Length..].TrimStart();
-
-                logger.LogTrace("Option '{0}' received", nameValue);
-
-                HandleGitCmdOption(nameValue);
-
-                continue;
+                _options.HandleNameValue(nameValue);
+            }
+            else
+            {
+                Console.Error.WriteLine("Unknown command '{0}'", line);
+                Environment.Exit(1);
             }
         }
     }
@@ -169,6 +229,11 @@ class GitRemoteHelper(ILogger<GitRemoteHelper> logger)
 
         _gitDir = gitDir;
 
+        _gitObjectsDir = Path.Join(gitDir, objectsDirname);
+
+        var objDirs = gitCli.AlternateObjectDirectories;
+        gitCli.AlternateObjectDirectories =  [..objDirs, _gitObjectsDir];
+
         var tautDir = Path.Join(_gitDir, tautDirName);
         Directory.CreateDirectory(tautDir);
 
@@ -177,91 +242,9 @@ class GitRemoteHelper(ILogger<GitRemoteHelper> logger)
         _tautDir = tautDir;
     }
 
-    void RunGit(params string[] args)
-    {
-        var startInfo = new ProcessStartInfo("git")
-        {
-            Arguments = string.Join(" ", args),
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-
-        logger.ZLogTrace($"Run git with arguments '{startInfo.Arguments}'");
-
-        Process process = new() { StartInfo = startInfo };
-
-        static void DataReceiver(object sender, DataReceivedEventArgs args)
-        {
-            if (args.Data is not null)
-                Console.Error.WriteLine(args.Data);
-        }
-
-        process.OutputDataReceived += DataReceiver;
-        process.ErrorDataReceived += DataReceiver;
-
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-        process.StandardInput.Close();
-
-        process.WaitForExit();
-        process.Close();
-    }
-
-    List<string> GetGitOutputLines(params string[] args)
-    {
-        var startInfo = new ProcessStartInfo("git")
-        {
-            Arguments = string.Join(" ", args),
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-
-        logger.ZLogTrace($"Run git with arguments '{startInfo.Arguments}'");
-
-        List<string> result = [];
-
-        Process process = new() { StartInfo = startInfo };
-
-        void OutputDataReceiver(object sender, DataReceivedEventArgs args)
-        {
-            if (args.Data is not null)
-            {
-                result.Add(args.Data);
-            }
-        }
-
-        static void ErrorDataReceiver(object sender, DataReceivedEventArgs args)
-        {
-            if (args.Data is not null)
-            {
-                Console.Error.WriteLine(args.Data);
-            }
-        }
-
-        process.OutputDataReceived += OutputDataReceiver;
-        process.ErrorDataReceived += ErrorDataReceiver;
-
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-        process.StandardInput.Close();
-
-        process.WaitForExit();
-        process.Close();
-
-        return result;
-    }
-
     void CloneRemoteRepoIntoTaut()
     {
-        RunGit("clone", "--bare", _address, _tautDir);
+        gitCli.Execute("clone", "--bare", _address, _tautDir);
     }
 
     void HandleGitCmdList()
@@ -273,59 +256,15 @@ class GitRemoteHelper(ILogger<GitRemoteHelper> logger)
         else
         {
             CloneRemoteRepoIntoTaut();
-            var lines = GetGitOutputLines("--git-dir", _tautDir, "show-ref");
+            var lines = gitCli.GetOutputLines("--git-dir", _tautDir, "show-ref");
             foreach (var line in lines)
             {
-                // logger.ZLogDebug($"output '{line}'");
                 Console.WriteLine(line);
             }
             Console.WriteLine();
         }
 
         // RaiseNotImplemented($"Command '{cmdList}' not implemented");
-    }
-
-    void HandleGitCmdOption(string nameValue)
-    {
-        bool GetBooleanValue(string opt)
-        {
-            return nameValue[(opt.Length + 1)..] == "true";
-        }
-
-        if (nameValue.StartsWith(optVerbosity))
-        {
-            if (int.TryParse(nameValue[(optVerbosity.Length + 1)..], out var value))
-            {
-                _verbosity = value;
-            }
-
-            Console.WriteLine("ok");
-
-            return;
-        }
-
-        if (nameValue.StartsWith(optProgress))
-        {
-            _showProgress = GetBooleanValue(optProgress);
-
-            Console.WriteLine("ok");
-
-            return;
-        }
-
-        if (nameValue.StartsWith(optCloning))
-        {
-            _isCloning = GetBooleanValue(optCloning);
-
-            Console.WriteLine("ok");
-
-            return;
-        }
-
-        // _checkConnectivity = GetBooleanValue("check-connectivity");
-        // _forceUpdate = GetBooleanValue("force");
-
-        Console.WriteLine("unsupported");
     }
 
     [DoesNotReturn]
