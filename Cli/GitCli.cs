@@ -53,14 +53,14 @@ class GitCli(ILogger<GitCli> logger)
 
         Process process = new() { StartInfo = startInfo };
 
-        static void DataReceiver(object sender, DataReceivedEventArgs args)
+        static void ErrorDataReceiver(object sender, DataReceivedEventArgs args)
         {
             if (args.Data is not null)
                 Console.Error.WriteLine(args.Data);
         }
 
-        process.OutputDataReceived += DataReceiver;
-        process.ErrorDataReceived += DataReceiver;
+        // process.OutputDataReceived += OutputDataReceiver; // ignore the output
+        process.ErrorDataReceived += ErrorDataReceiver;
 
         process.Start();
         process.BeginOutputReadLine();

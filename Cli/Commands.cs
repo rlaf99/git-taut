@@ -15,6 +15,16 @@ static class KnownEnvironVars
     internal const string GitAlternateObjectDirectories = "GIT_ALTERNATE_OBJECT_DIRECTORIES";
 }
 
+static class GitRepoLayout
+{
+    internal const string ObjectsDir = "Objects";
+    internal static readonly string ObjectsInfoDir = Path.Join(ObjectsDir, "info");
+    internal static readonly string ObjectsInfoAlternatesFile = Path.Join(
+        ObjectsInfoDir,
+        "alternates"
+    );
+}
+
 internal static class ConfigurationExtensions
 {
     internal static bool GetGitRemoteTautTrace(this IConfiguration config)
@@ -140,9 +150,9 @@ partial class GitRemoteHelper
 {
     string _remote = default!;
     string _address = default!;
-    string _gitDir = default!;
-    string _gitObjectsDir = default!;
-    string _tautDir = default!;
+    string _hostRepoDir = default!;
+    string _hostRepoObjectsDir = default!;
+    string _tautRepoDir = default!;
 
     /// <summary>
     /// Invoked by Git and handle the commands from Git.
@@ -227,40 +237,92 @@ partial class GitRemoteHelper
             RaiseInvalidOperation("Git dir is null");
         }
 
-        _gitDir = gitDir;
+        _hostRepoDir = gitDir;
 
-        _gitObjectsDir = Path.Join(gitDir, objectsDirname);
+        _hostRepoObjectsDir = Path.Join(gitDir, objectsDirname);
 
-        var objDirs = gitCli.AlternateObjectDirectories;
-        gitCli.AlternateObjectDirectories =  [..objDirs, _gitObjectsDir];
-
-        var tautDir = Path.Join(_gitDir, tautDirName);
+        var tautDir = Path.Join(_hostRepoDir, tautDirName);
         Directory.CreateDirectory(tautDir);
 
         logger.ZLogTrace($"Taut dir localtion '{tautDir}'");
 
-        _tautDir = tautDir;
+        _tautRepoDir = tautDir;
     }
 
-    void CloneRemoteRepoIntoTaut()
+    void SetHostRepoObjectsAsAlternate()
     {
-        gitCli.Execute("clone", "--bare", _address, _tautDir);
+        var tautRepoObjectsDir = Path.Join(_tautRepoDir, GitRepoLayout.ObjectsDir);
+
+        var tautRepoObjectsInfoAlternatesFile = Path.Join(
+            _tautRepoDir,
+            GitRepoLayout.ObjectsInfoAlternatesFile
+        );
+
+        var hostObjectsRelativePath = Path.GetRelativePath(tautRepoObjectsDir, _hostRepoObjectsDir);
+
+        using (var writer = File.AppendText(tautRepoObjectsInfoAlternatesFile))
+        {
+            writer.NewLine = "\n";
+            writer.WriteLine(hostObjectsRelativePath);
+        }
+
+        logger.ZLogTrace(
+            $"Append '{hostObjectsRelativePath}' to '{tautRepoObjectsInfoAlternatesFile}'"
+        );
+    }
+
+    void CloneRemoteIntoTaut()
+    {
+        gitCli.Execute("clone", "--bare", _address, _tautRepoDir);
+
+        SetHostRepoObjectsAsAlternate();
+    }
+
+    void InitializeTautRepo()
+    {
+        void RunGitInit()
+        {
+            gitCli.Execute("--git-dir", _tautRepoDir, "init", "--bare");
+
+            logger.ZLogTrace($"Initialized taut repo at '{_tautRepoDir}'");
+        }
+
+        RunGitInit();
+
+        void SetRemote()
+        {
+            gitCli.Execute("--git-dir", _tautRepoDir, "remote", "add", _remote, _address);
+
+            logger.ZLogTrace($"Added remote '{_remote}' = '{_address}'");
+        }
+
+        SetRemote();
+
+        SetHostRepoObjectsAsAlternate();
+
+        void RunGitFetch()
+        {
+            gitCli.Execute("--git-dir", _tautRepoDir, "fetch", "--all");
+        }
+
+        RunGitFetch();
     }
 
     void HandleGitCmdList()
     {
-        if (Directory.EnumerateFileSystemEntries(_tautDir).Any())
+        if (Directory.EnumerateFileSystemEntries(_tautRepoDir).Any())
         {
             RaiseNotImplemented($"taut repo exists");
         }
         else
         {
-            CloneRemoteRepoIntoTaut();
-            var lines = gitCli.GetOutputLines("--git-dir", _tautDir, "show-ref");
-            foreach (var line in lines)
-            {
-                Console.WriteLine(line);
-            }
+            CloneRemoteIntoTaut();
+
+            // var lines = gitCli.GetOutputLines("--git-dir", _tautRepoDir, "show-ref");
+            // foreach (var line in lines)
+            // {
+            //     Console.WriteLine(line);
+            // }
             Console.WriteLine();
         }
 

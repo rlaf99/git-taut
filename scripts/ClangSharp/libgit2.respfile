@@ -1,0 +1,64 @@
+# Run `ClangSharpPInvokeGenerator @path\to\this_file` at the project root
+
+--config
+preview-codegen
+# exclude-using-statics-for-enums
+# exclude-enum-operators
+generate-helper-types
+generate-macro-bindings
+generate-native-bitfield-attribute
+# generate-generic-pointer-wrapper
+# generate-doc-includes
+# generate-tests-xunit
+multi-file
+unix-types
+
+--libraryPath
+# comes with LibGit2Sharp.NativeBinaries 2.0.323
+git2-3f4182d 
+# libgit2
+
+--language
+c
+
+--with-type
+git_repository_init_flag_t=uint
+
+--traverse
+thirdparty/libgit2/include/git2/global.h
+thirdparty/libgit2/include/git2/common.h
+thirdparty/libgit2/include/git2/types.h
+thirdparty/libgit2/include/git2/oid.h
+thirdparty/libgit2/include/git2/buffer.h
+thirdparty/libgit2/include/git2/commit.h
+thirdparty/libgit2/include/git2/repository.h
+thirdparty/libgit2/include/git2/version.h
+
+--file
+thirdparty/libgit2/include/git2.h
+
+# --file-directory
+
+--include-directory
+thirdparty/libgit2/include
+# /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/
+
+# --std
+# c17
+
+--exclude
+GIT_OID_DEFAULT
+
+--methodClassName
+LibGit2Exports
+
+--namespace
+Lg2.Native
+
+--output
+Lg2/Native/
+
+# --test-output
+# Lg2/NativeTests/
+
+# end

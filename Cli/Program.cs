@@ -4,6 +4,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ZLogger;
+using static Lg2.Native.LibGit2Exports;
+
+var rc = git_libgit2_init();
+if (rc < 0)
+{
+    Console.Error.WriteLine($"Failed to initialize libgit2: {rc}");
+    Environment.Exit(1);
+}
 
 const string commandName = "git-remote-taut";
 
@@ -61,3 +69,5 @@ var app = ConsoleApp
 
 app.Add<GitRemoteHelper>();
 app.Run(args);
+
+git_libgit2_shutdown();
