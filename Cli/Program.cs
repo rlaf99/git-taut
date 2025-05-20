@@ -1,4 +1,5 @@
-﻿using ConsoleAppFramework;
+﻿using System.Text;
+using ConsoleAppFramework;
 using Git.Remote.Taut;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -68,6 +69,14 @@ var app = ConsoleApp
     );
 
 app.Add<GitRemoteHelper>();
+app.Add(
+    "--print-info",
+    () =>
+    {
+        var libgit2Version = Encoding.UTF8.GetString(LIBGIT2_VERSION);
+        ConsoleApp.Log($"LibGit2 Version: {libgit2Version}");
+    }
+);
 app.Run(args);
 
 git_libgit2_shutdown();

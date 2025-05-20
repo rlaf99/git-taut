@@ -335,6 +335,273 @@ namespace Lg2.Native
         public static extern int git_repository_commit_parents(git_commitarray* commits, git_repository* repo);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_strarray_dispose(git_strarray* array);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_lookup(git_reference** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_name_to_id(git_oid* @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_dwim(git_reference** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* shorthand);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_symbolic_create_matching(git_reference** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* target, int force, [NativeTypeName("const char *")] sbyte* current_value, [NativeTypeName("const char *")] sbyte* log_message);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_symbolic_create(git_reference** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* target, int force, [NativeTypeName("const char *")] sbyte* log_message);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_create(git_reference** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const git_oid *")] git_oid* id, int force, [NativeTypeName("const char *")] sbyte* log_message);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_create_matching(git_reference** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const git_oid *")] git_oid* id, int force, [NativeTypeName("const git_oid *")] git_oid* current_id, [NativeTypeName("const char *")] sbyte* log_message);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const git_oid *")]
+        public static extern git_oid* git_reference_target([NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const git_oid *")]
+        public static extern git_oid* git_reference_target_peel([NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const char *")]
+        public static extern sbyte* git_reference_symbolic_target([NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern git_reference_t git_reference_type([NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const char *")]
+        public static extern sbyte* git_reference_name([NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_resolve(git_reference** @out, [NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern git_repository* git_reference_owner([NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_symbolic_set_target(git_reference** @out, git_reference* @ref, [NativeTypeName("const char *")] sbyte* target, [NativeTypeName("const char *")] sbyte* log_message);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_set_target(git_reference** @out, git_reference* @ref, [NativeTypeName("const git_oid *")] git_oid* id, [NativeTypeName("const char *")] sbyte* log_message);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_rename(git_reference** new_ref, git_reference* @ref, [NativeTypeName("const char *")] sbyte* new_name, int force, [NativeTypeName("const char *")] sbyte* log_message);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_delete(git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_remove(git_repository* repo, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_list(git_strarray* array, git_repository* repo);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_foreach(git_repository* repo, [NativeTypeName("git_reference_foreach_cb")] delegate* unmanaged[Cdecl]<git_reference*, void*, int> callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_foreach_name(git_repository* repo, [NativeTypeName("git_reference_foreach_name_cb")] delegate* unmanaged[Cdecl]<sbyte*, void*, int> callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_dup(git_reference** dest, git_reference* source);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_reference_free(git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_cmp([NativeTypeName("const git_reference *")] git_reference* ref1, [NativeTypeName("const git_reference *")] git_reference* ref2);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_iterator_new(git_reference_iterator** @out, git_repository* repo);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_iterator_glob_new(git_reference_iterator** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* glob);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_next(git_reference** @out, git_reference_iterator* iter);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_next_name([NativeTypeName("const char **")] sbyte** @out, git_reference_iterator* iter);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_reference_iterator_free(git_reference_iterator* iter);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_foreach_glob(git_repository* repo, [NativeTypeName("const char *")] sbyte* glob, [NativeTypeName("git_reference_foreach_name_cb")] delegate* unmanaged[Cdecl]<sbyte*, void*, int> callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_has_log(git_repository* repo, [NativeTypeName("const char *")] sbyte* refname);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_ensure_log(git_repository* repo, [NativeTypeName("const char *")] sbyte* refname);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_is_branch([NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_is_remote([NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_is_tag([NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_is_note([NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_normalize_name([NativeTypeName("char *")] sbyte* buffer_out, [NativeTypeName("size_t")] nuint buffer_size, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("unsigned int")] uint flags);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_peel(git_object** @out, [NativeTypeName("const git_reference *")] git_reference* @ref, git_object_t type);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reference_name_is_valid(int* valid, [NativeTypeName("const char *")] sbyte* refname);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const char *")]
+        public static extern sbyte* git_reference_shorthand([NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_config_entry_free(git_config_entry* entry);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_find_global(git_buf* @out);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_find_xdg(git_buf* @out);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_find_system(git_buf* @out);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_find_programdata(git_buf* @out);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_open_default(git_config** @out);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_new(git_config** @out);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_add_file_ondisk(git_config* cfg, [NativeTypeName("const char *")] sbyte* path, git_config_level_t level, [NativeTypeName("const git_repository *")] git_repository* repo, int force);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_open_ondisk(git_config** @out, [NativeTypeName("const char *")] sbyte* path);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_open_level(git_config** @out, [NativeTypeName("const git_config *")] git_config* parent, git_config_level_t level);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_open_global(git_config** @out, git_config* config);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_set_writeorder(git_config* cfg, git_config_level_t* levels, [NativeTypeName("size_t")] nuint len);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_snapshot(git_config** @out, git_config* config);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_config_free(git_config* cfg);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_get_entry(git_config_entry** @out, [NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_get_int32([NativeTypeName("int32_t *")] int* @out, [NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_get_int64([NativeTypeName("int64_t *")] long* @out, [NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_get_bool(int* @out, [NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_get_path(git_buf* @out, [NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_get_string([NativeTypeName("const char **")] sbyte** @out, [NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_get_string_buf(git_buf* @out, [NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_get_multivar_foreach([NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* regexp, [NativeTypeName("git_config_foreach_cb")] delegate* unmanaged[Cdecl]<git_config_entry*, void*, int> callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_multivar_iterator_new(git_config_iterator** @out, [NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* regexp);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_next(git_config_entry** entry, git_config_iterator* iter);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_config_iterator_free(git_config_iterator* iter);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_set_int32(git_config* cfg, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("int32_t")] int value);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_set_int64(git_config* cfg, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("int64_t")] long value);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_set_bool(git_config* cfg, [NativeTypeName("const char *")] sbyte* name, int value);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_set_string(git_config* cfg, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* value);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_set_multivar(git_config* cfg, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* regexp, [NativeTypeName("const char *")] sbyte* value);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_delete_entry(git_config* cfg, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_delete_multivar(git_config* cfg, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* regexp);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_foreach([NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("git_config_foreach_cb")] delegate* unmanaged[Cdecl]<git_config_entry*, void*, int> callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_iterator_new(git_config_iterator** @out, [NativeTypeName("const git_config *")] git_config* cfg);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_iterator_glob_new(git_config_iterator** @out, [NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("const char *")] sbyte* regexp);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_foreach_match([NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("const char *")] sbyte* regexp, [NativeTypeName("git_config_foreach_cb")] delegate* unmanaged[Cdecl]<git_config_entry*, void*, int> callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_get_mapped(int* @out, [NativeTypeName("const git_config *")] git_config* cfg, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const git_configmap *")] git_configmap* maps, [NativeTypeName("size_t")] nuint map_n);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_lookup_map_value(int* @out, [NativeTypeName("const git_configmap *")] git_configmap* maps, [NativeTypeName("size_t")] nuint map_n, [NativeTypeName("const char *")] sbyte* value);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_parse_bool(int* @out, [NativeTypeName("const char *")] sbyte* value);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_parse_int32([NativeTypeName("int32_t *")] int* @out, [NativeTypeName("const char *")] sbyte* value);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_parse_int64([NativeTypeName("int64_t *")] long* @out, [NativeTypeName("const char *")] sbyte* value);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_parse_path(git_buf* @out, [NativeTypeName("const char *")] sbyte* value);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_backend_foreach_match(git_config_backend* backend, [NativeTypeName("const char *")] sbyte* regexp, [NativeTypeName("git_config_foreach_cb")] delegate* unmanaged[Cdecl]<git_config_entry*, void*, int> callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_lock(git_transaction** tx, git_config* cfg);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const git_error *")]
+        public static extern git_error* git_error_last();
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_libgit2_init();
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

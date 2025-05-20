@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using ConsoleAppFramework;
+using Lg2.Sharpy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ZLogger;
@@ -23,6 +24,9 @@ static class GitRepoLayout
         ObjectsInfoDir,
         "alternates"
     );
+
+    internal const string Description = "description";
+    internal const string DefaultDescriptionForTautRepo = "git-remote-taut";
 }
 
 internal static class ConfigurationExtensions
@@ -155,7 +159,7 @@ partial class GitRemoteHelper
     string _tautRepoDir = default!;
 
     /// <summary>
-    /// Invoked by Git and handle the commands from Git.
+    /// Invoked by Git and act as a remote helper.
     /// </summary>
     /// <param name="remote">Remote name.</param>
     /// <param name="address">Remote address.</param>
@@ -249,7 +253,7 @@ partial class GitRemoteHelper
         _tautRepoDir = tautDir;
     }
 
-    void SetHostRepoObjectsAsAlternate()
+    void RepoSetAlternateObjects()
     {
         var tautRepoObjectsDir = Path.Join(_tautRepoDir, GitRepoLayout.ObjectsDir);
 
@@ -258,16 +262,33 @@ partial class GitRemoteHelper
             GitRepoLayout.ObjectsInfoAlternatesFile
         );
 
-        var hostObjectsRelativePath = Path.GetRelativePath(tautRepoObjectsDir, _hostRepoObjectsDir);
+        var relPathToHostObjects = Path.GetRelativePath(tautRepoObjectsDir, _hostRepoObjectsDir);
 
         using (var writer = File.AppendText(tautRepoObjectsInfoAlternatesFile))
         {
             writer.NewLine = "\n";
-            writer.WriteLine(hostObjectsRelativePath);
+            writer.WriteLine(relPathToHostObjects);
         }
 
         logger.ZLogTrace(
-            $"Append '{hostObjectsRelativePath}' to '{tautRepoObjectsInfoAlternatesFile}'"
+            $"Append '{relPathToHostObjects}' to '{tautRepoObjectsInfoAlternatesFile}'"
+        );
+    }
+
+    void RepoSetDescription()
+    {
+        var tautRepoDescriptionFile = Path.Join(_tautRepoDir, GitRepoLayout.Description);
+
+        File.Delete(tautRepoDescriptionFile);
+
+        using (var writer = File.AppendText(tautRepoDescriptionFile))
+        {
+            writer.NewLine = "\n";
+            writer.WriteLine(GitRepoLayout.DefaultDescriptionForTautRepo);
+        }
+
+        logger.ZLogTrace(
+            $"Write '{GitRepoLayout.DefaultDescriptionForTautRepo}' to '{tautRepoDescriptionFile}'"
         );
     }
 
@@ -275,7 +296,8 @@ partial class GitRemoteHelper
     {
         gitCli.Execute("clone", "--bare", _address, _tautRepoDir);
 
-        SetHostRepoObjectsAsAlternate();
+        RepoSetAlternateObjects();
+        RepoSetDescription();
     }
 
     void InitializeTautRepo()
@@ -298,7 +320,7 @@ partial class GitRemoteHelper
 
         SetRemote();
 
-        SetHostRepoObjectsAsAlternate();
+        RepoSetAlternateObjects();
 
         void RunGitFetch()
         {
@@ -317,6 +339,10 @@ partial class GitRemoteHelper
         else
         {
             CloneRemoteIntoTaut();
+
+            var tautRepo = Lg2Repository.Open(_tautRepoDir);
+
+            logger.ZLogDebug($"IsBare {tautRepo.IsBare()}");
 
             // var lines = gitCli.GetOutputLines("--git-dir", _tautRepoDir, "show-ref");
             // foreach (var line in lines)
