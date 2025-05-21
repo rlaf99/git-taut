@@ -607,6 +607,172 @@ namespace Lg2.Native
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_libgit2_shutdown();
 
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_new(git_odb** @out);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_open(git_odb** @out, [NativeTypeName("const char *")] sbyte* objects_dir);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_add_disk_alternate(git_odb* odb, [NativeTypeName("const char *")] sbyte* path);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_odb_free(git_odb* db);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_read(git_odb_object** @out, git_odb* db, [NativeTypeName("const git_oid *")] git_oid* id);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_read_prefix(git_odb_object** @out, git_odb* db, [NativeTypeName("const git_oid *")] git_oid* short_id, [NativeTypeName("size_t")] nuint len);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_read_header([NativeTypeName("size_t *")] nuint* len_out, git_object_t* type_out, git_odb* db, [NativeTypeName("const git_oid *")] git_oid* id);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_exists(git_odb* db, [NativeTypeName("const git_oid *")] git_oid* id);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_exists_ext(git_odb* db, [NativeTypeName("const git_oid *")] git_oid* id, [NativeTypeName("unsigned int")] uint flags);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_exists_prefix(git_oid* @out, git_odb* db, [NativeTypeName("const git_oid *")] git_oid* short_id, [NativeTypeName("size_t")] nuint len);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_expand_ids(git_odb* db, git_odb_expand_id* ids, [NativeTypeName("size_t")] nuint count);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_refresh([NativeTypeName("struct git_odb *")] git_odb* db);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_foreach(git_odb* db, [NativeTypeName("git_odb_foreach_cb")] delegate* unmanaged[Cdecl]<git_oid*, void*, int> cb, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_write(git_oid* @out, git_odb* odb, [NativeTypeName("const void *")] void* data, [NativeTypeName("size_t")] nuint len, git_object_t type);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_open_wstream(git_odb_stream** @out, git_odb* db, [NativeTypeName("git_object_size_t")] ulong size, git_object_t type);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_stream_write(git_odb_stream* stream, [NativeTypeName("const char *")] sbyte* buffer, [NativeTypeName("size_t")] nuint len);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_stream_finalize_write(git_oid* @out, git_odb_stream* stream);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_stream_read(git_odb_stream* stream, [NativeTypeName("char *")] sbyte* buffer, [NativeTypeName("size_t")] nuint len);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_odb_stream_free(git_odb_stream* stream);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_open_rstream(git_odb_stream** @out, [NativeTypeName("size_t *")] nuint* len, git_object_t* type, git_odb* db, [NativeTypeName("const git_oid *")] git_oid* oid);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_write_multi_pack_index(git_odb* db);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_hash(git_oid* @out, [NativeTypeName("const void *")] void* data, [NativeTypeName("size_t")] nuint len, git_object_t type);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_hashfile(git_oid* @out, [NativeTypeName("const char *")] sbyte* path, git_object_t type);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_object_dup(git_odb_object** dest, git_odb_object* source);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_odb_object_free(git_odb_object* @object);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const git_oid *")]
+        public static extern git_oid* git_odb_object_id(git_odb_object* @object);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const void *")]
+        public static extern void* git_odb_object_data(git_odb_object* @object);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("size_t")]
+        public static extern nuint git_odb_object_size(git_odb_object* @object);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern git_object_t git_odb_object_type(git_odb_object* @object);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_add_backend(git_odb* odb, git_odb_backend* backend, int priority);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_add_alternate(git_odb* odb, git_odb_backend* backend, int priority);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("size_t")]
+        public static extern nuint git_odb_num_backends(git_odb* odb);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_get_backend(git_odb_backend** @out, git_odb* odb, [NativeTypeName("size_t")] nuint pos);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_set_commit_graph(git_odb* odb, git_commit_graph* cgraph);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_backend_pack(git_odb_backend** @out, [NativeTypeName("const char *")] sbyte* objects_dir);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_backend_one_pack(git_odb_backend** @out, [NativeTypeName("const char *")] sbyte* index_file);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_odb_backend_loose(git_odb_backend** @out, [NativeTypeName("const char *")] sbyte* objects_dir, int compression_level, int do_fsync, [NativeTypeName("unsigned int")] uint dir_mode, [NativeTypeName("unsigned int")] uint file_mode);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_new(git_revwalk** @out, git_repository* repo);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_reset(git_revwalk* walker);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_push(git_revwalk* walk, [NativeTypeName("const git_oid *")] git_oid* id);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_push_glob(git_revwalk* walk, [NativeTypeName("const char *")] sbyte* glob);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_push_head(git_revwalk* walk);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_hide(git_revwalk* walk, [NativeTypeName("const git_oid *")] git_oid* commit_id);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_hide_glob(git_revwalk* walk, [NativeTypeName("const char *")] sbyte* glob);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_hide_head(git_revwalk* walk);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_push_ref(git_revwalk* walk, [NativeTypeName("const char *")] sbyte* refname);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_hide_ref(git_revwalk* walk, [NativeTypeName("const char *")] sbyte* refname);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_next(git_oid* @out, git_revwalk* walk);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_sorting(git_revwalk* walk, [NativeTypeName("unsigned int")] uint sort_mode);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_push_range(git_revwalk* walk, [NativeTypeName("const char *")] sbyte* range);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_simplify_first_parent(git_revwalk* walk);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_revwalk_free(git_revwalk* walk);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern git_repository* git_revwalk_repository(git_revwalk* walk);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_revwalk_add_hide_cb(git_revwalk* walk, [NativeTypeName("git_revwalk_hide_cb")] delegate* unmanaged[Cdecl]<git_oid*, void*, int> hide_cb, void* payload);
+
         [NativeTypeName("#define GIT_WIN32 1")]
         public const int GIT_WIN32 = 1;
 
@@ -639,6 +805,15 @@ namespace Lg2.Native
 
         [NativeTypeName("#define GIT_REPOSITORY_INIT_OPTIONS_VERSION 1")]
         public const int GIT_REPOSITORY_INIT_OPTIONS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_ODB_OPTIONS_VERSION 1")]
+        public const int GIT_ODB_OPTIONS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_ODB_BACKEND_PACK_OPTIONS_VERSION 1")]
+        public const int GIT_ODB_BACKEND_PACK_OPTIONS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_ODB_BACKEND_LOOSE_OPTIONS_VERSION 1")]
+        public const int GIT_ODB_BACKEND_LOOSE_OPTIONS_VERSION = 1;
 
         [NativeTypeName("#define LIBGIT2_VERSION \"1.8.4\"")]
         public static ReadOnlySpan<byte> LIBGIT2_VERSION => "1.8.4"u8;

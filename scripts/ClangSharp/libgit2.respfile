@@ -38,6 +38,9 @@ thirdparty/libgit2/include/git2/refs.h
 thirdparty/libgit2/include/git2/strarray.h
 thirdparty/libgit2/include/git2/config.h
 thirdparty/libgit2/include/git2/errors.h
+thirdparty/libgit2/include/git2/revwalk.h
+thirdparty/libgit2/include/git2/odb.h
+thirdparty/libgit2/include/git2/odb_backend.h
 
 --file
 thirdparty/libgit2/include/git2.h
@@ -53,6 +56,9 @@ thirdparty/libgit2/include
 
 --exclude
 GIT_OID_DEFAULT
+# not used for now
+git_odb_writepack
+git_odb_write_pack
 
 --methodClassName
 LibGit2Exports

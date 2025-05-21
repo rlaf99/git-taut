@@ -330,6 +330,37 @@ partial class GitRemoteHelper
         RunGitFetch();
     }
 
+    void TautRepoConfigHostRepoRefs(Lg2Repository tautRepo)
+    {
+        using var lg2Config = tautRepo.GetConfig();
+        lg2Config.SetString("hostRepo.refs", "dummy");
+    }
+
+    void TautRepoMapObjectsToHostRepo(Lg2Repository tautRepo)
+    {
+        using var lg2RevWalk = tautRepo.NewRevWalk();
+    }
+
+    void TautRepoTransferCommonObjectsToHost(Lg2Repository tautRepo)
+    {
+        using var hostRepoOdb = Lg2Odb.Open(_hostRepoObjectsDir);
+
+        using var revWalk = tautRepo.NewRevWalk();
+
+        var refList = tautRepo.GetRefs();
+        foreach (var refName in refList)
+        {
+            revWalk.PushRef(refName);
+        }
+
+        Lg2Oid oid = new();
+
+        while (revWalk.Next(ref oid))
+        {
+            logger.ZLogDebug($"oid: {oid.ToString()}");
+        }
+    }
+
     void HandleGitCmdList()
     {
         if (Directory.EnumerateFileSystemEntries(_tautRepoDir).Any())
@@ -342,7 +373,20 @@ partial class GitRemoteHelper
 
             var tautRepo = Lg2Repository.Open(_tautRepoDir);
 
-            logger.ZLogDebug($"IsBare {tautRepo.IsBare()}");
+            var refList = tautRepo.GetRefs();
+
+            foreach (var refName in refList)
+            {
+                logger.ZLogDebug($"ref: {refName}");
+            }
+
+            TautRepoConfigHostRepoRefs(tautRepo);
+
+            TautRepoMapObjectsToHostRepo(tautRepo);
+
+            TautRepoTransferCommonObjectsToHost(tautRepo);
+
+            // logger.ZLogDebug($"IsBare {tautRepo.IsBare()}");
 
             // var lines = gitCli.GetOutputLines("--git-dir", _tautRepoDir, "show-ref");
             // foreach (var line in lines)
