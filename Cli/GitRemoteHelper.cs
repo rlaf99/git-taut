@@ -347,7 +347,7 @@ partial class GitRemoteHelper
 
         using var revWalk = tautRepo.NewRevWalk();
 
-        var refList = tautRepo.GetRefs();
+        var refList = tautRepo.GetRefList();
         foreach (var refName in refList)
         {
             revWalk.PushRef(refName);
@@ -358,6 +358,10 @@ partial class GitRemoteHelper
         while (revWalk.Next(ref oid))
         {
             logger.ZLogDebug($"oid: {oid.ToString()}");
+
+            var commit = tautRepo.LookupCommit(ref oid);
+
+            logger.ZLogDebug($"commit summary: {commit.GetSummary()}");
         }
     }
 
@@ -373,7 +377,7 @@ partial class GitRemoteHelper
 
             var tautRepo = Lg2Repository.Open(_tautRepoDir);
 
-            var refList = tautRepo.GetRefs();
+            var refList = tautRepo.GetRefList();
 
             foreach (var refName in refList)
             {

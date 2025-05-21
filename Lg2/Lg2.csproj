@@ -12,7 +12,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="git-remote-taut" />
     <InternalsVisibleTo Include="$(AssemblyName).Tests" />
   </ItemGroup>
 </Project>

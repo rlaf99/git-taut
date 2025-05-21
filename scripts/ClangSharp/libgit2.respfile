@@ -41,6 +41,10 @@ thirdparty/libgit2/include/git2/errors.h
 thirdparty/libgit2/include/git2/revwalk.h
 thirdparty/libgit2/include/git2/odb.h
 thirdparty/libgit2/include/git2/odb_backend.h
+thirdparty/libgit2/include/git2/tree.h
+thirdparty/libgit2/include/git2/blob.h
+thirdparty/libgit2/include/git2/tag.h
+thirdparty/libgit2/include/git2/object.h
 
 --file
 thirdparty/libgit2/include/git2.h
@@ -56,7 +60,7 @@ thirdparty/libgit2/include
 
 --exclude
 GIT_OID_DEFAULT
-# not used for now
+# unused for now
 git_odb_writepack
 git_odb_write_pack
 

@@ -120,28 +120,63 @@ internal sealed unsafe class Lg2StrArray : IDisposable
 
 static unsafe class Lg2StrArrayExtensions { }
 
-internal unsafe class Lg2Config : SafeHandle
+public unsafe interface IReleaseNative<TNative>
+    where TNative : unmanaged
 {
-    internal Lg2Config(git_config* pConfig)
-        : base(nint.Zero, true)
+    static abstract void ReleaseNative(TNative* pNative);
+}
+
+public abstract unsafe class SafeNativePointer<TDerived, TNative> : SafeHandle
+    where TNative : unmanaged
+    where TDerived : IReleaseNative<TNative>
+{
+    public delegate void Release(TNative* pNative);
+
+    internal SafeNativePointer(TNative* pNative)
+        : base(default, true)
     {
-        handle = (nint)pConfig;
+        handle = (nint)pNative;
     }
 
-    public override bool IsInvalid => handle == nint.Zero;
+    public override bool IsInvalid => handle == default;
 
     protected override bool ReleaseHandle()
     {
         if (IsInvalid == false)
         {
-            git_config_free((git_config*)handle);
+            TDerived.ReleaseNative((TNative*)handle);
+            handle = default;
         }
+
         return true;
     }
 
-    internal git_config* Ptr => (git_config*)handle;
+    internal TNative* Ptr => (TNative*)handle;
 
-    internal static Lg2Config New()
+    public void EnsureValid()
+    {
+        if (IsInvalid)
+        {
+            throw new InvalidOperationException(
+                $"The instance of {nameof(TDerived)} is not valide"
+            );
+        }
+    }
+}
+
+public sealed unsafe class Lg2Config
+    : SafeNativePointer<Lg2Config, git_config>,
+        IReleaseNative<git_config>
+{
+    internal Lg2Config(git_config* pNative)
+        : base(pNative) { }
+
+    public static void ReleaseNative(git_config* pNative)
+    {
+        git_config_free(pNative);
+    }
+
+    public static Lg2Config New()
     {
         git_config* pConfig = null;
         var rc = git_config_new(&pConfig);
@@ -151,19 +186,11 @@ internal unsafe class Lg2Config : SafeHandle
     }
 }
 
-internal static unsafe class Lg2ConfigExtensions
+public static unsafe class Lg2ConfigExtensions
 {
-    static void EnsureValidConfig(Lg2Config config)
+    public static void SetString(this Lg2Config config, string name, string value)
     {
-        if (config.IsInvalid)
-        {
-            throw new ArgumentException($"Invalid {nameof(config)}");
-        }
-    }
-
-    internal static void SetString(this Lg2Config config, string name, string value)
-    {
-        EnsureValidConfig(config);
+        config.EnsureValid();
 
         using var u8Name = new Lg2Utf8String(name);
         using var u8Value = new Lg2Utf8String(value);
@@ -173,52 +200,33 @@ internal static unsafe class Lg2ConfigExtensions
     }
 }
 
-internal unsafe class Lg2RevWalk : SafeHandle
+public unsafe class Lg2RevWalk
+    : SafeNativePointer<Lg2RevWalk, git_revwalk>,
+        IReleaseNative<git_revwalk>
 {
-    internal Lg2RevWalk(git_revwalk* pRevWalk)
-        : base(default, true)
+    internal Lg2RevWalk(git_revwalk* pNative)
+        : base(pNative) { }
+
+    public static void ReleaseNative(git_revwalk* pNative)
     {
-        handle = (nint)pRevWalk;
+        git_revwalk_free(pNative);
     }
-
-    public override bool IsInvalid => handle == default;
-
-    protected override bool ReleaseHandle()
-    {
-        if (IsInvalid == false)
-        {
-            git_revwalk_free((git_revwalk*)handle);
-            handle = default;
-        }
-
-        return true;
-    }
-
-    internal git_revwalk* Ptr => (git_revwalk*)handle;
 }
 
-internal static unsafe class Lg2RevWalkExtensions
+public static unsafe class Lg2RevWalkExtensions
 {
-    static void EnsureValidRevWalk(Lg2RevWalk revWalk)
+    public static void PushRef(this Lg2RevWalk revWalk, string refName)
     {
-        if (revWalk.IsInvalid)
-        {
-            throw new ArgumentException($"Invalid {nameof(revWalk)}");
-        }
-    }
-
-    internal static void PushRef(this Lg2RevWalk revWalk, string refName)
-    {
-        EnsureValidRevWalk(revWalk);
+        revWalk.EnsureValid();
 
         using var u8RefName = new Lg2Utf8String(refName);
         var rc = git_revwalk_push_ref(revWalk.Ptr, u8RefName.Ptr);
         Lg2Exception.RaiseIfNotOk(rc);
     }
 
-    internal static bool Next(this Lg2RevWalk revWalk, ref Lg2Oid oid)
+    public static bool Next(this Lg2RevWalk revWalk, ref Lg2Oid oid)
     {
-        EnsureValidRevWalk(revWalk);
+        revWalk.EnsureValid();
 
         var rc = (int)GIT_OK;
         fixed (git_oid* pOid = &oid._raw)
@@ -237,7 +245,7 @@ internal static unsafe class Lg2RevWalkExtensions
 
     internal static void Hide(this Lg2RevWalk revWalk, ref Lg2Oid oid)
     {
-        EnsureValidRevWalk(revWalk);
+        revWalk.EnsureValid();
 
         var rc = (int)GIT_OK;
         fixed (git_oid* pOid = &oid._raw)
@@ -249,7 +257,7 @@ internal static unsafe class Lg2RevWalkExtensions
 
     internal static void AddHideCallback(this Lg2RevWalk revWalk)
     {
-        EnsureValidRevWalk(revWalk);
+        revWalk.EnsureValid();
 
         // TODO
         // git_revwalk_add_hide_cb();
@@ -258,7 +266,9 @@ internal static unsafe class Lg2RevWalkExtensions
     }
 }
 
-internal unsafe ref struct Lg2Oid
+public interface ILg2WithOid { }
+
+public unsafe ref struct Lg2Oid : ILg2WithOid
 {
     internal git_oid _raw;
 
@@ -278,28 +288,17 @@ internal unsafe ref struct Lg2Oid
     }
 }
 
-internal unsafe class Lg2Odb : SafeHandle
+public unsafe class Lg2Odb : SafeNativePointer<Lg2Odb, git_odb>, IReleaseNative<git_odb>
 {
-    Lg2Odb(git_odb* pOdb)
-        : base(default, true)
+    internal Lg2Odb(git_odb* pNative)
+        : base(pNative) { }
+
+    public static unsafe void ReleaseNative(git_odb* pNative)
     {
-        handle = (nint)pOdb;
+        git_odb_free(pNative);
     }
 
-    public override bool IsInvalid => handle == default;
-
-    protected override bool ReleaseHandle()
-    {
-        if (IsInvalid == false)
-        {
-            git_odb_free((git_odb*)handle);
-            handle = default;
-        }
-
-        return true;
-    }
-
-    internal static Lg2Odb Open(string objectsDir)
+    public static Lg2Odb Open(string objectsDir)
     {
         var u8ObjectsDir = new Lg2Utf8String(objectsDir);
 
@@ -310,7 +309,7 @@ internal unsafe class Lg2Odb : SafeHandle
         return new Lg2Odb(pOdb);
     }
 
-    internal static Lg2Odb New()
+    public static Lg2Odb New()
     {
         git_odb* pOdb = null;
         var rc = git_odb_new(&pOdb);
@@ -320,18 +319,97 @@ internal unsafe class Lg2Odb : SafeHandle
     }
 }
 
-internal static unsafe class Lg2OdbExtensions
+public static unsafe class Lg2OdbExtensions { }
+
+public unsafe class Lg2Tree : SafeNativePointer<Lg2Tree, git_tree>, IReleaseNative<git_tree>
 {
-    static void EnsureValidOdb(Lg2Odb odb)
+    internal Lg2Tree(git_tree* pNative)
+        : base(pNative) { }
+
+    public static unsafe void ReleaseNative(git_tree* pNative)
     {
-        if (odb.IsInvalid)
-        {
-            throw new ArgumentException($"Invalid {nameof(odb)}");
-        }
+        git_tree_free(pNative);
     }
 }
 
-internal unsafe class Lg2Utf8String : SafeHandle
+public unsafe class Lg2Commit
+    : SafeNativePointer<Lg2Commit, git_commit>,
+        IReleaseNative<git_commit>,
+        ILg2WithOid
+{
+    internal Lg2Commit(git_commit* pNative)
+        : base(pNative) { }
+
+    public static unsafe void ReleaseNative(git_commit* pNative)
+    {
+        git_commit_free(pNative);
+    }
+}
+
+public static unsafe class Lg2CommitExtensions
+{
+    public static string GetSummary(this Lg2Commit commit)
+    {
+        commit.EnsureValid();
+
+        var summary = git_commit_summary(commit.Ptr);
+        var result = Marshal.PtrToStringUTF8((nint)summary) ?? string.Empty;
+
+        return result;
+    }
+}
+
+public unsafe class Lg2Blob
+    : SafeNativePointer<Lg2Blob, git_blob>,
+        IReleaseNative<git_blob>,
+        ILg2WithOid
+{
+    internal Lg2Blob(git_blob* pNative)
+        : base(pNative) { }
+
+    public static unsafe void ReleaseNative(git_blob* pNative)
+    {
+        git_blob_free(pNative);
+    }
+}
+
+public unsafe class Lg2Tag
+    : SafeNativePointer<Lg2Tag, git_tag>,
+        IReleaseNative<git_tag>,
+        ILg2WithOid
+{
+    internal Lg2Tag(git_tag* pNative)
+        : base(pNative) { }
+
+    public static unsafe void ReleaseNative(git_tag* pNative)
+    {
+        git_tag_free(pNative);
+    }
+}
+
+public unsafe class Lg2Object
+    : SafeNativePointer<Lg2Object, git_object>,
+        IReleaseNative<git_object>,
+        ILg2WithOid
+{
+    internal Lg2Object(git_object* pNative)
+        : base(pNative) { }
+
+    public static unsafe void ReleaseNative(git_object* pNative)
+    {
+        git_object_free(pNative);
+    }
+}
+
+public static unsafe class Lg2ObjectExtensions
+{
+    // public static void Id(this Lg2Object obj)
+    // {
+    //     git_object_id(obj.Ptr);
+    // }
+}
+
+public unsafe class Lg2Utf8String : SafeHandle
 {
     internal Lg2Utf8String(string source)
         : base(nint.Zero, true)
