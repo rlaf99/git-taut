@@ -33,7 +33,7 @@ public unsafe class Lg2Repository
 
 public static unsafe class Lg2RepositoryExtensions
 {
-    public static bool GetIsBare(this Lg2Repository repo)
+    public static bool IsBare(this Lg2Repository repo)
     {
         repo.EnsureValid();
 
@@ -65,6 +65,17 @@ public static unsafe class Lg2RepositoryExtensions
         return new Lg2Config(pConfig);
     }
 
+    public static Lg2Odb GetOdb(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        git_odb* pOdb = null;
+        var rc = git_repository_odb(&pOdb, repo.Ptr);
+        Lg2Exception.RaiseIfNotOk(rc);
+
+        return new(pOdb);
+    }
+
     public static Lg2RevWalk NewRevWalk(this Lg2Repository repo)
     {
         repo.EnsureValid();
@@ -76,19 +87,62 @@ public static unsafe class Lg2RepositoryExtensions
         return new Lg2RevWalk(pRevWalk);
     }
 
+    public static Lg2Object LookupObject(
+        this Lg2Repository repo,
+        ILg2WithOid oid,
+        Lg2ObjectType objType
+    )
+    {
+        repo.EnsureValid();
+
+        var oidRef = oid.GetOidPlainRef();
+
+        git_object* pObj = null;
+        var rc = git_object_lookup(&pObj, repo.Ptr, oidRef.Ptr, (git_object_t)objType);
+        Lg2Exception.RaiseIfNotOk(rc);
+
+        return new(pObj);
+    }
+
     public static Lg2Tree LookupTree(this Lg2Repository repo, ref Lg2Oid oid)
     {
         repo.EnsureValid();
 
         git_tree* pTree = null;
         var rc = (int)GIT_OK;
-        fixed (git_oid* git_oid = &oid._raw)
+        fixed (git_oid* pOid = &oid._raw)
         {
-            rc = git_tree_lookup(&pTree, repo.Ptr, git_oid);
+            rc = git_tree_lookup(&pTree, repo.Ptr, pOid);
         }
         Lg2Exception.RaiseIfNotOk(rc);
 
         return new Lg2Tree(pTree);
+    }
+
+    public static Lg2Tree LookupTree(this Lg2Repository repo, ILg2WithOid oid)
+    {
+        repo.EnsureValid();
+
+        var oidPlainRef = oid.GetOidPlainRef();
+
+        git_tree* pTree = null;
+        var rc = (int)GIT_OK;
+        rc = git_tree_lookup(&pTree, repo.Ptr, oidPlainRef.Ptr);
+        Lg2Exception.RaiseIfNotOk(rc);
+
+        return new Lg2Tree(pTree);
+    }
+
+    public static Lg2Blob LookupBlob(this Lg2Repository repo, ILg2WithOid oid)
+    {
+        var oidPlainRef = oid.GetOidPlainRef();
+
+        git_blob* pBlob = null;
+        var rc = (int)GIT_OK;
+        rc = git_blob_lookup(&pBlob, repo.Ptr, oidPlainRef.Ptr);
+        Lg2Exception.RaiseIfNotOk(rc);
+
+        return new Lg2Blob(pBlob);
     }
 
     public static Lg2Commit LookupCommit(this Lg2Repository repo, ref Lg2Oid oid)

@@ -343,6 +343,7 @@ partial class GitRemoteHelper
 
     void TautRepoTransferCommonObjectsToHost(Lg2Repository tautRepo)
     {
+        using var tautRepoOdb = tautRepo.GetOdb();
         using var hostRepoOdb = Lg2Odb.Open(_hostRepoObjectsDir);
 
         using var revWalk = tautRepo.NewRevWalk();
@@ -362,6 +363,56 @@ partial class GitRemoteHelper
             var commit = tautRepo.LookupCommit(ref oid);
 
             logger.ZLogDebug($"commit summary: {commit.GetSummary()}");
+
+            var rootTree = commit.GetTree();
+
+            Queue<Lg2Tree> unprocessed = new();
+            unprocessed.Enqueue(rootTree);
+
+            while (unprocessed.Count > 0)
+            {
+                var tree = unprocessed.Dequeue();
+
+                for (nuint idx = 0; idx < tree.GetEntryCount(); idx++)
+                {
+                    var entry = tree.GetEntryByIndex(idx);
+                    var entryName = entry.GetName();
+                    var entryOidText = entry.GetOidString();
+
+                    logger.ZLogDebug($"{entryName}");
+
+                    var objType = entry.GetObjectType();
+                    if (objType.IsValid() == false)
+                    {
+                        logger.ZLogWarning(
+                            $"Invalid object type {objType.ToString()} for tree entry '{entryName}"
+                        );
+                    }
+                    if (!hostRepoOdb.ExistsExt(entry, Lg2OdbLookupFlags.LG2_ODB_LOOKUP_NO_REFRESH))
+                    {
+                        var odbObj = tautRepoOdb.Read(entry);
+                        hostRepoOdb.Write(odbObj.GetRawData(), objType);
+
+                        logger.ZLogTrace($"Write object {entryOidText} to host repo");
+                    }
+
+                    // switch (objType)
+                    // {
+                    //     case Lg2ObjectType.LG2_OBJECT_TREE:
+                    //         var treeEntry = tautRepo.LookupTree(entry);
+                    //         unprocessed.Enqueue(treeEntry);
+                    //         break;
+                    //     case Lg2ObjectType.LG2_OBJECT_BLOB:
+                    //         var blobEntry = tautRepo.LookupBlob(entry);
+                    //         logger.ZLogDebug($"rawSize: {blobEntry.GetRawSize()}");
+                    //         break;
+                    //     default:
+                    //         logger.ZLogDebug($"Unexpcted object type {objType}");
+                    //         break;
+                    //         // throw new InvalidProgramException($"Unexpcted object type {objType}");
+                    // }
+                }
+            }
         }
     }
 
@@ -390,6 +441,9 @@ partial class GitRemoteHelper
 
             TautRepoTransferCommonObjectsToHost(tautRepo);
 
+            logger.ZLogDebug($"TautRepoTransferCommonObjectsToHost done");
+
+            Thread.Sleep(100); // for zlogger to flush
             // logger.ZLogDebug($"IsBare {tautRepo.IsBare()}");
 
             // var lines = gitCli.GetOutputLines("--git-dir", _tautRepoDir, "show-ref");
