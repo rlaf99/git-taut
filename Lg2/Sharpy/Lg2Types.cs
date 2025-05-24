@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.git_error_code;
@@ -121,50 +120,8 @@ internal sealed unsafe class Lg2StrArray : IDisposable
 
 static unsafe class Lg2StrArrayExtensions { }
 
-public unsafe interface IReleaseNative<TNative>
-    where TNative : unmanaged
-{
-    static abstract void ReleaseNative(TNative* pNative);
-}
-
-public abstract unsafe class SafeNativePointer<TDerived, TNative> : SafeHandle
-    where TNative : unmanaged
-    where TDerived : IReleaseNative<TNative>
-{
-    public delegate void Release(TNative* pNative);
-
-    internal SafeNativePointer(TNative* pNative)
-        : base(default, true)
-    {
-        handle = (nint)pNative;
-    }
-
-    public override bool IsInvalid => handle == default;
-
-    protected override bool ReleaseHandle()
-    {
-        if (IsInvalid == false)
-        {
-            TDerived.ReleaseNative((TNative*)handle);
-            handle = default;
-        }
-
-        return true;
-    }
-
-    internal TNative* Ptr => (TNative*)handle;
-
-    public void EnsureValid()
-    {
-        if (IsInvalid)
-        {
-            throw new InvalidOperationException($"The instance of {nameof(TDerived)} is not valid");
-        }
-    }
-}
-
 public sealed unsafe class Lg2Config
-    : SafeNativePointer<Lg2Config, git_config>,
+    : NativeSafePointer<Lg2Config, git_config>,
         IReleaseNative<git_config>
 {
     internal Lg2Config(git_config* pNative)
@@ -200,7 +157,7 @@ public static unsafe class Lg2ConfigExtensions
 }
 
 public unsafe class Lg2RevWalk
-    : SafeNativePointer<Lg2RevWalk, git_revwalk>,
+    : NativeSafePointer<Lg2RevWalk, git_revwalk>,
         IReleaseNative<git_revwalk>
 {
     internal Lg2RevWalk(git_revwalk* pNative)
@@ -275,43 +232,29 @@ public readonly unsafe ref struct Lg2OidPlainRef
     }
 }
 
-public interface ILg2WithOid
+public interface ILg2GetOidPlainRef
 {
     Lg2OidPlainRef GetOidPlainRef();
 }
 
-public static unsafe class Lg2WithOidExtensions
+public static unsafe class Lg2objLikeExtensions
 {
-    public static string GetOidString(this ILg2WithOid oid)
+    public static string GetOidString(this ILg2GetOidPlainRef objLike)
     {
-        var oidRef = oid.GetOidPlainRef();
+        var oidRef = objLike.GetOidPlainRef();
         return Lg2Oid.ToString(oidRef.Ptr);
     }
 }
 
-public unsafe class Lg2OidOwnedRef<TOwner> : ILg2WithOid
+public unsafe class Lg2OidOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_oid>, ILg2GetOidPlainRef
     where TOwner : class
 {
-    readonly WeakReference<TOwner> _ownerWeakRef;
-    readonly git_oid* _pOid;
-
-    internal Lg2OidOwnedRef(TOwner owner, git_oid* pOid)
-    {
-        _ownerWeakRef = new WeakReference<TOwner>(owner);
-        _pOid = pOid;
-    }
+    internal Lg2OidOwnedRef(TOwner owner, git_oid* pNative)
+        : base(owner, pNative) { }
 
     public Lg2OidPlainRef GetOidPlainRef()
     {
-        return new Lg2OidPlainRef(_pOid);
-    }
-
-    void EnsureValid()
-    {
-        if (_ownerWeakRef.TryGetTarget(out _) == false)
-        {
-            throw new InvalidOperationException($"The instance of {nameof(TOwner)} is not valid");
-        }
+        return new Lg2OidPlainRef(_pNative);
     }
 }
 
@@ -327,11 +270,35 @@ public unsafe ref struct Lg2Oid
         }
     }
 
+    public string ToPartialString(int size)
+    {
+        fixed (git_oid* pOid = &_raw)
+        {
+            return ToPartialString(pOid, size);
+        }
+    }
+
     public static string ToString(git_oid* pOid)
     {
         var buf = stackalloc sbyte[GIT_OID_MAX_HEXSIZE + 1];
-        var rc = (int)GIT_OK;
-        rc = git_oid_fmt(buf, pOid);
+        var rc = git_oid_fmt(buf, pOid);
+        Lg2Exception.RaiseIfNotOk(rc);
+
+        var result = Marshal.PtrToStringUTF8((nint)buf) ?? string.Empty;
+
+        return result;
+    }
+
+    public static string ToPartialString(git_oid* pOid, int size)
+    {
+        if (size > GIT_OID_MAX_HEXSIZE)
+        {
+            throw new ArgumentException($"Value too large", nameof(size));
+        }
+
+        var buf = stackalloc sbyte[size + 1];
+
+        var rc = git_oid_nfmt(buf, (nuint)size, pOid);
         Lg2Exception.RaiseIfNotOk(rc);
 
         var result = Marshal.PtrToStringUTF8((nint)buf) ?? string.Empty;
@@ -347,9 +314,9 @@ public unsafe ref struct Lg2RawData
 }
 
 public unsafe class Lg2OdbObject
-    : SafeNativePointer<Lg2OdbObject, git_odb_object>,
+    : NativeSafePointer<Lg2OdbObject, git_odb_object>,
         IReleaseNative<git_odb_object>,
-        ILg2WithOid
+        ILg2GetOidPlainRef
 {
     internal Lg2OdbObject(git_odb_object* pNative)
         : base(pNative) { }
@@ -395,7 +362,7 @@ public static unsafe class Lg2OdbObjectExtensions
     }
 }
 
-public unsafe class Lg2Odb : SafeNativePointer<Lg2Odb, git_odb>, IReleaseNative<git_odb>
+public unsafe class Lg2Odb : NativeSafePointer<Lg2Odb, git_odb>, IReleaseNative<git_odb>
 {
     internal Lg2Odb(git_odb* pNative)
         : base(pNative) { }
@@ -436,22 +403,26 @@ public static unsafe class Lg2OdbExtenions
         Lg2Exception.RaiseIfNotOk(rc);
     }
 
-    public static bool Exists(this Lg2Odb odb, ILg2WithOid oid)
+    public static bool Exists(this Lg2Odb odb, ILg2GetOidPlainRef objLike)
     {
         odb.EnsureValid();
 
-        var plainRef = oid.GetOidPlainRef();
-        var val = git_odb_exists(odb.Ptr, plainRef.Ptr);
+        var oidRef = objLike.GetOidPlainRef();
+        var val = git_odb_exists(odb.Ptr, oidRef.Ptr);
 
         return val != 0;
     }
 
-    public static bool ExistsExt(this Lg2Odb odb, ILg2WithOid oid, Lg2OdbLookupFlags flags)
+    public static bool ExistsExt(
+        this Lg2Odb odb,
+        ILg2GetOidPlainRef objLike,
+        Lg2OdbLookupFlags flags
+    )
     {
         odb.EnsureValid();
 
-        var plainRef = oid.GetOidPlainRef();
-        var val = git_odb_exists_ext(odb.Ptr, plainRef.Ptr, (uint)flags);
+        var oidRef = objLike.GetOidPlainRef();
+        var val = git_odb_exists_ext(odb.Ptr, oidRef.Ptr, (uint)flags);
 
         return val != 0;
     }
@@ -471,11 +442,11 @@ public static unsafe class Lg2OdbExtenions
         return new(pOdbObject);
     }
 
-    public static Lg2OdbObject Read(this Lg2Odb odb, ILg2WithOid oid)
+    public static Lg2OdbObject Read(this Lg2Odb odb, ILg2GetOidPlainRef objLike)
     {
         odb.EnsureValid();
 
-        var oidRef = oid.GetOidPlainRef();
+        var oidRef = objLike.GetOidPlainRef();
         git_odb_object* pOdbObject = null;
         var rc = git_odb_read(&pOdbObject, odb.Ptr, oidRef.Ptr);
         Lg2Exception.RaiseIfNotOk(rc);
@@ -494,22 +465,40 @@ public static unsafe class Lg2OdbExtenions
         return oid;
     }
 
-    // public static Lg2Oid Write(this Lg2Odb odb, void* pData, nuint size, Lg2ObjectType objType)
-    // {
-    //     odb.EnsureValid();
+    public static bool TryCopyObjectToAnother(
+        this Lg2Odb thisOdb,
+        Lg2Odb thatOdb,
+        ILg2GetOidPlainRef objLike,
+        bool refreshThatOdb = false
+    )
+    {
+        bool alreadyExists;
 
-    //     Lg2Oid oid = new();
-    //     var rc = git_odb_write(&oid._raw, odb.Ptr, pData, size, (git_object_t)objType);
-    //     Lg2Exception.RaiseIfNotOk(rc);
+        if (refreshThatOdb)
+        {
+            alreadyExists = thatOdb.Exists(objLike);
+        }
+        else
+        {
+            alreadyExists = thatOdb.ExistsExt(objLike, Lg2OdbLookupFlags.LG2_ODB_LOOKUP_NO_REFRESH);
+        }
 
-    //     return oid;
-    // }
+        if (alreadyExists)
+        {
+            return false;
+        }
+
+        var odbObject = thisOdb.Read(objLike);
+        thatOdb.Write(odbObject.GetRawData(), odbObject.GetObjectType());
+
+        return true;
+    }
 }
 
 public unsafe class Lg2Commit
-    : SafeNativePointer<Lg2Commit, git_commit>,
+    : NativeSafePointer<Lg2Commit, git_commit>,
         IReleaseNative<git_commit>,
-        ILg2WithOid
+        ILg2GetOidPlainRef
 {
     internal Lg2Commit(git_commit* pNative)
         : base(pNative) { }
@@ -554,9 +543,9 @@ public static unsafe class Lg2CommitExtensions
 }
 
 public unsafe class Lg2Blob
-    : SafeNativePointer<Lg2Blob, git_blob>,
+    : NativeSafePointer<Lg2Blob, git_blob>,
         IReleaseNative<git_blob>,
-        ILg2WithOid
+        ILg2GetOidPlainRef
 {
     internal Lg2Blob(git_blob* pNative)
         : base(pNative) { }
@@ -607,9 +596,9 @@ public static unsafe class Lg2BlobExtensions
 }
 
 public unsafe class Lg2Tag
-    : SafeNativePointer<Lg2Tag, git_tag>,
+    : NativeSafePointer<Lg2Tag, git_tag>,
         IReleaseNative<git_tag>,
-        ILg2WithOid
+        ILg2GetOidPlainRef
 {
     internal Lg2Tag(git_tag* pNative)
         : base(pNative) { }
@@ -629,9 +618,9 @@ public unsafe class Lg2Tag
 }
 
 public unsafe class Lg2Object
-    : SafeNativePointer<Lg2Object, git_object>,
+    : NativeSafePointer<Lg2Object, git_object>,
         IReleaseNative<git_object>,
-        ILg2WithOid
+        ILg2GetOidPlainRef
 {
     internal Lg2Object(git_object* pNative)
         : base(pNative) { }

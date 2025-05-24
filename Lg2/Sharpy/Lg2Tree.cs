@@ -4,14 +4,14 @@ using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
 
-public interface ILg2TreeEntry : ILg2WithOid
+public interface ILg2TreeEntry : ILg2GetOidPlainRef
 {
     string GetName();
     Lg2ObjectType GetObjectType();
 }
 
 public unsafe class Lg2TreeEntry
-    : SafeNativePointer<Lg2TreeEntry, git_tree_entry>,
+    : NativeSafePointer<Lg2TreeEntry, git_tree_entry>,
         IReleaseNative<git_tree_entry>,
         ILg2TreeEntry
 {
@@ -47,24 +47,20 @@ public unsafe class Lg2TreeEntry
     }
 }
 
-public unsafe class Lg2TreeEntryRef : ILg2TreeEntry
+public readonly unsafe ref struct Lg2TreeEntryPlainRef : ILg2TreeEntry
 {
-    readonly WeakReference<Lg2Tree> _treeWeakRef;
-    readonly git_tree_entry* _pEntry;
+    internal readonly git_tree_entry* Ptr;
 
-    internal Lg2TreeEntryRef(Lg2Tree tree, git_tree_entry* pEntry)
+    internal Lg2TreeEntryPlainRef(git_tree_entry* pEntry)
     {
-        _treeWeakRef = new WeakReference<Lg2Tree>(tree);
-        _pEntry = pEntry;
+        Ptr = pEntry;
     }
 
     void EnsureValid()
     {
-        if (_treeWeakRef.TryGetTarget(out _) == false)
+        if (Ptr == default)
         {
-            throw new InvalidOperationException(
-                $"The instance of {nameof(git_tree_entry)} is not valid"
-            );
+            throw new InvalidOperationException($"Invalid {nameof(Lg2TreeEntryPlainRef)}");
         }
     }
 
@@ -72,7 +68,7 @@ public unsafe class Lg2TreeEntryRef : ILg2TreeEntry
     {
         EnsureValid();
 
-        var pOid = git_tree_entry_id(_pEntry);
+        var pOid = git_tree_entry_id(Ptr);
 
         return new Lg2OidPlainRef(pOid);
     }
@@ -81,14 +77,43 @@ public unsafe class Lg2TreeEntryRef : ILg2TreeEntry
     {
         EnsureValid();
 
-        return Lg2TreeEntryExtensions.GetName(_pEntry);
+        return Lg2TreeEntryExtensions.GetName(Ptr);
     }
 
     public Lg2ObjectType GetObjectType()
     {
         EnsureValid();
 
-        return Lg2TreeEntryExtensions.GetType(_pEntry);
+        return Lg2TreeEntryExtensions.GetType(Ptr);
+    }
+}
+
+public unsafe class Lg2TreeEntryOwnedRef : NativeOwnedRef<Lg2Tree, git_tree_entry>, ILg2TreeEntry
+{
+    internal Lg2TreeEntryOwnedRef(Lg2Tree owner, git_tree_entry* pNative)
+        : base(owner, pNative) { }
+
+    public Lg2OidPlainRef GetOidPlainRef()
+    {
+        EnsureValid();
+
+        var pOid = git_tree_entry_id(_pNative);
+
+        return new Lg2OidPlainRef(pOid);
+    }
+
+    public string GetName()
+    {
+        EnsureValid();
+
+        return Lg2TreeEntryExtensions.GetName(_pNative);
+    }
+
+    public Lg2ObjectType GetObjectType()
+    {
+        EnsureValid();
+
+        return Lg2TreeEntryExtensions.GetType(_pNative);
     }
 }
 
@@ -106,7 +131,10 @@ public static unsafe class Lg2TreeEntryExtensions
     }
 }
 
-public unsafe class Lg2Tree : SafeNativePointer<Lg2Tree, git_tree>, IReleaseNative<git_tree>
+public unsafe class Lg2Tree
+    : NativeSafePointer<Lg2Tree, git_tree>,
+        IReleaseNative<git_tree>,
+        ILg2GetOidPlainRef
 {
     internal Lg2Tree(git_tree* pNative)
         : base(pNative) { }
@@ -115,17 +143,53 @@ public unsafe class Lg2Tree : SafeNativePointer<Lg2Tree, git_tree>, IReleaseNati
     {
         git_tree_free(pNative);
     }
+
+    public Lg2OidPlainRef GetOidPlainRef()
+    {
+        EnsureValid();
+
+        var pOid = git_tree_id(Ptr);
+
+        return new(pOid);
+    }
 }
 
 public static unsafe class Lg2TreeExtensions
 {
-    public static void EnsureValidIndex(this Lg2Tree tree, nuint index)
+    public static unsafe IEnumerator<Lg2TreeEntryOwnedRef> GetEnumerator(this Lg2Tree tree)
     {
-        var count = git_tree_entrycount(tree.Ptr);
-        if (index >= count)
+        tree.EnsureValid();
+
+        Lg2TreeEntryOwnedRef? ownedRef = null;
+
+        for (nuint idx = 0; idx < tree.GetEntryCount(); idx++)
         {
-            throw new ArgumentException($"Invalid {nameof(index)}");
+            unsafe
+            {
+                var pEntry = git_tree_entry_byindex(tree.Ptr, idx);
+                if (pEntry is null)
+                {
+                    throw new ArgumentException($"Invalid {nameof(idx)}");
+                }
+
+                ownedRef = new(tree, pEntry);
+            }
+
+            yield return ownedRef;
         }
+    }
+
+    public static unsafe Lg2TreeEntryPlainRef GetEntryPlainRefByIndex(this Lg2Tree tree, nuint idx)
+    {
+        tree.EnsureValid();
+
+        var pEntry = git_tree_entry_byindex(tree.Ptr, idx);
+        if (pEntry is null)
+        {
+            throw new ArgumentException($"Invalid {nameof(idx)}");
+        }
+
+        return new(pEntry);
     }
 
     public static nuint GetEntryCount(this Lg2Tree tree)
@@ -145,7 +209,7 @@ public static unsafe class Lg2TreeExtensions
             throw new ArgumentException($"Invalid {nameof(index)}");
         }
 
-        return new Lg2TreeEntryRef(tree, pEntry);
+        return new Lg2TreeEntryOwnedRef(tree, pEntry);
     }
 
     public static ILg2TreeEntry GetEntryByName(this Lg2Tree tree, string name)
@@ -160,6 +224,6 @@ public static unsafe class Lg2TreeExtensions
             throw new ArgumentException($"Invalid {nameof(name)}");
         }
 
-        return new Lg2TreeEntryRef(tree, pEntry);
+        return new Lg2TreeEntryOwnedRef(tree, pEntry);
     }
 }

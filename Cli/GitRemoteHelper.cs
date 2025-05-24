@@ -1,54 +1,12 @@
 using System.Diagnostics.CodeAnalysis;
 using ConsoleAppFramework;
 using Lg2.Sharpy;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
 namespace Git.Remote.Taut;
 
-static class KnownEnvironVars
-{
-    internal const string GitDir = "GIT_DIR";
-
-    internal const string GitRemoteTautTrace = "GIT_REMOTE_TAUT_TRACE";
-
-    internal const string GitAlternateObjectDirectories = "GIT_ALTERNATE_OBJECT_DIRECTORIES";
-}
-
-static class GitRepoLayout
-{
-    internal const string ObjectsDir = "Objects";
-    internal static readonly string ObjectsInfoDir = Path.Join(ObjectsDir, "info");
-    internal static readonly string ObjectsInfoAlternatesFile = Path.Join(
-        ObjectsInfoDir,
-        "alternates"
-    );
-
-    internal const string Description = "description";
-    internal const string DefaultDescriptionForTautRepo = "git-remote-taut";
-}
-
-internal static class ConfigurationExtensions
-{
-    internal static bool GetGitRemoteTautTrace(this IConfiguration config)
-    {
-        var val = config[KnownEnvironVars.GitRemoteTautTrace];
-        if (val is null)
-        {
-            return false;
-        }
-
-        if (val == "0" || val.Equals("false", StringComparison.InvariantCultureIgnoreCase))
-        {
-            return false;
-        }
-
-        return true;
-    }
-}
-
-partial class GitRemoteHelper(GitCli gitCli, ILogger<GitRemoteHelper> logger)
+partial class GitRemoteHelper(ILogger<GitRemoteHelper> logger, GitCli gitCli, TautRepo tautRepo)
 {
     // for pushing
     const string capPush = "push";
@@ -68,7 +26,6 @@ partial class GitRemoteHelper(GitCli gitCli, ILogger<GitRemoteHelper> logger)
     const string cmdFetch = "fetch";
     const string cmdOption = "option";
 
-    const string objectsDirname = "objects";
     const string tautDirName = "taut";
 }
 
@@ -155,7 +112,6 @@ partial class GitRemoteHelper
     string _remote = default!;
     string _address = default!;
     string _hostRepoDir = default!;
-    string _hostRepoObjectsDir = default!;
     string _tautRepoDir = default!;
 
     /// <summary>
@@ -243,177 +199,25 @@ partial class GitRemoteHelper
 
         _hostRepoDir = gitDir;
 
-        _hostRepoObjectsDir = Path.Join(gitDir, objectsDirname);
-
         var tautDir = Path.Join(_hostRepoDir, tautDirName);
         Directory.CreateDirectory(tautDir);
 
-        logger.ZLogTrace($"Taut dir localtion '{tautDir}'");
+        logger.ZLogTrace($"Taut dir locates at '{tautDir}'");
 
         _tautRepoDir = tautDir;
     }
 
-    void RepoSetAlternateObjects()
-    {
-        var tautRepoObjectsDir = Path.Join(_tautRepoDir, GitRepoLayout.ObjectsDir);
-
-        var tautRepoObjectsInfoAlternatesFile = Path.Join(
-            _tautRepoDir,
-            GitRepoLayout.ObjectsInfoAlternatesFile
-        );
-
-        var relPathToHostObjects = Path.GetRelativePath(tautRepoObjectsDir, _hostRepoObjectsDir);
-
-        using (var writer = File.AppendText(tautRepoObjectsInfoAlternatesFile))
-        {
-            writer.NewLine = "\n";
-            writer.WriteLine(relPathToHostObjects);
-        }
-
-        logger.ZLogTrace(
-            $"Append '{relPathToHostObjects}' to '{tautRepoObjectsInfoAlternatesFile}'"
-        );
-    }
-
-    void RepoSetDescription()
-    {
-        var tautRepoDescriptionFile = Path.Join(_tautRepoDir, GitRepoLayout.Description);
-
-        File.Delete(tautRepoDescriptionFile);
-
-        using (var writer = File.AppendText(tautRepoDescriptionFile))
-        {
-            writer.NewLine = "\n";
-            writer.WriteLine(GitRepoLayout.DefaultDescriptionForTautRepo);
-        }
-
-        logger.ZLogTrace(
-            $"Write '{GitRepoLayout.DefaultDescriptionForTautRepo}' to '{tautRepoDescriptionFile}'"
-        );
-    }
-
-    void CloneRemoteIntoTaut()
+    TautRepo CloneRemoteIntoTaut()
     {
         gitCli.Execute("clone", "--bare", _address, _tautRepoDir);
 
-        RepoSetAlternateObjects();
-        RepoSetDescription();
-    }
+        tautRepo.Open(_tautRepoDir);
 
-    void InitializeTautRepo()
-    {
-        void RunGitInit()
-        {
-            gitCli.Execute("--git-dir", _tautRepoDir, "init", "--bare");
+        tautRepo.SetDescription();
+        tautRepo.AddHostObjects();
+        tautRepo.SetHostRepoRefs();
 
-            logger.ZLogTrace($"Initialized taut repo at '{_tautRepoDir}'");
-        }
-
-        RunGitInit();
-
-        void SetRemote()
-        {
-            gitCli.Execute("--git-dir", _tautRepoDir, "remote", "add", _remote, _address);
-
-            logger.ZLogTrace($"Added remote '{_remote}' = '{_address}'");
-        }
-
-        SetRemote();
-
-        RepoSetAlternateObjects();
-
-        void RunGitFetch()
-        {
-            gitCli.Execute("--git-dir", _tautRepoDir, "fetch", "--all");
-        }
-
-        RunGitFetch();
-    }
-
-    void TautRepoConfigHostRepoRefs(Lg2Repository tautRepo)
-    {
-        using var lg2Config = tautRepo.GetConfig();
-        lg2Config.SetString("hostRepo.refs", "dummy");
-    }
-
-    void TautRepoMapObjectsToHostRepo(Lg2Repository tautRepo)
-    {
-        using var lg2RevWalk = tautRepo.NewRevWalk();
-    }
-
-    void TautRepoTransferCommonObjectsToHost(Lg2Repository tautRepo)
-    {
-        using var tautRepoOdb = tautRepo.GetOdb();
-        using var hostRepoOdb = Lg2Odb.Open(_hostRepoObjectsDir);
-
-        using var revWalk = tautRepo.NewRevWalk();
-
-        var refList = tautRepo.GetRefList();
-        foreach (var refName in refList)
-        {
-            revWalk.PushRef(refName);
-        }
-
-        Lg2Oid oid = new();
-
-        while (revWalk.Next(ref oid))
-        {
-            logger.ZLogDebug($"oid: {oid.ToString()}");
-
-            var commit = tautRepo.LookupCommit(ref oid);
-
-            logger.ZLogDebug($"commit summary: {commit.GetSummary()}");
-
-            var rootTree = commit.GetTree();
-
-            Queue<Lg2Tree> unprocessed = new();
-            unprocessed.Enqueue(rootTree);
-
-            while (unprocessed.Count > 0)
-            {
-                var tree = unprocessed.Dequeue();
-
-                for (nuint idx = 0; idx < tree.GetEntryCount(); idx++)
-                {
-                    var entry = tree.GetEntryByIndex(idx);
-                    var entryName = entry.GetName();
-                    var entryOidText = entry.GetOidString();
-
-                    logger.ZLogDebug($"{entryName}");
-
-                    var objType = entry.GetObjectType();
-                    if (objType.IsValid() == false)
-                    {
-                        logger.ZLogWarning(
-                            $"Invalid object type {objType.ToString()} for tree entry '{entryName}"
-                        );
-                    }
-                    if (!hostRepoOdb.ExistsExt(entry, Lg2OdbLookupFlags.LG2_ODB_LOOKUP_NO_REFRESH))
-                    {
-                        var odbObj = tautRepoOdb.Read(entry);
-                        hostRepoOdb.Write(odbObj.GetRawData(), objType);
-
-                        logger.ZLogTrace($"Write object {entryOidText} to host repo");
-                    }
-
-                    // switch (objType)
-                    // {
-                    //     case Lg2ObjectType.LG2_OBJECT_TREE:
-                    //         var treeEntry = tautRepo.LookupTree(entry);
-                    //         unprocessed.Enqueue(treeEntry);
-                    //         break;
-                    //     case Lg2ObjectType.LG2_OBJECT_BLOB:
-                    //         var blobEntry = tautRepo.LookupBlob(entry);
-                    //         logger.ZLogDebug($"rawSize: {blobEntry.GetRawSize()}");
-                    //         break;
-                    //     default:
-                    //         logger.ZLogDebug($"Unexpcted object type {objType}");
-                    //         break;
-                    //         // throw new InvalidProgramException($"Unexpcted object type {objType}");
-                    // }
-                }
-            }
-        }
+        return tautRepo;
     }
 
     void HandleGitCmdList()
@@ -424,24 +228,9 @@ partial class GitRemoteHelper
         }
         else
         {
-            CloneRemoteIntoTaut();
+            var tautRepo = CloneRemoteIntoTaut();
 
-            var tautRepo = Lg2Repository.Open(_tautRepoDir);
-
-            var refList = tautRepo.GetRefList();
-
-            foreach (var refName in refList)
-            {
-                logger.ZLogDebug($"ref: {refName}");
-            }
-
-            TautRepoConfigHostRepoRefs(tautRepo);
-
-            TautRepoMapObjectsToHostRepo(tautRepo);
-
-            TautRepoTransferCommonObjectsToHost(tautRepo);
-
-            logger.ZLogDebug($"TautRepoTransferCommonObjectsToHost done");
+            tautRepo.TransferCommonObjectsToHostRepo();
 
             Thread.Sleep(100); // for zlogger to flush
             // logger.ZLogDebug($"IsBare {tautRepo.IsBare()}");

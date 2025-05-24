@@ -1,0 +1,69 @@
+using System.Net.Sockets;
+using System.Runtime.InteropServices;
+
+namespace Lg2.Sharpy;
+
+public unsafe interface IReleaseNative<TNative>
+    where TNative : unmanaged
+{
+    static abstract void ReleaseNative(TNative* pNative);
+}
+
+public abstract unsafe class NativeSafePointer<TDerived, TNative> : SafeHandle
+    where TNative : unmanaged
+    where TDerived : IReleaseNative<TNative>
+{
+    public delegate void Release(TNative* pNative);
+
+    internal NativeSafePointer(TNative* pNative)
+        : base(default, true)
+    {
+        handle = (nint)pNative;
+    }
+
+    public override bool IsInvalid => handle == default;
+
+    protected override bool ReleaseHandle()
+    {
+        if (IsInvalid == false)
+        {
+            TDerived.ReleaseNative((TNative*)handle);
+            handle = default;
+        }
+
+        return true;
+    }
+
+    internal TNative* Ptr => (TNative*)handle;
+
+    public void EnsureValid()
+    {
+        if (IsInvalid)
+        {
+            throw new InvalidOperationException($"The instance of {nameof(TDerived)} is not valid");
+        }
+    }
+}
+
+public abstract unsafe class NativeOwnedRef<TOwner, TNative>
+    where TOwner : class
+    where TNative : unmanaged
+{
+    protected readonly WeakReference<TOwner> _ownerWeakRef;
+
+    protected readonly TNative* _pNative;
+
+    internal NativeOwnedRef(TOwner owner, TNative* pNative)
+    {
+        _ownerWeakRef = new WeakReference<TOwner>(owner);
+        _pNative = pNative;
+    }
+
+    public void EnsureValid()
+    {
+        if (_ownerWeakRef.TryGetTarget(out _) == false)
+        {
+            throw new InvalidOperationException($"The instance of {nameof(TOwner)} is not valid");
+        }
+    }
+}

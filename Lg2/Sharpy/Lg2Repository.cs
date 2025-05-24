@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.git_error_code;
 using static Lg2.Native.LibGit2Exports;
@@ -5,9 +6,12 @@ using static Lg2.Native.LibGit2Exports;
 namespace Lg2.Sharpy;
 
 public unsafe class Lg2Repository
-    : SafeNativePointer<Lg2Repository, git_repository>,
+    : NativeSafePointer<Lg2Repository, git_repository>,
         IReleaseNative<git_repository>
 {
+    public Lg2Repository()
+        : base(null) { }
+
     internal Lg2Repository(git_repository* pNative)
         : base(pNative) { }
 
@@ -16,10 +20,30 @@ public unsafe class Lg2Repository
         git_repository_free(pNative);
     }
 
-    public static implicit operator git_repository*(Lg2Repository repo) =>
-        (git_repository*)repo.handle;
+    static git_repository* OpenRaw(string repoPath)
+    {
+        using var u8Path = new Lg2Utf8String(repoPath);
 
-    public static Lg2Repository Open(string repoPath)
+        git_repository* pRepo;
+        var rc = git_repository_open(&pRepo, u8Path.Ptr);
+        Lg2Exception.RaiseIfNotOk(rc);
+
+        return pRepo;
+    }
+
+    public void Open(string repoPath)
+    {
+        if (IsInvalid == false)
+        {
+            throw new InvalidOperationException($"{nameof(Lg2Repository)} is already opened");
+        }
+
+        var pRepo = OpenRaw(repoPath);
+
+        SetHandle((nint)pRepo);
+    }
+
+    public static Lg2Repository New(string repoPath)
     {
         var u8Path = new Lg2Utf8String(repoPath);
 
@@ -76,6 +100,16 @@ public static unsafe class Lg2RepositoryExtensions
         return new(pOdb);
     }
 
+    public static string GetPath(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        var pPath = git_repository_path(repo.Ptr);
+        var result = Marshal.PtrToStringUTF8((nint)pPath) ?? string.Empty;
+
+        return result;
+    }
+
     public static Lg2RevWalk NewRevWalk(this Lg2Repository repo)
     {
         repo.EnsureValid();
@@ -89,13 +123,13 @@ public static unsafe class Lg2RepositoryExtensions
 
     public static Lg2Object LookupObject(
         this Lg2Repository repo,
-        ILg2WithOid oid,
+        ILg2GetOidPlainRef objLike,
         Lg2ObjectType objType
     )
     {
         repo.EnsureValid();
 
-        var oidRef = oid.GetOidPlainRef();
+        var oidRef = objLike.GetOidPlainRef();
 
         git_object* pObj = null;
         var rc = git_object_lookup(&pObj, repo.Ptr, oidRef.Ptr, (git_object_t)objType);
@@ -119,7 +153,7 @@ public static unsafe class Lg2RepositoryExtensions
         return new Lg2Tree(pTree);
     }
 
-    public static Lg2Tree LookupTree(this Lg2Repository repo, ILg2WithOid oid)
+    public static Lg2Tree LookupTree(this Lg2Repository repo, ILg2GetOidPlainRef oid)
     {
         repo.EnsureValid();
 
@@ -133,7 +167,7 @@ public static unsafe class Lg2RepositoryExtensions
         return new Lg2Tree(pTree);
     }
 
-    public static Lg2Blob LookupBlob(this Lg2Repository repo, ILg2WithOid oid)
+    public static Lg2Blob LookupBlob(this Lg2Repository repo, ILg2GetOidPlainRef oid)
     {
         var oidPlainRef = oid.GetOidPlainRef();
 

@@ -14,8 +14,6 @@ if (rc < 0)
     Environment.Exit(1);
 }
 
-const string commandName = "git-remote-taut";
-
 ConsoleApp.Version = "alpha-0.0.1";
 
 var app = ConsoleApp
@@ -27,6 +25,7 @@ var app = ConsoleApp
     .ConfigureServices(services =>
     {
         services.AddSingleton<GitCli>();
+        services.AddSingleton<TautRepo>();
     })
     .ConfigureLogging(
         (config, logging) =>
@@ -45,7 +44,7 @@ var app = ConsoleApp
                         (in MessageTemplate template, in LogInfo info) =>
                             template.Format(
                                 info.Timestamp.Local.ToString("hh:mm:ss.ffffff"),
-                                commandName,
+                                ProgramInfo.CommandName,
                                 info.LogLevel
                             )
                     );
@@ -55,6 +54,8 @@ var app = ConsoleApp
                             Utf8StringInterpolation.Utf8String.Format(writer, $"{ex.Message}")
                     );
                 });
+
+                options.FullMode = BackgroundBufferFullMode.Block;
             });
 
             if (config.GetGitRemoteTautTrace())
