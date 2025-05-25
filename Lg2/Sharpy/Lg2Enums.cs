@@ -26,7 +26,7 @@ public static unsafe class Lg2ObjectTypeExtensions
             || objType == Lg2ObjectType.LG2_OBJECT_TAG;
     }
 
-    public static string ToString(this Lg2ObjectType objType)
+    public static string GetName(this Lg2ObjectType objType)
     {
         var pStr = git_object_type2string((git_object_t)objType);
         var result = Marshal.PtrToStringUTF8((nint)pStr) ?? string.Empty;

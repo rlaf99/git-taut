@@ -4,21 +4,20 @@ using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
 
-public interface ILg2TreeEntry : ILg2GetOidPlainRef
+public interface ILg2TreeEntry : ILg2ObjectInfo
 {
     string GetName();
-    Lg2ObjectType GetObjectType();
 }
 
 public unsafe class Lg2TreeEntry
     : NativeSafePointer<Lg2TreeEntry, git_tree_entry>,
-        IReleaseNative<git_tree_entry>,
+        INativeRelease<git_tree_entry>,
         ILg2TreeEntry
 {
     internal Lg2TreeEntry(git_tree_entry* pNative)
         : base(pNative) { }
 
-    public static unsafe void ReleaseNative(git_tree_entry* pNative)
+    public static unsafe void NativeRelease(git_tree_entry* pNative)
     {
         git_tree_entry_free(pNative);
     }
@@ -133,13 +132,13 @@ public static unsafe class Lg2TreeEntryExtensions
 
 public unsafe class Lg2Tree
     : NativeSafePointer<Lg2Tree, git_tree>,
-        IReleaseNative<git_tree>,
-        ILg2GetOidPlainRef
+        INativeRelease<git_tree>,
+        ILg2ObjectInfo
 {
     internal Lg2Tree(git_tree* pNative)
         : base(pNative) { }
 
-    public static unsafe void ReleaseNative(git_tree* pNative)
+    public static unsafe void NativeRelease(git_tree* pNative)
     {
         git_tree_free(pNative);
     }
@@ -151,6 +150,11 @@ public unsafe class Lg2Tree
         var pOid = git_tree_id(Ptr);
 
         return new(pOid);
+    }
+
+    public Lg2ObjectType GetObjectType()
+    {
+        return Lg2ObjectType.LG2_OBJECT_TREE;
     }
 }
 

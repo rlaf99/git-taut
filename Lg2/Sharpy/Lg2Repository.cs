@@ -7,7 +7,7 @@ namespace Lg2.Sharpy;
 
 public unsafe class Lg2Repository
     : NativeSafePointer<Lg2Repository, git_repository>,
-        IReleaseNative<git_repository>
+        INativeRelease<git_repository>
 {
     public Lg2Repository()
         : base(null) { }
@@ -15,7 +15,7 @@ public unsafe class Lg2Repository
     internal Lg2Repository(git_repository* pNative)
         : base(pNative) { }
 
-    public static void ReleaseNative(git_repository* pNative)
+    public static void NativeRelease(git_repository* pNative)
     {
         git_repository_free(pNative);
     }
@@ -123,13 +123,13 @@ public static unsafe class Lg2RepositoryExtensions
 
     public static Lg2Object LookupObject(
         this Lg2Repository repo,
-        ILg2GetOidPlainRef objLike,
+        ILg2ObjectInfo objInfo,
         Lg2ObjectType objType
     )
     {
         repo.EnsureValid();
 
-        var oidRef = objLike.GetOidPlainRef();
+        var oidRef = objInfo.GetOidPlainRef();
 
         git_object* pObj = null;
         var rc = git_object_lookup(&pObj, repo.Ptr, oidRef.Ptr, (git_object_t)objType);
@@ -143,8 +143,8 @@ public static unsafe class Lg2RepositoryExtensions
         repo.EnsureValid();
 
         git_tree* pTree = null;
-        var rc = (int)GIT_OK;
-        fixed (git_oid* pOid = &oid._raw)
+        int rc;
+        fixed (git_oid* pOid = &oid.Raw)
         {
             rc = git_tree_lookup(&pTree, repo.Ptr, pOid);
         }
@@ -153,27 +153,26 @@ public static unsafe class Lg2RepositoryExtensions
         return new Lg2Tree(pTree);
     }
 
-    public static Lg2Tree LookupTree(this Lg2Repository repo, ILg2GetOidPlainRef oid)
+    public static Lg2Tree LookupTree(this Lg2Repository repo, ILg2ObjectInfo objInfo)
     {
         repo.EnsureValid();
 
-        var oidPlainRef = oid.GetOidPlainRef();
+        var oidPlainRef = objInfo.GetOidPlainRef();
 
         git_tree* pTree = null;
-        var rc = (int)GIT_OK;
-        rc = git_tree_lookup(&pTree, repo.Ptr, oidPlainRef.Ptr);
+        var rc = git_tree_lookup(&pTree, repo.Ptr, oidPlainRef.Ptr);
         Lg2Exception.RaiseIfNotOk(rc);
 
         return new Lg2Tree(pTree);
     }
 
-    public static Lg2Blob LookupBlob(this Lg2Repository repo, ILg2GetOidPlainRef oid)
+    public static Lg2Blob LookupBlob(this Lg2Repository repo, ILg2ObjectInfo objInfo)
     {
-        var oidPlainRef = oid.GetOidPlainRef();
+        var oidPlainRef = objInfo.GetOidPlainRef();
 
         git_blob* pBlob = null;
-        var rc = (int)GIT_OK;
-        rc = git_blob_lookup(&pBlob, repo.Ptr, oidPlainRef.Ptr);
+
+        var rc = git_blob_lookup(&pBlob, repo.Ptr, oidPlainRef.Ptr);
         Lg2Exception.RaiseIfNotOk(rc);
 
         return new Lg2Blob(pBlob);
@@ -184,10 +183,10 @@ public static unsafe class Lg2RepositoryExtensions
         repo.EnsureValid();
 
         git_commit* pCommit = null;
-        var rc = (int)GIT_OK;
-        fixed (git_oid* git_oid = &oid._raw)
+        int rc;
+        fixed (git_oid* pOid = &oid.Raw)
         {
-            rc = git_commit_lookup(&pCommit, repo.Ptr, git_oid);
+            rc = git_commit_lookup(&pCommit, repo.Ptr, pOid);
         }
         Lg2Exception.RaiseIfNotOk(rc);
 
@@ -199,13 +198,26 @@ public static unsafe class Lg2RepositoryExtensions
         repo.EnsureValid();
 
         git_tag* pTag = null;
-        var rc = (int)GIT_OK;
-        fixed (git_oid* git_oid = &oid._raw)
+        int rc;
+        fixed (git_oid* pOid = &oid.Raw)
         {
-            rc = git_tag_lookup(&pTag, repo.Ptr, git_oid);
+            rc = git_tag_lookup(&pTag, repo.Ptr, pOid);
         }
         Lg2Exception.RaiseIfNotOk(rc);
 
         return new Lg2Tag(pTag);
+    }
+
+    public static void GetOidFromName(this Lg2Repository repo, string name, ref Lg2Oid oid)
+    {
+        repo.EnsureValid();
+
+        using var u8Name = new Lg2Utf8String(name);
+        int rc;
+        fixed (git_oid* pOid = &oid.Raw)
+        {
+            rc = git_reference_name_to_id(pOid, repo.Ptr, u8Name.Ptr);
+        }
+        Lg2Exception.RaiseIfNotOk(rc);
     }
 }

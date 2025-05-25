@@ -1,0 +1,1 @@
+A thin wrapper on top of the native Libgit2 library, just enough for the intended use.

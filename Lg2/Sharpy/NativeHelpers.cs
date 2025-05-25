@@ -1,17 +1,16 @@
-using System.Net.Sockets;
 using System.Runtime.InteropServices;
 
 namespace Lg2.Sharpy;
 
-public unsafe interface IReleaseNative<TNative>
+public unsafe interface INativeRelease<TNative>
     where TNative : unmanaged
 {
-    static abstract void ReleaseNative(TNative* pNative);
+    static abstract void NativeRelease(TNative* pNative);
 }
 
 public abstract unsafe class NativeSafePointer<TDerived, TNative> : SafeHandle
     where TNative : unmanaged
-    where TDerived : IReleaseNative<TNative>
+    where TDerived : INativeRelease<TNative>
 {
     public delegate void Release(TNative* pNative);
 
@@ -27,7 +26,7 @@ public abstract unsafe class NativeSafePointer<TDerived, TNative> : SafeHandle
     {
         if (IsInvalid == false)
         {
-            TDerived.ReleaseNative((TNative*)handle);
+            TDerived.NativeRelease((TNative*)handle);
             handle = default;
         }
 

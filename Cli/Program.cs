@@ -25,7 +25,7 @@ var app = ConsoleApp
     .ConfigureServices(services =>
     {
         services.AddSingleton<GitCli>();
-        services.AddSingleton<TautRepo>();
+        services.AddSingleton<TautManager>();
     })
     .ConfigureLogging(
         (config, logging) =>

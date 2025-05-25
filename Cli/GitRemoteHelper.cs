@@ -6,7 +6,11 @@ using ZLogger;
 
 namespace Git.Remote.Taut;
 
-partial class GitRemoteHelper(ILogger<GitRemoteHelper> logger, GitCli gitCli, TautRepo tautRepo)
+partial class GitRemoteHelper(
+    ILogger<GitRemoteHelper> logger,
+    GitCli gitCli,
+    TautManager tautManager
+)
 {
     // for pushing
     const string capPush = "push";
@@ -34,19 +38,19 @@ partial class GitRemoteHelper
     class Options(ILogger<GitRemoteHelper> logger)
     {
         const string optVerbosity = "verbosity";
-        int _verbosity = 1;
+        internal int Verbosity = 1;
 
         const string optProgress = "progress";
-        bool _showProgress = false;
+        internal bool ShowProgress = false;
 
         const string optCloning = "cloning";
-        bool _isCloning = false;
+        internal bool IsCloning = false;
 
         const string optCheckConnectivity = "check-connectivity";
-        bool _checkConnectivity = false;
+        internal bool CheckConnectivity = false;
 
         const string optForce = "force";
-        bool _forceUpdate = false;
+        internal bool ForceUpdate = false;
 
         internal void HandleNameValue(string nameValue)
         {
@@ -64,7 +68,7 @@ partial class GitRemoteHelper
             {
                 if (int.TryParse(nameValue[(optVerbosity.Length + 1)..], out var value))
                 {
-                    _verbosity = value;
+                    Verbosity = value;
                     LogUpdate(optVerbosity, value);
                     Console.WriteLine("ok");
                 }
@@ -75,26 +79,26 @@ partial class GitRemoteHelper
             }
             else if (nameValue.StartsWith(optProgress))
             {
-                _showProgress = GetBooleanValue(optProgress);
-                LogUpdate(optProgress, _showProgress);
+                ShowProgress = GetBooleanValue(optProgress);
+                LogUpdate(optProgress, ShowProgress);
                 Console.WriteLine("ok");
             }
             else if (nameValue.StartsWith(optCloning))
             {
-                _isCloning = GetBooleanValue(optCloning);
-                LogUpdate(optCloning, _isCloning);
+                IsCloning = GetBooleanValue(optCloning);
+                LogUpdate(optCloning, IsCloning);
                 Console.WriteLine("ok");
             }
             else if (nameValue.StartsWith(optCheckConnectivity))
             {
-                _checkConnectivity = GetBooleanValue(optCheckConnectivity);
-                LogUpdate(optCheckConnectivity, _checkConnectivity);
+                CheckConnectivity = GetBooleanValue(optCheckConnectivity);
+                LogUpdate(optCheckConnectivity, CheckConnectivity);
                 Console.WriteLine("ok");
             }
             else if (nameValue.StartsWith(optForce))
             {
-                _forceUpdate = GetBooleanValue("force");
-                LogUpdate(optForce, _forceUpdate);
+                ForceUpdate = GetBooleanValue("force");
+                LogUpdate(optForce, ForceUpdate);
                 Console.WriteLine("ok");
             }
             else
@@ -105,6 +109,32 @@ partial class GitRemoteHelper
     }
 
     readonly Options _options = new(logger);
+}
+
+static partial class GitRemoteHelperTraces
+{
+    [ZLoggerMessage(LogLevel.Trace, "Received command '{line}'")]
+    internal static partial void TraceReceivedGitCommand(
+        this ILogger<GitRemoteHelper> logger,
+        string line
+    );
+}
+
+partial class GitRemoteHelper
+{
+    record struct CmdFetchArgs(string Hash, string Name)
+    {
+        internal static CmdFetchArgs Parse(string input)
+        {
+            var parts = input.Split();
+            if (parts.Length != 2)
+            {
+                throw new ArgumentException($"{cmdFetch}: failed to parse args '{input}'");
+            }
+
+            return new CmdFetchArgs(parts[0], parts[1]);
+        }
+    }
 }
 
 partial class GitRemoteHelper
@@ -129,6 +159,8 @@ partial class GitRemoteHelper
 
         EnsureTautDir();
 
+        string lastCmd = string.Empty;
+
         for (; ; )
         {
             var line = Console.ReadLine();
@@ -139,52 +171,88 @@ partial class GitRemoteHelper
 
             if (line == cmdCapabilities)
             {
-                logger.ZLogTrace($"Command '{cmdCapabilities}' received");
+                logger.TraceReceivedGitCommand(line);
 
                 Console.WriteLine(capPush);
                 Console.WriteLine(capFetch);
                 Console.WriteLine(capCheckConnectivity);
                 Console.WriteLine(capOption);
                 Console.WriteLine();
+
+                lastCmd = cmdCapabilities;
             }
             else if (line == cmdList)
             {
-                logger.ZLogTrace($"Command '{cmdList}' received");
+                logger.TraceReceivedGitCommand(line);
 
                 HandleGitCmdList();
+
+                lastCmd = cmdList;
             }
             else if (line == cmdListForPush)
             {
-                logger.ZLogTrace($"Command '{cmdListForPush}' received");
+                logger.TraceReceivedGitCommand(line);
 
                 Console.Error.WriteLine("Not implemented");
                 Environment.Exit(1);
+
+                lastCmd = cmdListForPush;
             }
             else if (line == cmdPush)
             {
-                logger.LogTrace("Command '{0}' received", cmdPush);
+                logger.TraceReceivedGitCommand(line);
 
                 Console.Error.WriteLine("Not implemented");
                 Environment.Exit(1);
+
+                lastCmd = cmdPush;
             }
             else if (line.StartsWith(cmdFetch))
             {
-                logger.ZLogTrace($"Received Command '{line}'");
+                logger.TraceReceivedGitCommand(line);
 
-                Console.Error.WriteLine("Not implemented");
-                Environment.Exit(1);
+                var args = CmdFetchArgs.Parse(line[cmdFetch.Length..].TrimStart());
+
+                HandleGitCmdFetch(args);
+
+                lastCmd = cmdFetch;
             }
             else if (line.StartsWith(cmdOption))
             {
-                logger.ZLogTrace($"Received Command '{line}'");
+                logger.TraceReceivedGitCommand(line);
 
                 var nameValue = line[cmdOption.Length..].TrimStart();
                 _options.HandleNameValue(nameValue);
+
+                lastCmd = cmdFetch;
             }
             else
             {
-                Console.Error.WriteLine("Unknown command '{0}'", line);
-                Environment.Exit(1);
+                if (line.Length == 0)
+                {
+                    if (lastCmd == cmdFetch)
+                    {
+                        if (_options.CheckConnectivity)
+                        {
+                            Console.WriteLine("connectivity-ok");
+                            Console.WriteLine();
+                        }
+                        else
+                        {
+                            Console.WriteLine();
+                        }
+
+                        lastCmd = string.Empty;
+                        continue;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                var message = $"Unknown command '{line}'";
+                RaiseInvalidOperation(message);
             }
         }
     }
@@ -207,17 +275,15 @@ partial class GitRemoteHelper
         _tautRepoDir = tautDir;
     }
 
-    TautRepo CloneRemoteIntoTaut()
+    void CloneRemoteIntoTaut()
     {
         gitCli.Execute("clone", "--bare", _address, _tautRepoDir);
 
-        tautRepo.Open(_tautRepoDir);
+        tautManager.Open(_tautRepoDir);
 
-        tautRepo.SetDescription();
-        tautRepo.AddHostObjects();
-        tautRepo.SetHostRepoRefs();
-
-        return tautRepo;
+        tautManager.SetDescription();
+        tautManager.AddHostObjects();
+        tautManager.SetHostRepoRefs();
     }
 
     void HandleGitCmdList()
@@ -228,22 +294,24 @@ partial class GitRemoteHelper
         }
         else
         {
-            var tautRepo = CloneRemoteIntoTaut();
+            CloneRemoteIntoTaut();
 
-            tautRepo.TransferCommonObjectsToHostRepo();
+            foreach (var refName in tautManager.RefList)
+            {
+                Lg2Oid oid = new();
+                tautManager.Repo.GetOidFromName(refName, ref oid);
+                Console.WriteLine($"{oid.ToString()} {refName}");
+            }
 
-            Thread.Sleep(100); // for zlogger to flush
-            // logger.ZLogDebug($"IsBare {tautRepo.IsBare()}");
-
-            // var lines = gitCli.GetOutputLines("--git-dir", _tautRepoDir, "show-ref");
-            // foreach (var line in lines)
-            // {
-            //     Console.WriteLine(line);
-            // }
             Console.WriteLine();
         }
+    }
 
-        // RaiseNotImplemented($"Command '{cmdList}' not implemented");
+    void HandleGitCmdFetch(CmdFetchArgs args)
+    {
+        Lg2Oid oid = new();
+        oid.FromString(args.Hash);
+        tautManager.TransferCommitToHost(ref oid);
     }
 
     [DoesNotReturn]

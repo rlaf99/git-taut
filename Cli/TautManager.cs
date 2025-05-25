@@ -1,14 +1,17 @@
+using System.Security.Cryptography;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
 namespace Git.Remote.Taut;
 
-class TautRepo(ILogger<TautRepo> logger)
+class TautManager(ILogger<TautManager> logger)
 {
-    const string defaultDescription = "git-remote-taut";
+    const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
 
     readonly Lg2Repository _repo = new();
+
+    internal Lg2Repository Repo => _repo;
 
     string? _location = null;
     internal string Location
@@ -21,6 +24,10 @@ class TautRepo(ILogger<TautRepo> logger)
     }
 
     internal string HostPath => Path.Join(Location, "..");
+
+    internal List<string> RefList => _repo.GetRefList();
+
+    internal Lg2Odb RepoOdb => _repo.GetOdb();
 
     internal void Open(string repoPath)
     {
@@ -36,10 +43,10 @@ class TautRepo(ILogger<TautRepo> logger)
         using (var writer = File.AppendText(descriptionFile))
         {
             writer.NewLine = "\n";
-            writer.WriteLine($"Created by {ProgramInfo.CommandName}");
+            writer.WriteLine(defaultDescription);
         }
 
-        logger.ZLogTrace($"Wrote '{defaultDescription}' to '{descriptionFile}'");
+        logger.ZLogTrace($"Write '{defaultDescription}' to '{descriptionFile}'");
     }
 
     internal void SetHostRepoRefs()
@@ -70,17 +77,31 @@ class TautRepo(ILogger<TautRepo> logger)
         logger.ZLogTrace($"Append '{relPathToHostObjects}' to '{objectsInfoAlternatesFile}'");
     }
 
-    internal void TransferCommonObjectsToHostRepo()
+    internal void TransferObjectToHost(ref Lg2Oid oid)
+    {
+        var hostRepoObjectsDir = Path.Join(HostPath, GitRepoLayout.ObjectsDir);
+        using var hostRepoOdb = Lg2Odb.Open(hostRepoObjectsDir);
+
+        RepoOdb.CopyObjectToAnother(hostRepoOdb, ref oid, out var objType);
+
+        var typeName = objType.GetName();
+
+        logger.ZLogTrace($"Transfer {typeName} {oid.ToString()} to the host repo");
+    }
+
+    internal void TransferCommitToHost(ref Lg2Oid commitOid)
     {
         var hostRepoObjectsDir = Path.Join(HostPath, GitRepoLayout.ObjectsDir);
         using var hostRepoOdb = Lg2Odb.Open(hostRepoObjectsDir);
         using var tautRepoOdb = _repo.GetOdb();
 
-        void CopyObjectToHost(ILg2GetOidPlainRef objLike)
+        void CopyObjectToHost(ILg2ObjectInfo objInfo)
         {
-            if (tautRepoOdb.TryCopyObjectToAnother(hostRepoOdb, objLike))
+            if (tautRepoOdb.TryCopyObjectToAnother(hostRepoOdb, objInfo))
             {
-                logger.ZLogTrace($"Wrote object {objLike.GetOidString()} to the host repo");
+                var typeName = objInfo.GetObjectType().GetName();
+
+                logger.ZLogTrace($"Write {typeName} {objInfo.GetOidString()} to the host repo");
             }
         }
 
@@ -122,13 +143,7 @@ class TautRepo(ILogger<TautRepo> logger)
         }
 
         using var revWalk = _repo.NewRevWalk();
-
-        var refList = _repo.GetRefList();
-
-        foreach (var refName in refList)
-        {
-            revWalk.PushRef(refName);
-        }
+        revWalk.Push(ref commitOid);
 
         Lg2Oid oid = new();
 
@@ -136,10 +151,10 @@ class TautRepo(ILogger<TautRepo> logger)
         {
             var commit = _repo.LookupCommit(ref oid);
 
-            var commitOidStr8 = oid.ToPartialString(8);
+            var commitOidStr8 = oid.ToString(8);
             var commitSummary = commit.GetSummary();
 
-            logger.ZLogTrace($"Transferring commit {commitOidStr8} {commitSummary}");
+            logger.ZLogTrace($"Start transferring commit {commitOidStr8} {commitSummary}");
 
             CopyObjectToHost(commit);
 
