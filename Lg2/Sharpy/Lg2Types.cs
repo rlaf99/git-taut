@@ -704,6 +704,28 @@ public unsafe class Lg2Reference
     }
 }
 
+public static unsafe class Lg2ReferenceExtensions
+{
+    internal static Lg2RefType GetRefType(this Lg2Reference reference)
+    {
+        reference.EnsureValid();
+
+        var refType = git_reference_type(reference.Ptr);
+
+        return (Lg2RefType)refType;
+    }
+
+    internal static string GetName(this Lg2Reference reference)
+    {
+        reference.EnsureValid();
+
+        var pName = git_reference_name(reference.Ptr);
+        var result = Marshal.PtrToStringUTF8((nint)pName) ?? string.Empty;
+
+        return result;
+    }
+}
+
 public unsafe class Lg2RefSpec
     : NativeSafePointer<Lg2RefSpec, git_refspec>,
         INativeRelease<git_refspec>

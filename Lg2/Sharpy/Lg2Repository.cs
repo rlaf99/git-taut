@@ -121,6 +121,30 @@ public static unsafe class Lg2RepositoryExtensions
         return new Lg2RevWalk(pRevWalk);
     }
 
+    public static bool TryLookupRefSmart(
+        this Lg2Repository repo,
+        string shorthand,
+        out Lg2Reference reference
+    )
+    {
+        repo.EnsureValid();
+
+        using var u8Shorthand = new Lg2Utf8String(shorthand);
+        git_reference* pRef = null;
+        var rc = git_reference_dwim(&pRef, repo.Ptr, u8Shorthand.Ptr);
+
+        if (rc != (int)GIT_OK)
+        {
+            reference = new Lg2Reference(default);
+            return false;
+        }
+        else
+        {
+            reference = new Lg2Reference(pRef);
+            return true;
+        }
+    }
+
     public static Lg2Object LookupObject(
         this Lg2Repository repo,
         ILg2ObjectInfo objInfo,

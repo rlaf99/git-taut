@@ -188,10 +188,6 @@ partial class GitRemoteHelper
         }
 
         var result = _handleGitCommand(input);
-        if (result == HandleGitCommandResult.Done)
-        {
-            _handleGitCommand = null;
-        }
 
         return result;
     }
@@ -339,7 +335,12 @@ partial class GitRemoteHelper
             logger.TraceReceivedGitCommand(input);
 
             _handleGitCommand ??= DispatchGitCommand;
-            _handleGitCommand(input);
+
+            var result = _handleGitCommand(input);
+            if (result == HandleGitCommandResult.Done)
+            {
+                _handleGitCommand = null;
+            }
         }
     }
 

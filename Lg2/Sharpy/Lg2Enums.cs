@@ -40,3 +40,11 @@ public enum Lg2OdbLookupFlags
 {
     LG2_ODB_LOOKUP_NO_REFRESH = git_odb_lookup_flags_t.GIT_ODB_LOOKUP_NO_REFRESH,
 }
+
+public enum Lg2RefType
+{
+    LG2_REFERENCE_INVALID = git_reference_t.GIT_REFERENCE_INVALID,
+    LG2_REFERENCE_DIRECT = git_reference_t.GIT_REFERENCE_DIRECT,
+    LG2_REFERENCE_SYMBOLIC = git_reference_t.GIT_REFERENCE_SYMBOLIC,
+    LG2_REFERENCE_ALL = git_reference_t.GIT_REFERENCE_ALL,
+}
