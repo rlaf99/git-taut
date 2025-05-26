@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using ConsoleAppFramework;
 using Lg2.Sharpy;
@@ -169,9 +170,9 @@ partial class GitRemoteHelper
         {
             _handleGitCommand = HandleGitCmdListForPush;
         }
-        else if (input == cmdPush)
+        else if (input.StartsWith(cmdPush))
         {
-            RaiseNotImplemented($"{cmdPush} not implemented");
+            _handleGitCommand = HandleGitCmdPush;
         }
         else if (input.StartsWith(cmdFetch))
         {
@@ -229,32 +230,6 @@ partial class GitRemoteHelper
         return HandleGitCommandResult.Done;
     }
 
-    HandleGitCommandResult HandleGitCmdListForPush(string input)
-    {
-        UpdateTaut();
-
-        tautManager.Open(_tautRepoDir);
-
-        foreach (var refName in tautManager.RefList)
-        {
-            Lg2Oid oid = new();
-            tautManager.Repo.GetOidFromName(refName, ref oid);
-            Console.WriteLine($"{oid.ToString()} {refName}");
-        }
-
-        Console.WriteLine();
-
-        return HandleGitCommandResult.Done;
-    }
-
-    HandleGitCommandResult HandleGitCmdOption(string input)
-    {
-        var nameValue = input[cmdOption.Length..].TrimStart();
-        _options.HandleNameValue(nameValue);
-
-        return HandleGitCommandResult.Done;
-    }
-
     HandleGitCommandResult HandleGitCmdFetch(string input)
     {
         if (input.Length == 0)
@@ -279,6 +254,55 @@ partial class GitRemoteHelper
         tautManager.TransferCommitToHost(ref oid);
 
         return HandleGitCommandResult.Keep;
+    }
+
+    HandleGitCommandResult HandleGitCmdListForPush(string input)
+    {
+        UpdateTaut();
+
+        tautManager.Open(_tautRepoDir);
+
+        foreach (var refName in tautManager.RefList)
+        {
+            Lg2Oid oid = new();
+            tautManager.Repo.GetOidFromName(refName, ref oid);
+            Console.WriteLine($"{oid.ToString()} {refName}");
+        }
+
+        Console.WriteLine();
+
+        return HandleGitCommandResult.Done;
+    }
+
+    HandleGitCommandResult HandleGitCmdPush(string input)
+    {
+        if (input.Length == 0)
+        {
+            RaiseNotImplemented($"{cmdPush} length 0");
+
+            return HandleGitCommandResult.Done;
+        }
+
+        var refSpecText = input[cmdPush.Length..].TrimStart();
+
+        if (Lg2RefSpec.TryParseForPush(refSpecText, out var refSpec) == false)
+        {
+            RaiseInvalidOperation($"Invalid refspec {refSpecText}");
+        }
+
+        logger.ZLogDebug($"{refSpec.GetSrc()} {refSpec.GetDst()}");
+
+        RaiseNotImplemented($"{cmdPush} xxx");
+
+        return HandleGitCommandResult.Keep;
+    }
+
+    HandleGitCommandResult HandleGitCmdOption(string input)
+    {
+        var nameValue = input[cmdOption.Length..].TrimStart();
+        _options.HandleNameValue(nameValue);
+
+        return HandleGitCommandResult.Done;
     }
 }
 

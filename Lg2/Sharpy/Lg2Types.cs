@@ -716,15 +716,13 @@ public unsafe class Lg2RefSpec
         git_refspec_free(pNative);
     }
 
-    public static bool TryParse(string input, bool isFetch, out Lg2RefSpec refSpec)
+    static bool TryParse(string input, bool isFetch, ref Lg2RefSpec refSpec)
     {
-        refSpec = new(null);
-
         using var u8Input = new Lg2Utf8String(input);
 
         git_refspec* pRefSpec = null;
         var rc = git_refspec_parse(&pRefSpec, u8Input.Ptr, isFetch ? 1 : 0);
-        if (rc == 0)
+        if (rc != (int)GIT_OK)
         {
             return false;
         }
@@ -733,11 +731,25 @@ public unsafe class Lg2RefSpec
 
         return true;
     }
+
+    public static bool TryParseForPush(string input, out Lg2RefSpec refSpec)
+    {
+        refSpec = new(null);
+
+        return TryParse(input, false, ref refSpec);
+    }
+
+    public static bool TryParseForFetch(string input, out Lg2RefSpec refSpec)
+    {
+        refSpec = new(null);
+
+        return TryParse(input, true, ref refSpec);
+    }
 }
 
 public static unsafe class Lg2RefSpecExtensions
 {
-    static string GetSrc(this Lg2RefSpec refSpec)
+    public static string GetSrc(this Lg2RefSpec refSpec)
     {
         refSpec.EnsureValid();
 
@@ -747,7 +759,7 @@ public static unsafe class Lg2RefSpecExtensions
         return result;
     }
 
-    static string GetDst(this Lg2RefSpec refSpec)
+    public static string GetDst(this Lg2RefSpec refSpec)
     {
         refSpec.EnsureValid();
 
@@ -757,7 +769,7 @@ public static unsafe class Lg2RefSpecExtensions
         return result;
     }
 
-    static string GetString(this Lg2RefSpec refSpec)
+    public static string GetString(this Lg2RefSpec refSpec)
     {
         refSpec.EnsureValid();
 
