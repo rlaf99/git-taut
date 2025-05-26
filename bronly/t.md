@@ -3,7 +3,6 @@ a13
 ## TODO
 
 - `git push`
-  - [x] support list-for-push
   - [ ] support push
     - [ ] save host refs to refs/tautened/
     - [ ] invoke git push
