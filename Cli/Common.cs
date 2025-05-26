@@ -28,6 +28,11 @@ static class GitRepoLayout
     internal const string Description = "description";
 }
 
+static class GitConfig
+{
+    internal const string Fetch_Prune = "fetch.prune";
+}
+
 internal static class ConfigurationExtensions
 {
     internal static bool GetGitRemoteTautTrace(this IConfiguration config)

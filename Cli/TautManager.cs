@@ -34,7 +34,7 @@ class TautManager(ILogger<TautManager> logger)
         _repo.Open(repoPath);
     }
 
-    internal void SetDescription()
+    internal void SetDefaultDescription()
     {
         var descriptionFile = Path.Join(Location, GitRepoLayout.Description);
 
@@ -49,10 +49,10 @@ class TautManager(ILogger<TautManager> logger)
         logger.ZLogTrace($"Write '{defaultDescription}' to '{descriptionFile}'");
     }
 
-    internal void SetHostRepoRefs()
+    internal void SetDefaultConfig()
     {
         using var config = _repo.GetConfig();
-        config.SetString("hostRepo.refs", "dummy");
+        config.SetString(GitConfig.Fetch_Prune, "true");
     }
 
     internal void AddHostObjects()
@@ -75,18 +75,6 @@ class TautManager(ILogger<TautManager> logger)
         }
 
         logger.ZLogTrace($"Append '{relPathToHostObjects}' to '{objectsInfoAlternatesFile}'");
-    }
-
-    internal void TransferObjectToHost(ref Lg2Oid oid)
-    {
-        var hostRepoObjectsDir = Path.Join(HostPath, GitRepoLayout.ObjectsDir);
-        using var hostRepoOdb = Lg2Odb.Open(hostRepoObjectsDir);
-
-        RepoOdb.CopyObjectToAnother(hostRepoOdb, ref oid, out var objType);
-
-        var typeName = objType.GetName();
-
-        logger.ZLogTrace($"Transfer {typeName} {oid.ToString()} to the host repo");
     }
 
     internal void TransferCommitToHost(ref Lg2Oid commitOid)
@@ -129,6 +117,7 @@ class TautManager(ILogger<TautManager> logger)
                         logger.ZLogWarning(
                             $"Invalid object type {objType.ToString()} for tree entry '{entryName}"
                         );
+                        continue;
                     }
 
                     CopyObjectToHost(entry);

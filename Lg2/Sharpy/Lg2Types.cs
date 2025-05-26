@@ -704,6 +704,79 @@ public unsafe class Lg2Reference
     }
 }
 
+public unsafe class Lg2RefSpec
+    : NativeSafePointer<Lg2RefSpec, git_refspec>,
+        INativeRelease<git_refspec>
+{
+    internal Lg2RefSpec(git_refspec* pNative)
+        : base(pNative) { }
+
+    public static unsafe void NativeRelease(git_refspec* pNative)
+    {
+        git_refspec_free(pNative);
+    }
+
+    public static bool TryParse(string input, bool isFetch, out Lg2RefSpec refSpec)
+    {
+        refSpec = new(null);
+
+        using var u8Input = new Lg2Utf8String(input);
+
+        git_refspec* pRefSpec = null;
+        var rc = git_refspec_parse(&pRefSpec, u8Input.Ptr, isFetch ? 1 : 0);
+        if (rc == 0)
+        {
+            return false;
+        }
+
+        refSpec.SetHandle((nint)pRefSpec);
+
+        return true;
+    }
+}
+
+public static unsafe class Lg2RefSpecExtensions
+{
+    static string GetSrc(this Lg2RefSpec refSpec)
+    {
+        refSpec.EnsureValid();
+
+        var pSrc = git_refspec_src(refSpec.Ptr);
+        var result = Marshal.PtrToStringUTF8((nint)pSrc) ?? string.Empty;
+
+        return result;
+    }
+
+    static string GetDst(this Lg2RefSpec refSpec)
+    {
+        refSpec.EnsureValid();
+
+        var pDst = git_refspec_dst(refSpec.Ptr);
+        var result = Marshal.PtrToStringUTF8((nint)pDst) ?? string.Empty;
+
+        return result;
+    }
+
+    static string GetString(this Lg2RefSpec refSpec)
+    {
+        refSpec.EnsureValid();
+
+        var pStr = git_refspec_string(refSpec.Ptr);
+        var result = Marshal.PtrToStringUTF8((nint)pStr) ?? string.Empty;
+
+        return result;
+    }
+
+    static bool GetForce(this Lg2RefSpec refSpec)
+    {
+        refSpec.EnsureValid();
+
+        var force = git_refspec_force(refSpec.Ptr);
+
+        return force != 0;
+    }
+}
+
 public unsafe class Lg2Utf8String : SafeHandle
 {
     internal Lg2Utf8String(string source)
