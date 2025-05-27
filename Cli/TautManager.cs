@@ -86,7 +86,7 @@ class TautManager(ILogger<TautManager> logger)
         logger.ZLogTrace($"Append '{relPathToHostObjects}' to '{objectsInfoAlternatesFile}'");
     }
 
-    internal void MapHostRefToTaut(Lg2RefSpec refSpec)
+    internal string MapHostRefToTaut(Lg2RefSpec refSpec)
     {
         if (_hostRepo.TryLookupRef(refSpec.GetSrc(), out var srcRef) == false)
         {
@@ -112,6 +112,8 @@ class TautManager(ILogger<TautManager> logger)
 
             logger.ZLogTrace($"{logMessage}");
         }
+
+        return mappedSrcRefName;
     }
 
     [DoesNotReturn]

@@ -47,6 +47,8 @@ thirdparty/libgit2/include/git2/tag.h
 thirdparty/libgit2/include/git2/object.h
 thirdparty/libgit2/include/git2/refspec.h
 thirdparty/libgit2/include/git2/trace.h
+thirdparty/libgit2/include/git2/net.h
+
 
 --file
 thirdparty/libgit2/include/git2.h
@@ -65,7 +67,6 @@ GIT_OID_DEFAULT
 # unused for now
 git_odb_writepack
 git_odb_write_pack
-git_refspec_direction
 
 --methodClassName
 LibGit2Exports

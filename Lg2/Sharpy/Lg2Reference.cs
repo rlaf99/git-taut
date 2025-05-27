@@ -165,4 +165,17 @@ unsafe partial class Lg2RepositoryExtensions
         }
         Lg2Exception.RaiseIfNotOk(rc);
     }
+
+    public static List<string> GetRefList(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        var refs = new git_strarray();
+        var rc = git_reference_list(&refs, repo.Ptr);
+        Lg2Exception.RaiseIfNotOk(rc);
+
+        using var lg2Refs = Lg2StrArray.FromNative(refs);
+
+        return lg2Refs.ToList();
+    }
 }

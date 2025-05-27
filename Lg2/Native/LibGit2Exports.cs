@@ -687,6 +687,9 @@ namespace Lg2.Native
         public static extern int git_refspec_force([NativeTypeName("const git_refspec *")] git_refspec* refspec);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern git_direction git_refspec_direction([NativeTypeName("const git_refspec *")] git_refspec* spec);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_refspec_src_matches([NativeTypeName("const git_refspec *")] git_refspec* refspec, [NativeTypeName("const char *")] sbyte* refname);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -1118,6 +1121,9 @@ namespace Lg2.Native
 
         [NativeTypeName("#define GIT_BLOB_FILTER_OPTIONS_VERSION 1")]
         public const int GIT_BLOB_FILTER_OPTIONS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_DEFAULT_PORT \"9418\"")]
+        public static ReadOnlySpan<byte> GIT_DEFAULT_PORT => "9418"u8;
 
         [NativeTypeName("#define GIT_ODB_OPTIONS_VERSION 1")]
         public const int GIT_ODB_OPTIONS_VERSION = 1;

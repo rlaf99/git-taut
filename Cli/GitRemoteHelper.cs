@@ -286,11 +286,11 @@ partial class GitRemoteHelper
             RaiseInvalidOperation($"Invalid refspec {refSpecText}");
         }
 
-        logger.ZLogDebug($"{refSpec.GetSrc()} {refSpec.GetDst()}");
+        var mappedSrcRefName = tautManager.MapHostRefToTaut(refSpec);
 
-        tautManager.MapHostRefToTaut(refSpec);
+        var refSpecTextToUse = refSpec.ToString(replaceSrc: mappedSrcRefName);
 
-        RaiseNotImplemented($"{cmdPush} not implemented");
+        gitCli.Execute("--git-dir", _tautRepoDir, "push", _remote, refSpecTextToUse);
 
         return HandleGitCommandResult.Keep;
     }
