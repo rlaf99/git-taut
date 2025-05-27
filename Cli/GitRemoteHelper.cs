@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using ConsoleAppFramework;
 using Lg2.Sharpy;
@@ -169,9 +170,9 @@ partial class GitRemoteHelper
         {
             _handleGitCommand = HandleGitCmdListForPush;
         }
-        else if (input == cmdPush)
+        else if (input.StartsWith(cmdPush))
         {
-            RaiseNotImplemented($"{cmdPush} not implemented");
+            _handleGitCommand = HandleGitCmdPush;
         }
         else if (input.StartsWith(cmdFetch))
         {
@@ -187,10 +188,6 @@ partial class GitRemoteHelper
         }
 
         var result = _handleGitCommand(input);
-        if (result == HandleGitCommandResult.Done)
-        {
-            _handleGitCommand = null;
-        }
 
         return result;
     }
@@ -214,43 +211,17 @@ partial class GitRemoteHelper
         }
         else
         {
-            CloneTaut();
+            GitCloneTaut();
 
-            foreach (var refName in tautManager.RefList)
+            foreach (var refName in tautManager.TautRepo.GetRefList())
             {
                 Lg2Oid oid = new();
-                tautManager.Repo.GetOidFromName(refName, ref oid);
+                tautManager.TautRepo.GetOidForRef(refName, ref oid);
                 Console.WriteLine($"{oid.ToString()} {refName}");
             }
 
             Console.WriteLine();
         }
-
-        return HandleGitCommandResult.Done;
-    }
-
-    HandleGitCommandResult HandleGitCmdListForPush(string input)
-    {
-        UpdateTaut();
-
-        tautManager.Open(_tautRepoDir);
-
-        foreach (var refName in tautManager.RefList)
-        {
-            Lg2Oid oid = new();
-            tautManager.Repo.GetOidFromName(refName, ref oid);
-            Console.WriteLine($"{oid.ToString()} {refName}");
-        }
-
-        Console.WriteLine();
-
-        return HandleGitCommandResult.Done;
-    }
-
-    HandleGitCommandResult HandleGitCmdOption(string input)
-    {
-        var nameValue = input[cmdOption.Length..].TrimStart();
-        _options.HandleNameValue(nameValue);
 
         return HandleGitCommandResult.Done;
     }
@@ -279,6 +250,57 @@ partial class GitRemoteHelper
         tautManager.TransferCommitToHost(ref oid);
 
         return HandleGitCommandResult.Keep;
+    }
+
+    HandleGitCommandResult HandleGitCmdListForPush(string input)
+    {
+        GitUpdateTaut();
+
+        tautManager.Open(_tautRepoDir);
+
+        foreach (var refName in tautManager.TautRepo.GetRefList())
+        {
+            Lg2Oid oid = new();
+            tautManager.TautRepo.GetOidForRef(refName, ref oid);
+            Console.WriteLine($"{oid.ToString()} {refName}");
+        }
+
+        Console.WriteLine();
+
+        return HandleGitCommandResult.Done;
+    }
+
+    HandleGitCommandResult HandleGitCmdPush(string input)
+    {
+        if (input.Length == 0)
+        {
+            RaiseNotImplemented($"{cmdPush} length 0");
+
+            return HandleGitCommandResult.Done;
+        }
+
+        var refSpecText = input[cmdPush.Length..].TrimStart();
+
+        if (Lg2RefSpec.TryParseForPush(refSpecText, out var refSpec) == false)
+        {
+            RaiseInvalidOperation($"Invalid refspec {refSpecText}");
+        }
+
+        logger.ZLogDebug($"{refSpec.GetSrc()} {refSpec.GetDst()}");
+
+        tautManager.MapHostRefToTaut(refSpec);
+
+        RaiseNotImplemented($"{cmdPush} not implemented");
+
+        return HandleGitCommandResult.Keep;
+    }
+
+    HandleGitCommandResult HandleGitCmdOption(string input)
+    {
+        var nameValue = input[cmdOption.Length..].TrimStart();
+        _options.HandleNameValue(nameValue);
+
+        return HandleGitCommandResult.Done;
     }
 }
 
@@ -315,7 +337,12 @@ partial class GitRemoteHelper
             logger.TraceReceivedGitCommand(input);
 
             _handleGitCommand ??= DispatchGitCommand;
-            _handleGitCommand(input);
+
+            var result = _handleGitCommand(input);
+            if (result == HandleGitCommandResult.Done)
+            {
+                _handleGitCommand = null;
+            }
         }
     }
 
@@ -337,7 +364,7 @@ partial class GitRemoteHelper
         _tautRepoDir = tautDir;
     }
 
-    void CloneTaut()
+    void GitCloneTaut()
     {
         gitCli.Execute("clone", "--bare", _address, _tautRepoDir);
 
@@ -345,12 +372,12 @@ partial class GitRemoteHelper
 
         tautManager.Open(_tautRepoDir);
 
-        tautManager.AddHostObjects();
-        tautManager.SetDefaultConfig();
-        tautManager.SetDefaultDescription();
+        tautManager.TautRepoAddHostObjects();
+        tautManager.TautRepoSetDefaultConfig();
+        tautManager.TautRepoSetDefaultDescription();
     }
 
-    void UpdateTaut()
+    void GitUpdateTaut()
     {
         gitCli.Execute("--git-dir", _tautRepoDir, "fetch", _remote, "+refs/heads/*:refs/heads/*");
 

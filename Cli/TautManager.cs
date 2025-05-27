@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+using System.Diagnostics.CodeAnalysis;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Logging;
 using ZLogger;
@@ -9,34 +9,43 @@ class TautManager(ILogger<TautManager> logger)
 {
     const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
 
-    readonly Lg2Repository _repo = new();
+    readonly Lg2Repository _tautRepo = new();
 
-    internal Lg2Repository Repo => _repo;
+    readonly Lg2Repository _hostRepo = new();
 
-    string? _location = null;
-    internal string Location
+    internal Lg2Repository TautRepo => _tautRepo;
+
+    internal Lg2Repository HostRepo => _hostRepo;
+
+    string? _tautRepoPath = null;
+    internal string TautRepoPath
     {
         get
         {
-            _location ??= _repo.GetPath();
-            return _location;
+            _tautRepoPath ??= _tautRepo.GetPath();
+            return _tautRepoPath;
         }
     }
 
-    internal string HostPath => Path.Join(Location, "..");
-
-    internal List<string> RefList => _repo.GetRefList();
-
-    internal Lg2Odb RepoOdb => _repo.GetOdb();
+    string? _hostRepoPath = null;
+    internal string HostRepoPath
+    {
+        get
+        {
+            _hostRepoPath ??= _hostRepo.GetPath();
+            return _hostRepoPath;
+        }
+    }
 
     internal void Open(string repoPath)
     {
-        _repo.Open(repoPath);
+        _tautRepo.Open(repoPath);
+        _hostRepo.Open(Path.Join(repoPath, ".."));
     }
 
-    internal void SetDefaultDescription()
+    internal void TautRepoSetDefaultDescription()
     {
-        var descriptionFile = Path.Join(Location, GitRepoLayout.Description);
+        var descriptionFile = Path.Join(TautRepoPath, GitRepoLayout.Description);
 
         File.Delete(descriptionFile);
 
@@ -49,22 +58,22 @@ class TautManager(ILogger<TautManager> logger)
         logger.ZLogTrace($"Write '{defaultDescription}' to '{descriptionFile}'");
     }
 
-    internal void SetDefaultConfig()
+    internal void TautRepoSetDefaultConfig()
     {
-        using var config = _repo.GetConfig();
+        using var config = _tautRepo.GetConfig();
         config.SetString(GitConfig.Fetch_Prune, "true");
     }
 
-    internal void AddHostObjects()
+    internal void TautRepoAddHostObjects()
     {
-        var objectsDir = Path.Join(Location, GitRepoLayout.ObjectsDir);
+        var objectsDir = Path.Join(TautRepoPath, GitRepoLayout.ObjectsDir);
 
         var objectsInfoAlternatesFile = Path.Join(
-            Location,
+            TautRepoPath,
             GitRepoLayout.ObjectsInfoAlternatesFile
         );
 
-        var hostRepoObjectsDir = Path.Join(HostPath, GitRepoLayout.ObjectsDir);
+        var hostRepoObjectsDir = Path.Join(HostRepoPath, GitRepoLayout.ObjectsDir);
 
         var relPathToHostObjects = Path.GetRelativePath(objectsDir, hostRepoObjectsDir);
 
@@ -77,11 +86,45 @@ class TautManager(ILogger<TautManager> logger)
         logger.ZLogTrace($"Append '{relPathToHostObjects}' to '{objectsInfoAlternatesFile}'");
     }
 
+    internal void MapHostRefToTaut(Lg2RefSpec refSpec)
+    {
+        if (_hostRepo.TryLookupRef(refSpec.GetSrc(), out var srcRef) == false)
+        {
+            RaiseInvalidOperation($"Invalide source reference '{refSpec.GetSrc()}'");
+        }
+
+        var srcRefName = srcRef.GetName();
+        var srcRefOid = srcRef.GetTarget();
+
+        var mappedSrcRefName = "refs/tautened" + srcRefName["refs".Length..];
+
+        if (_tautRepo.TryLookupRef(mappedSrcRefName, out var mappedSrcRef) == false)
+        {
+            var logMessage = $"Create a mapped reference '{mappedSrcRefName}'";
+            mappedSrcRef = _tautRepo.NewReference(mappedSrcRefName, srcRefOid, false, logMessage);
+
+            logger.ZLogTrace($"{logMessage}");
+        }
+        else
+        {
+            var logMessage = $"Update mapped reference '{mappedSrcRefName}'";
+            mappedSrcRef.SetTarget(srcRefOid, logMessage);
+
+            logger.ZLogTrace($"{logMessage}");
+        }
+    }
+
+    [DoesNotReturn]
+    void RaiseInvalidOperation(string message)
+    {
+        logger.ZLogError($"{message}");
+        throw new InvalidOperationException(message);
+    }
+
     internal void TransferCommitToHost(ref Lg2Oid commitOid)
     {
-        var hostRepoObjectsDir = Path.Join(HostPath, GitRepoLayout.ObjectsDir);
-        using var hostRepoOdb = Lg2Odb.Open(hostRepoObjectsDir);
-        using var tautRepoOdb = _repo.GetOdb();
+        using var hostRepoOdb = _hostRepo.GetOdb();
+        using var tautRepoOdb = _tautRepo.GetOdb();
 
         void CopyObjectToHost(ILg2ObjectInfo objInfo)
         {
@@ -124,21 +167,21 @@ class TautManager(ILogger<TautManager> logger)
 
                     if (objType == Lg2ObjectType.LG2_OBJECT_TREE)
                     {
-                        var subTree = _repo.LookupTree(entry);
+                        var subTree = _tautRepo.LookupTree(entry);
                         unprocessed.Enqueue(subTree);
                     }
                 }
             }
         }
 
-        using var revWalk = _repo.NewRevWalk();
+        using var revWalk = _tautRepo.NewRevWalk();
         revWalk.Push(ref commitOid);
 
         Lg2Oid oid = new();
 
         while (revWalk.Next(ref oid))
         {
-            var commit = _repo.LookupCommit(ref oid);
+            var commit = _tautRepo.LookupCommit(ref oid);
 
             var commitOidStr8 = oid.ToString(8);
             var commitSummary = commit.GetSummary();

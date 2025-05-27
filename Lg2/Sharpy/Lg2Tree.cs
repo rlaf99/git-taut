@@ -231,3 +231,34 @@ public static unsafe class Lg2TreeExtensions
         return new Lg2TreeEntryOwnedRef(tree, pEntry);
     }
 }
+
+unsafe partial class Lg2RepositoryExtensions
+{
+    public static Lg2Tree LookupTree(this Lg2Repository repo, ref Lg2Oid oid)
+    {
+        repo.EnsureValid();
+
+        git_tree* pTree = null;
+        int rc;
+        fixed (git_oid* pOid = &oid.Raw)
+        {
+            rc = git_tree_lookup(&pTree, repo.Ptr, pOid);
+        }
+        Lg2Exception.RaiseIfNotOk(rc);
+
+        return new Lg2Tree(pTree);
+    }
+
+    public static Lg2Tree LookupTree(this Lg2Repository repo, ILg2ObjectInfo objInfo)
+    {
+        repo.EnsureValid();
+
+        var oidPlainRef = objInfo.GetOidPlainRef();
+
+        git_tree* pTree = null;
+        var rc = git_tree_lookup(&pTree, repo.Ptr, oidPlainRef.Ptr);
+        Lg2Exception.RaiseIfNotOk(rc);
+
+        return new Lg2Tree(pTree);
+    }
+}

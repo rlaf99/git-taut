@@ -31,14 +31,11 @@ public class Lg2Exception : Exception
             var lastError = git_error_last();
             var message = Marshal.PtrToStringUTF8((nint)lastError->message);
 
-            throw new Lg2Exception(
-                errorCode,
-                $"Lg2 Error: {errorCode}: {lastError->klass}: {message}"
-            );
+            throw new Lg2Exception(errorCode, $"{errorCode}: {lastError->klass}: {message}");
         }
         else
         {
-            throw new Lg2Exception(GIT_ERROR, $"Lg2 Error: unknown error code {code} encountered");
+            throw new Lg2Exception(GIT_ERROR, $"unknown error code {code} encountered");
         }
     }
 }
@@ -153,81 +150,6 @@ public static unsafe class Lg2ConfigExtensions
 
         var rc = git_config_set_string(config.Ptr, u8Name.Ptr, u8Value.Ptr);
         Lg2Exception.RaiseIfNotOk(rc);
-    }
-}
-
-public unsafe class Lg2RevWalk
-    : NativeSafePointer<Lg2RevWalk, git_revwalk>,
-        INativeRelease<git_revwalk>
-{
-    internal Lg2RevWalk(git_revwalk* pNative)
-        : base(pNative) { }
-
-    public static void NativeRelease(git_revwalk* pNative)
-    {
-        git_revwalk_free(pNative);
-    }
-}
-
-public static unsafe class Lg2RevWalkExtensions
-{
-    public static void PushRef(this Lg2RevWalk revWalk, string refName)
-    {
-        revWalk.EnsureValid();
-
-        using var u8RefName = new Lg2Utf8String(refName);
-        var rc = git_revwalk_push_ref(revWalk.Ptr, u8RefName.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
-    }
-
-    public static void Push(this Lg2RevWalk revWalk, ref Lg2Oid oid)
-    {
-        fixed (git_oid* pOid = &oid.Raw)
-        {
-            var rc = git_revwalk_push(revWalk.Ptr, pOid);
-            Lg2Exception.RaiseIfNotOk(rc);
-        }
-    }
-
-    public static bool Next(this Lg2RevWalk revWalk, ref Lg2Oid oid)
-    {
-        revWalk.EnsureValid();
-
-        var rc = (int)GIT_OK;
-        fixed (git_oid* pOid = &oid.Raw)
-        {
-            rc = git_revwalk_next(pOid, revWalk.Ptr);
-        }
-
-        if (rc == (int)GIT_ITEROVER)
-        {
-            return false;
-        }
-        Lg2Exception.RaiseIfNotOk(rc);
-
-        return true;
-    }
-
-    internal static void Hide(this Lg2RevWalk revWalk, ref Lg2Oid oid)
-    {
-        revWalk.EnsureValid();
-
-        var rc = (int)GIT_OK;
-        fixed (git_oid* pOid = &oid.Raw)
-        {
-            rc = git_revwalk_hide(revWalk.Ptr, pOid);
-        }
-        Lg2Exception.RaiseIfNotOk(rc);
-    }
-
-    internal static void AddHideCallback(this Lg2RevWalk revWalk)
-    {
-        revWalk.EnsureValid();
-
-        // TODO
-        // git_revwalk_add_hide_cb();
-
-        throw new NotImplementedException();
     }
 }
 
@@ -691,19 +613,6 @@ public static unsafe class Lg2ObjectExtensions
     }
 }
 
-public unsafe class Lg2Reference
-    : NativeSafePointer<Lg2Reference, git_reference>,
-        INativeRelease<git_reference>
-{
-    internal Lg2Reference(git_reference* pNative)
-        : base(pNative) { }
-
-    public static unsafe void NativeRelease(git_reference* pNative)
-    {
-        git_reference_free(pNative);
-    }
-}
-
 public unsafe class Lg2RefSpec
     : NativeSafePointer<Lg2RefSpec, git_refspec>,
         INativeRelease<git_refspec>
@@ -716,15 +625,13 @@ public unsafe class Lg2RefSpec
         git_refspec_free(pNative);
     }
 
-    public static bool TryParse(string input, bool isFetch, out Lg2RefSpec refSpec)
+    static bool TryParse(string input, bool isFetch, ref Lg2RefSpec refSpec)
     {
-        refSpec = new(null);
-
         using var u8Input = new Lg2Utf8String(input);
 
         git_refspec* pRefSpec = null;
         var rc = git_refspec_parse(&pRefSpec, u8Input.Ptr, isFetch ? 1 : 0);
-        if (rc == 0)
+        if (rc != (int)GIT_OK)
         {
             return false;
         }
@@ -733,11 +640,25 @@ public unsafe class Lg2RefSpec
 
         return true;
     }
+
+    public static bool TryParseForPush(string input, out Lg2RefSpec refSpec)
+    {
+        refSpec = new(null);
+
+        return TryParse(input, false, ref refSpec);
+    }
+
+    public static bool TryParseForFetch(string input, out Lg2RefSpec refSpec)
+    {
+        refSpec = new(null);
+
+        return TryParse(input, true, ref refSpec);
+    }
 }
 
 public static unsafe class Lg2RefSpecExtensions
 {
-    static string GetSrc(this Lg2RefSpec refSpec)
+    public static string GetSrc(this Lg2RefSpec refSpec)
     {
         refSpec.EnsureValid();
 
@@ -747,7 +668,7 @@ public static unsafe class Lg2RefSpecExtensions
         return result;
     }
 
-    static string GetDst(this Lg2RefSpec refSpec)
+    public static string GetDst(this Lg2RefSpec refSpec)
     {
         refSpec.EnsureValid();
 
@@ -757,7 +678,7 @@ public static unsafe class Lg2RefSpecExtensions
         return result;
     }
 
-    static string GetString(this Lg2RefSpec refSpec)
+    public static string GetString(this Lg2RefSpec refSpec)
     {
         refSpec.EnsureValid();
 

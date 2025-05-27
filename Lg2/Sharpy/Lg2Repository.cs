@@ -55,7 +55,7 @@ public unsafe class Lg2Repository
     }
 }
 
-public static unsafe class Lg2RepositoryExtensions
+public static unsafe partial class Lg2RepositoryExtensions
 {
     public static bool IsBare(this Lg2Repository repo)
     {
@@ -110,17 +110,6 @@ public static unsafe class Lg2RepositoryExtensions
         return result;
     }
 
-    public static Lg2RevWalk NewRevWalk(this Lg2Repository repo)
-    {
-        repo.EnsureValid();
-
-        git_revwalk* pRevWalk = null;
-        var rc = git_revwalk_new(&pRevWalk, repo.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
-
-        return new Lg2RevWalk(pRevWalk);
-    }
-
     public static Lg2Object LookupObject(
         this Lg2Repository repo,
         ILg2ObjectInfo objInfo,
@@ -136,34 +125,6 @@ public static unsafe class Lg2RepositoryExtensions
         Lg2Exception.RaiseIfNotOk(rc);
 
         return new(pObj);
-    }
-
-    public static Lg2Tree LookupTree(this Lg2Repository repo, ref Lg2Oid oid)
-    {
-        repo.EnsureValid();
-
-        git_tree* pTree = null;
-        int rc;
-        fixed (git_oid* pOid = &oid.Raw)
-        {
-            rc = git_tree_lookup(&pTree, repo.Ptr, pOid);
-        }
-        Lg2Exception.RaiseIfNotOk(rc);
-
-        return new Lg2Tree(pTree);
-    }
-
-    public static Lg2Tree LookupTree(this Lg2Repository repo, ILg2ObjectInfo objInfo)
-    {
-        repo.EnsureValid();
-
-        var oidPlainRef = objInfo.GetOidPlainRef();
-
-        git_tree* pTree = null;
-        var rc = git_tree_lookup(&pTree, repo.Ptr, oidPlainRef.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
-
-        return new Lg2Tree(pTree);
     }
 
     public static Lg2Blob LookupBlob(this Lg2Repository repo, ILg2ObjectInfo objInfo)
@@ -206,18 +167,5 @@ public static unsafe class Lg2RepositoryExtensions
         Lg2Exception.RaiseIfNotOk(rc);
 
         return new Lg2Tag(pTag);
-    }
-
-    public static void GetOidFromName(this Lg2Repository repo, string name, ref Lg2Oid oid)
-    {
-        repo.EnsureValid();
-
-        using var u8Name = new Lg2Utf8String(name);
-        int rc;
-        fixed (git_oid* pOid = &oid.Raw)
-        {
-            rc = git_reference_name_to_id(pOid, repo.Ptr, u8Name.Ptr);
-        }
-        Lg2Exception.RaiseIfNotOk(rc);
     }
 }
