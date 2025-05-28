@@ -89,6 +89,47 @@ public static unsafe class Lg2RefSpecExtensions
         return force != 0;
     }
 
+    static string Transform(this Lg2RefSpec refSpec, string refName, bool reverse)
+    {
+        refSpec.EnsureValid();
+
+        using var u8RefName = new Lg2Utf8String(refName);
+
+        git_buf buf = new();
+
+        try
+        {
+            int rc;
+            if (reverse)
+            {
+                rc = git_refspec_rtransform(&buf, refSpec.Ptr, u8RefName.Ptr);
+            }
+            else
+            {
+                rc = git_refspec_transform(&buf, refSpec.Ptr, u8RefName.Ptr);
+            }
+            Lg2Exception.RaiseIfNotOk(rc);
+
+            var result = Marshal.PtrToStringUTF8((nint)(&buf)) ?? string.Empty;
+
+            return result;
+        }
+        finally
+        {
+            git_buf_dispose(&buf);
+        }
+    }
+
+    public static string TransformToTarget(this Lg2RefSpec refSpec, string refName)
+    {
+        return refSpec.Transform(refName, reverse: false);
+    }
+
+    public static string TransformToSource(this Lg2RefSpec refSpec, string refName)
+    {
+        return refSpec.Transform(refName, reverse: true);
+    }
+
     public static string ToString(
         this Lg2RefSpec refSpec,
         string? replaceSrc = null,
@@ -96,6 +137,8 @@ public static unsafe class Lg2RefSpecExtensions
         bool? replaceForce = null
     )
     {
+        refSpec.EnsureValid();
+
         var src = replaceSrc ?? refSpec.GetSrc();
         var dst = replaceDst ?? refSpec.GetDst();
         var forced = replaceForce ?? refSpec.IsForced();

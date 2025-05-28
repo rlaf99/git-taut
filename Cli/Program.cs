@@ -1,16 +1,20 @@
-﻿using System.Text;
-using ConsoleAppFramework;
+﻿using ConsoleAppFramework;
 using Git.Remote.Taut;
+using Lg2.Sharpy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ZLogger;
-using static Lg2.Native.LibGit2Exports;
 
-var rc = git_libgit2_init();
-if (rc < 0)
+using var lg2Global = new Lg2Global();
+
+try
 {
-    Console.Error.WriteLine($"Failed to initialize libgit2: {rc}");
+    lg2Global.Init();
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine(ex.Message);
     Environment.Exit(1);
 }
 
@@ -69,15 +73,45 @@ var app = ConsoleApp
         }
     );
 
+app.UseFilter<Lg2TraceFilter>();
+
 app.Add<GitRemoteHelper>();
 app.Add(
     "--print-info",
     () =>
     {
-        var libgit2Version = Encoding.UTF8.GetString(LIBGIT2_VERSION);
-        ConsoleApp.Log($"LibGit2 Version: {libgit2Version}");
+        var lg2Version = Lg2Global.Version;
+        ConsoleApp.Log($"LibGit2 Version: {lg2Version}");
     }
 );
+
 app.Run(args);
 
-git_libgit2_shutdown();
+internal class Lg2TraceFilter(IServiceProvider serviceProvider, ConsoleAppFilter next)
+    : ConsoleAppFilter(next)
+{
+    public override async Task InvokeAsync(
+        ConsoleAppContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+        var logger = loggerFactory.CreateLogger<Lg2Trace>();
+
+        Lg2Trace.SetTraceOutput(
+            (message) =>
+            {
+                logger.ZLogTrace($"{message}");
+            }
+        );
+
+        try
+        {
+            await Next.InvokeAsync(context, cancellationToken);
+        }
+        finally
+        {
+            Lg2Trace.SetTraceOutput(null);
+        }
+    }
+}
