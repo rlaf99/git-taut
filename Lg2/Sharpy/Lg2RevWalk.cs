@@ -8,6 +8,9 @@ public unsafe class Lg2RevWalk
     : NativeSafePointer<Lg2RevWalk, git_revwalk>,
         INativeRelease<git_revwalk>
 {
+    public Lg2RevWalk()
+        : this(default) { }
+
     internal Lg2RevWalk(git_revwalk* pNative)
         : base(pNative) { }
 

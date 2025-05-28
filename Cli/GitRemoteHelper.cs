@@ -140,6 +140,8 @@ partial class GitRemoteHelper
 
 partial class GitRemoteHelper
 {
+    List<string> _pushBatch = [];
+
     enum HandleGitCommandResult
     {
         Keep = 0,
@@ -272,27 +274,53 @@ partial class GitRemoteHelper
 
     HandleGitCommandResult HandleGitCmdPush(string input)
     {
+        void HandleBatch()
+        {
+            foreach (var pushCmd in _pushBatch)
+            {
+                logger.ZLogTrace($"Handling '{pushCmd}'");
+
+                var refSpecText = pushCmd[cmdPush.Length..].TrimStart();
+
+                if (Lg2RefSpec.TryParseForPush(refSpecText, out var refSpec) == false)
+                {
+                    RaiseInvalidOperation($"Invalid refspec {refSpecText}");
+                }
+
+                var srcRefName = refSpec.GetSrc();
+
+                if (tautManager.HostRepo.TryLookupRef(srcRefName, out var srcRef) == false)
+                {
+                    RaiseInvalidOperation($"Invalide source reference '{refSpec.GetSrc()}'");
+                }
+
+                var mappedSrcRefName = tautManager.MapHostRefToTautened(srcRef);
+
+                var refSpecTextToUse = refSpec.ToString(replaceSrc: mappedSrcRefName);
+
+                gitCli.Execute("--git-dir", _tautRepoDir, "push", _remote, refSpecTextToUse);
+            }
+
+            Console.WriteLine();
+        }
+
         if (input.Length == 0)
         {
-            RaiseNotImplemented($"{cmdPush} length 0");
+            HandleBatch();
 
             return HandleGitCommandResult.Done;
         }
-
-        var refSpecText = input[cmdPush.Length..].TrimStart();
-
-        if (Lg2RefSpec.TryParseForPush(refSpecText, out var refSpec) == false)
+        else if (input.StartsWith(cmdPush))
         {
-            RaiseInvalidOperation($"Invalid refspec {refSpecText}");
+            _pushBatch.Add(input);
+
+            return HandleGitCommandResult.Keep;
         }
+        {
+            RaiseInvalidOperation($"{nameof(HandleGitCmdPush)}: Invalid input '{input}'");
 
-        var mappedSrcRefName = tautManager.MapHostRefToTaut(refSpec);
-
-        var refSpecTextToUse = refSpec.ToString(replaceSrc: mappedSrcRefName);
-
-        gitCli.Execute("--git-dir", _tautRepoDir, "push", _remote, refSpecTextToUse);
-
-        return HandleGitCommandResult.Keep;
+            return HandleGitCommandResult.Done;
+        }
     }
 
     HandleGitCommandResult HandleGitCmdOption(string input)

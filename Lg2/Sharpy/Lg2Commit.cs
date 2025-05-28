@@ -9,6 +9,9 @@ public unsafe class Lg2Commit
         INativeRelease<git_commit>,
         ILg2ObjectInfo
 {
+    public Lg2Commit()
+        : this(default) { }
+
     internal Lg2Commit(git_commit* pNative)
         : base(pNative) { }
 

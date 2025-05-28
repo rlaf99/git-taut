@@ -37,10 +37,15 @@ class TautManager(ILogger<TautManager> logger)
         }
     }
 
+    const string TautenedMappingRefSpecText = "refs/*:refs/tautened/*";
+    Lg2RefSpec _tautnedMappingRefSpec = new();
+
     internal void Open(string repoPath)
     {
         _tautRepo.Open(repoPath);
         _hostRepo.Open(Path.Join(repoPath, ".."));
+
+        _tautnedMappingRefSpec.ParseForPush(TautenedMappingRefSpecText);
     }
 
     internal void TautRepoSetDefaultDescription()
@@ -86,17 +91,12 @@ class TautManager(ILogger<TautManager> logger)
         logger.ZLogTrace($"Append '{relPathToHostObjects}' to '{objectsInfoAlternatesFile}'");
     }
 
-    internal string MapHostRefToTaut(Lg2RefSpec refSpec)
+    internal string MapHostRefToTautened(Lg2Reference hostRef)
     {
-        if (_hostRepo.TryLookupRef(refSpec.GetSrc(), out var srcRef) == false)
-        {
-            RaiseInvalidOperation($"Invalide source reference '{refSpec.GetSrc()}'");
-        }
+        var srcRefName = hostRef.GetName();
+        var srcRefOid = hostRef.GetTarget();
 
-        var srcRefName = srcRef.GetName();
-        var srcRefOid = srcRef.GetTarget();
-
-        var mappedSrcRefName = "refs/tautened" + srcRefName["refs".Length..];
+        var mappedSrcRefName = _tautnedMappingRefSpec.TransformToTarget(srcRefName);
 
         if (_tautRepo.TryLookupRef(mappedSrcRefName, out var mappedSrcRef) == false)
         {
@@ -134,7 +134,7 @@ class TautManager(ILogger<TautManager> logger)
             {
                 var typeName = objInfo.GetObjectType().GetName();
 
-                logger.ZLogTrace($"Write {typeName} {objInfo.GetOidString()} to the host repo");
+                logger.ZLogTrace($"Write {typeName} {objInfo.GetOidString()} to host");
             }
         }
 

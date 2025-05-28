@@ -79,6 +79,9 @@ public unsafe class Lg2OdbObject
         INativeRelease<git_odb_object>,
         ILg2ObjectInfo
 {
+    public Lg2OdbObject()
+        : this(default) { }
+
     internal Lg2OdbObject(git_odb_object* pNative)
         : base(pNative) { }
 
@@ -125,6 +128,9 @@ public static unsafe class Lg2OdbObjectExtensions
 
 public unsafe class Lg2Odb : NativeSafePointer<Lg2Odb, git_odb>, INativeRelease<git_odb>
 {
+    public Lg2Odb()
+        : this(default) { }
+
     internal Lg2Odb(git_odb* pNative)
         : base(pNative) { }
 

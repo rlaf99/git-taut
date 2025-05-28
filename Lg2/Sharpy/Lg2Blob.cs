@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
 
@@ -9,6 +8,9 @@ public unsafe class Lg2Blob
         INativeRelease<git_blob>,
         ILg2ObjectInfo
 {
+    public Lg2Blob()
+        : this(default) { }
+
     internal Lg2Blob(git_blob* pNative)
         : base(pNative) { }
 

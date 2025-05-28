@@ -9,6 +9,9 @@ public unsafe class Lg2Reference
     : NativeSafePointer<Lg2Reference, git_reference>,
         INativeRelease<git_reference>
 {
+    public Lg2Reference()
+        : this(default) { }
+
     internal Lg2Reference(git_reference* pNative)
         : base(pNative) { }
 

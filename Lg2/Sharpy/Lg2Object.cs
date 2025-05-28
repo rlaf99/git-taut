@@ -24,6 +24,9 @@ public unsafe class Lg2Object
         INativeRelease<git_object>,
         ILg2ObjectInfo
 {
+    public Lg2Object()
+        : this(default) { }
+
     internal Lg2Object(git_object* pNative)
         : base(pNative) { }
 

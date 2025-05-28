@@ -10,7 +10,7 @@ public unsafe interface INativeRelease<TNative>
 
 public abstract unsafe class NativeSafePointer<TDerived, TNative> : SafeHandle
     where TNative : unmanaged
-    where TDerived : INativeRelease<TNative>
+    where TDerived : INativeRelease<TNative>, new()
 {
     public delegate void Release(TNative* pNative);
 

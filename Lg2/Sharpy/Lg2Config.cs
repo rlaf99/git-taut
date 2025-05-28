@@ -7,6 +7,9 @@ public sealed unsafe class Lg2Config
     : NativeSafePointer<Lg2Config, git_config>,
         INativeRelease<git_config>
 {
+    public Lg2Config()
+        : this(default) { }
+
     internal Lg2Config(git_config* pNative)
         : base(pNative) { }
 

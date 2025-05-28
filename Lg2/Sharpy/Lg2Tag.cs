@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
 
@@ -9,6 +8,9 @@ public unsafe class Lg2Tag
         INativeRelease<git_tag>,
         ILg2ObjectInfo
 {
+    public Lg2Tag()
+        : this(default) { }
+
     internal Lg2Tag(git_tag* pNative)
         : base(pNative) { }
 

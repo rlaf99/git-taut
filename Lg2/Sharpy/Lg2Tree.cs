@@ -14,6 +14,9 @@ public unsafe class Lg2TreeEntry
         INativeRelease<git_tree_entry>,
         ILg2TreeEntry
 {
+    public Lg2TreeEntry()
+        : this(default) { }
+
     internal Lg2TreeEntry(git_tree_entry* pNative)
         : base(pNative) { }
 
@@ -135,6 +138,9 @@ public unsafe class Lg2Tree
         INativeRelease<git_tree>,
         ILg2ObjectInfo
 {
+    public Lg2Tree()
+        : this(default) { }
+
     internal Lg2Tree(git_tree* pNative)
         : base(pNative) { }
 
