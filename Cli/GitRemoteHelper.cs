@@ -70,8 +70,9 @@ partial class GitRemoteHelper
                 if (int.TryParse(nameValue[(optVerbosity.Length + 1)..], out var value))
                 {
                     Verbosity = value;
-                    TraceOptionUpdate(optVerbosity, value);
                     Console.WriteLine("ok");
+
+                    TraceOptionUpdate(optVerbosity, value);
                 }
                 else
                 {
@@ -81,30 +82,36 @@ partial class GitRemoteHelper
             else if (nameValue.StartsWith(optProgress))
             {
                 ShowProgress = GetBooleanValue(optProgress);
-                TraceOptionUpdate(optProgress, ShowProgress);
                 Console.WriteLine("ok");
+
+                TraceOptionUpdate(optProgress, ShowProgress);
             }
             else if (nameValue.StartsWith(optCloning))
             {
                 IsCloning = GetBooleanValue(optCloning);
-                TraceOptionUpdate(optCloning, IsCloning);
                 Console.WriteLine("ok");
+
+                TraceOptionUpdate(optCloning, IsCloning);
             }
             else if (nameValue.StartsWith(optCheckConnectivity))
             {
                 CheckConnectivity = GetBooleanValue(optCheckConnectivity);
-                TraceOptionUpdate(optCheckConnectivity, CheckConnectivity);
                 Console.WriteLine("ok");
+
+                TraceOptionUpdate(optCheckConnectivity, CheckConnectivity);
             }
             else if (nameValue.StartsWith(optForce))
             {
                 ForceUpdate = GetBooleanValue("force");
-                TraceOptionUpdate(optForce, ForceUpdate);
                 Console.WriteLine("ok");
+
+                TraceOptionUpdate(optForce, ForceUpdate);
             }
             else
             {
                 Console.WriteLine("unsupported");
+
+                logger.ZLogTrace($"Unsupported option '{nameValue}'");
             }
         }
     }
@@ -207,22 +214,31 @@ partial class GitRemoteHelper
 
     HandleGitCommandResult HandleGitCmdList(string input)
     {
+        void HandleList()
+        {
+            foreach (var refName in tautManager.GetRefsForTaut())
+            {
+                Lg2Oid oid = new();
+                tautManager.TautRepo.GetOidForRef(refName, ref oid);
+                var oidText = oid.ToString();
+
+                Console.WriteLine($"{oidText} {refName}");
+
+                logger.ZLogTrace($"{nameof(HandleGitCmdList)}: {oidText} {refName}");
+            }
+
+            Console.WriteLine();
+        }
+
         if (Directory.EnumerateFileSystemEntries(_tautRepoDir).Any())
         {
-            RaiseNotImplemented($"taut repo exists");
+            GitFetchTaut();
+            HandleList();
         }
         else
         {
             GitCloneTaut();
-
-            foreach (var refName in tautManager.TautRepo.GetRefList())
-            {
-                Lg2Oid oid = new();
-                tautManager.TautRepo.GetOidForRef(refName, ref oid);
-                Console.WriteLine($"{oid.ToString()} {refName}");
-            }
-
-            Console.WriteLine();
+            HandleList();
         }
 
         return HandleGitCommandResult.Done;
@@ -260,7 +276,7 @@ partial class GitRemoteHelper
 
         tautManager.Open(_tautRepoDir);
 
-        foreach (var refName in tautManager.TautRepo.GetRefList())
+        foreach (var refName in tautManager.GetRefsForTaut())
         {
             Lg2Oid oid = new();
             tautManager.TautRepo.GetOidForRef(refName, ref oid);
@@ -350,7 +366,7 @@ partial class GitRemoteHelper
         _remote = remote;
         _address = address;
 
-        logger.ZLogInformation($"Working on remote '{remote}' at '{address}'");
+        logger.ZLogTrace($"Run {ProgramInfo.CommandName} with '{remote}' and '{address}'");
 
         EnsureTautDir();
 
@@ -405,6 +421,13 @@ partial class GitRemoteHelper
         tautManager.TautRepoSetDefaultDescription();
     }
 
+    void GitFetchTaut()
+    {
+        tautManager.Open(_tautRepoDir);
+
+        GitUpdateTaut();
+    }
+
     void GitUpdateTaut()
     {
         gitCli.Execute("--git-dir", _tautRepoDir, "fetch", _remote, "+refs/heads/*:refs/heads/*");
@@ -422,7 +445,7 @@ partial class GitRemoteHelper
     [DoesNotReturn]
     void RaiseNotImplemented(string message)
     {
-        logger.ZLogCritical($"{message}");
+        logger.ZLogError($"{message}");
         throw new NotImplementedException(message);
     }
 }

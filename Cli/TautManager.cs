@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Logging;
 using ZLogger;
@@ -37,15 +36,17 @@ class TautManager(ILogger<TautManager> logger)
         }
     }
 
-    const string TautenedMappingRefSpecText = "refs/*:refs/tautened/*";
-    Lg2RefSpec _tautnedMappingRefSpec = new();
+    const string TautenedRefSpecText = "refs/*:refs/tautened/*";
+    Lg2RefSpec _tautnedRefSpec = new();
 
     internal void Open(string repoPath)
     {
         _tautRepo.Open(repoPath);
         _hostRepo.Open(Path.Join(repoPath, ".."));
 
-        _tautnedMappingRefSpec.ParseForPush(TautenedMappingRefSpecText);
+        _tautnedRefSpec.ParseForPush(TautenedRefSpecText);
+
+        logger.ZLogTrace($"{nameof(TautManager)}: {nameof(Open)} '{repoPath}'");
     }
 
     internal void TautRepoSetDefaultDescription()
@@ -67,6 +68,24 @@ class TautManager(ILogger<TautManager> logger)
     {
         using var config = _tautRepo.GetConfig();
         config.SetString(GitConfig.Fetch_Prune, "true");
+    }
+
+    internal List<string> GetRefsForTaut()
+    {
+        List<string> result = [];
+        var refList = _tautRepo.GetRefList();
+
+        foreach (var refName in refList)
+        {
+            if (_tautnedRefSpec.DstMatches(refName))
+            {
+                continue;
+            }
+
+            result.Add(refName);
+        }
+
+        return result;
     }
 
     internal void TautRepoAddHostObjects()
@@ -96,7 +115,7 @@ class TautManager(ILogger<TautManager> logger)
         var srcRefName = hostRef.GetName();
         var srcRefOid = hostRef.GetTarget();
 
-        var mappedSrcRefName = _tautnedMappingRefSpec.TransformToTarget(srcRefName);
+        var mappedSrcRefName = _tautnedRefSpec.TransformToTarget(srcRefName);
 
         if (_tautRepo.TryLookupRef(mappedSrcRefName, out var mappedSrcRef) == false)
         {
@@ -114,13 +133,6 @@ class TautManager(ILogger<TautManager> logger)
         }
 
         return mappedSrcRefName;
-    }
-
-    [DoesNotReturn]
-    void RaiseInvalidOperation(string message)
-    {
-        logger.ZLogError($"{message}");
-        throw new InvalidOperationException(message);
     }
 
     internal void TransferCommitToHost(ref Lg2Oid commitOid)

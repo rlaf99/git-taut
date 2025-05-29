@@ -78,6 +78,57 @@ public static unsafe class Lg2ReferenceExtensions
 
         return new(pOid);
     }
+
+    public static string GetShorthand(this Lg2Reference reference)
+    {
+        reference.EnsureValid();
+
+        var pName = git_reference_shorthand(reference.Ptr);
+        if (pName is null)
+        {
+            throw new InvalidOperationException("Reference's shorthand is null");
+        }
+
+        var result = Marshal.PtrToStringUTF8((nint)pName) ?? string.Empty;
+
+        return result;
+    }
+
+    public static bool IsBranch(this Lg2Reference reference)
+    {
+        reference.EnsureValid();
+
+        var result = git_reference_is_branch(reference.Ptr);
+
+        return result != 0;
+    }
+
+    public static bool IsRemote(this Lg2Reference reference)
+    {
+        reference.EnsureValid();
+
+        var result = git_reference_is_remote(reference.Ptr);
+
+        return result != 0;
+    }
+
+    public static bool IsTag(this Lg2Reference reference)
+    {
+        reference.EnsureValid();
+
+        var result = git_reference_is_tag(reference.Ptr);
+
+        return result != 0;
+    }
+
+    public static bool IsNote(this Lg2Reference reference)
+    {
+        reference.EnsureValid();
+
+        var result = git_reference_is_note(reference.Ptr);
+
+        return result != 0;
+    }
 }
 
 unsafe partial class Lg2RepositoryExtensions
@@ -180,5 +231,26 @@ unsafe partial class Lg2RepositoryExtensions
         using var lg2Refs = Lg2StrArray.FromNative(refs);
 
         return lg2Refs.ToList();
+    }
+
+    public static bool HasRefLog(this Lg2Repository repo, string refName)
+    {
+        repo.EnsureValid();
+
+        using var u8RefName = new Lg2Utf8String(refName);
+
+        var result = git_reference_has_log(repo.Ptr, u8RefName.Ptr);
+
+        return result != 0;
+    }
+
+    public static void EnsureRefLog(this Lg2Repository repo, string refName)
+    {
+        repo.EnsureValid();
+
+        using var u8RefName = new Lg2Utf8String(refName);
+
+        var result = git_reference_ensure_log(repo.Ptr, u8RefName.Ptr);
+        Lg2Exception.RaiseIfNotOk(result);
     }
 }

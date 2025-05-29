@@ -39,7 +39,8 @@ public abstract unsafe class NativeSafePointer<TDerived, TNative> : SafeHandle
     {
         if (IsInvalid)
         {
-            throw new InvalidOperationException($"The instance of {nameof(TDerived)} is not valid");
+            var derivedTypeName = typeof(TDerived).Name;
+            throw new InvalidOperationException($"The instance of {derivedTypeName} is not valid");
         }
     }
 }

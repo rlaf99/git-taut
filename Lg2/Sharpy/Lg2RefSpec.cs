@@ -159,6 +159,28 @@ public static unsafe class Lg2RefSpecExtensions
         return refSpec.Transform(refName, reverse: true);
     }
 
+    public static bool SrcMatches(this Lg2RefSpec refSpec, string refName)
+    {
+        refSpec.EnsureValid();
+
+        using var u8RefName = new Lg2Utf8String(refName);
+
+        var result = git_refspec_src_matches(refSpec.Ptr, u8RefName.Ptr);
+
+        return result != 0;
+    }
+
+    public static bool DstMatches(this Lg2RefSpec refSpec, string refName)
+    {
+        refSpec.EnsureValid();
+
+        using var u8RefName = new Lg2Utf8String(refName);
+
+        var result = git_refspec_dst_matches(refSpec.Ptr, u8RefName.Ptr);
+
+        return result != 0;
+    }
+
     public static string ToString(
         this Lg2RefSpec refSpec,
         string? replaceSrc = null,

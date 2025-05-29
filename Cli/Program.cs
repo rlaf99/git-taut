@@ -73,7 +73,7 @@ var app = ConsoleApp
         }
     );
 
-app.UseFilter<Lg2TraceFilter>();
+app.UseFilter<CustomFilter>();
 
 app.Add<GitRemoteHelper>();
 app.Add(
@@ -87,13 +87,10 @@ app.Add(
 
 app.Run(args);
 
-internal class Lg2TraceFilter(IServiceProvider serviceProvider, ConsoleAppFilter next)
+internal class CustomFilter(IServiceProvider serviceProvider, ConsoleAppFilter next)
     : ConsoleAppFilter(next)
 {
-    public override async Task InvokeAsync(
-        ConsoleAppContext context,
-        CancellationToken cancellationToken
-    )
+    void SetLg2TraceOutput()
     {
         var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
         var logger = loggerFactory.CreateLogger<Lg2Trace>();
@@ -104,6 +101,21 @@ internal class Lg2TraceFilter(IServiceProvider serviceProvider, ConsoleAppFilter
                 logger.ZLogTrace($"{message}");
             }
         );
+    }
+
+    void ResetLg2TraceOutput()
+    {
+        Lg2Trace.SetTraceOutput(null);
+    }
+
+    public override async Task InvokeAsync(
+        ConsoleAppContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        ConsoleApp.LogError = msg => Console.Error.WriteLine(msg);
+
+        SetLg2TraceOutput();
 
         try
         {
@@ -111,7 +123,7 @@ internal class Lg2TraceFilter(IServiceProvider serviceProvider, ConsoleAppFilter
         }
         finally
         {
-            Lg2Trace.SetTraceOutput(null);
+            ResetLg2TraceOutput();
         }
     }
 }
