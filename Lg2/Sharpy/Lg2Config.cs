@@ -42,7 +42,7 @@ public static unsafe class Lg2ConfigExtensions
     }
 }
 
-public static unsafe partial class Lg2RepositoryExtensions
+unsafe partial class Lg2RepositoryExtensions
 {
     public static Lg2Config GetConfig(this Lg2Repository repo)
     {

@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
 

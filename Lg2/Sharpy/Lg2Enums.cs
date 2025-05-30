@@ -48,3 +48,25 @@ public enum Lg2RefType
     LG2_REFERENCE_SYMBOLIC = git_reference_t.GIT_REFERENCE_SYMBOLIC,
     LG2_REFERENCE_ALL = git_reference_t.GIT_REFERENCE_ALL,
 }
+
+[Flags]
+public enum Lg2PathSpecFlags : uint
+{
+    LG2_PATHSPEC_DEFAULT = git_pathspec_flag_t.GIT_PATHSPEC_DEFAULT,
+    LG2_PATHSPEC_IGNORE_CASE = git_pathspec_flag_t.GIT_PATHSPEC_IGNORE_CASE,
+    LG2_PATHSPEC_USE_CASE = git_pathspec_flag_t.GIT_PATHSPEC_USE_CASE,
+    LG2_PATHSPEC_NO_GLOB = git_pathspec_flag_t.GIT_PATHSPEC_NO_GLOB,
+    LG2_PATHSPEC_NO_MATCH_ERROR = git_pathspec_flag_t.GIT_PATHSPEC_NO_MATCH_ERROR,
+    LG2_PATHSPEC_FIND_FAILURES = git_pathspec_flag_t.GIT_PATHSPEC_FIND_FAILURES,
+    LG2_PATHSPEC_FAILURES_ONLY = git_pathspec_flag_t.GIT_PATHSPEC_FAILURES_ONLY,
+}
+
+public enum Lg2FileMode
+{
+    LG2_FILEMODE_UNREADABLE = git_filemode_t.GIT_FILEMODE_UNREADABLE,
+    LG2_FILEMODE_TREE = git_filemode_t.GIT_FILEMODE_TREE,
+    LG2_FILEMODE_BLOB = git_filemode_t.GIT_FILEMODE_BLOB,
+    LG2_FILEMODE_BLOB_EXECUTABLE = git_filemode_t.GIT_FILEMODE_BLOB_EXECUTABLE,
+    LG2_FILEMODE_LINK = git_filemode_t.GIT_FILEMODE_LINK,
+    LG2_FILEMODE_COMMIT = git_filemode_t.GIT_FILEMODE_COMMIT,
+}

@@ -24,6 +24,12 @@ c
 --with-type
 git_repository_init_flag_t=uint
 git_reference_format_t=uint
+git_pathspec_flag_t=uint
+git_diff_option_t=uint
+git_diff_format_t=uint
+git_diff_flag_t=uint
+git_diff_stats_format_t=uint
+git_diff_find_t=uint
 
 --traverse
 thirdparty/libgit2/include/git2/global.h
@@ -48,6 +54,8 @@ thirdparty/libgit2/include/git2/object.h
 thirdparty/libgit2/include/git2/refspec.h
 thirdparty/libgit2/include/git2/trace.h
 thirdparty/libgit2/include/git2/net.h
+thirdparty/libgit2/include/git2/pathspec.h
+thirdparty/libgit2/include/git2/diff.h
 
 
 --file

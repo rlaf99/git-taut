@@ -224,13 +224,18 @@ unsafe partial class Lg2RepositoryExtensions
     {
         repo.EnsureValid();
 
-        var refs = new git_strarray();
+        git_strarray refs = new();
         var rc = git_reference_list(&refs, repo.Ptr);
         Lg2Exception.RaiseIfNotOk(rc);
 
-        using var lg2Refs = Lg2StrArray.FromNative(refs);
-
-        return lg2Refs.ToList();
+        try
+        {
+            return refs.ToList();
+        }
+        finally
+        {
+            git_strarray_dispose(&refs);
+        }
     }
 
     public static bool HasRefLog(this Lg2Repository repo, string refName)

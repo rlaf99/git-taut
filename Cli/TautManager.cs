@@ -39,12 +39,17 @@ class TautManager(ILogger<TautManager> logger)
     const string TautenedRefSpecText = "refs/*:refs/tautened/*";
     Lg2RefSpec _tautnedRefSpec = new();
 
+    readonly List<string> TautenedPathSpecList = ["*.tt", "*.taut"];
+    Lg2PathSpec _tautenedPathSpec = new();
+
     internal void Open(string repoPath)
     {
         _tautRepo.Open(repoPath);
         _hostRepo.Open(Path.Join(repoPath, ".."));
 
         _tautnedRefSpec.ParseForPush(TautenedRefSpecText);
+
+        _tautenedPathSpec.Reload(TautenedPathSpecList);
 
         logger.ZLogTrace($"{nameof(TautManager)}: {nameof(Open)} '{repoPath}'");
     }
@@ -165,16 +170,25 @@ class TautManager(ILogger<TautManager> logger)
                 for (nuint idx = 0; idx < tree.GetEntryCount(); idx++)
                 {
                     var entry = tree.GetEntryByIndex(idx);
-                    var entryName = entry.GetName();
+                    var entryFileName = entry.GetFileName();
                     var entryOidText = entry.GetOidString();
 
                     var objType = entry.GetObjectType();
                     if (objType.IsValid() == false)
                     {
                         logger.ZLogWarning(
-                            $"Invalid object type {objType.ToString()} for tree entry '{entryName}"
+                            $"Invalid object type {objType.GetName()} for tree entry '{entryFileName}"
                         );
                         continue;
+                    }
+                    if (
+                        _tautenedPathSpec.MatchPath(
+                            entryFileName,
+                            Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE
+                        )
+                    )
+                    {
+                        logger.ZLogDebug($"{entryFileName} should be tautened");
                     }
 
                     CopyObjectToHost(entry);

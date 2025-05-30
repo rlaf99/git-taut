@@ -6,7 +6,7 @@ namespace Lg2.Sharpy;
 
 public interface ILg2TreeEntry : ILg2ObjectInfo
 {
-    string GetName();
+    string GetFileName();
 }
 
 public unsafe class Lg2TreeEntry
@@ -34,18 +34,53 @@ public unsafe class Lg2TreeEntry
         return new Lg2OidPlainRef(pOid);
     }
 
-    public string GetName()
+    public string GetFileName()
     {
         EnsureValid();
 
-        return Lg2TreeEntryExtensions.GetName(Ptr);
+        return GetFileName(Ptr);
     }
 
     public Lg2ObjectType GetObjectType()
     {
         EnsureValid();
 
-        return Lg2TreeEntryExtensions.GetType(Ptr);
+        return GetType(Ptr);
+    }
+
+    public Lg2FileMode GetFileMode()
+    {
+        EnsureValid();
+
+        return GetFileMode(Ptr);
+    }
+
+    public Lg2FileMode GetFileModeRaw()
+    {
+        EnsureValid();
+
+        return GetFileModeRaw(Ptr);
+    }
+
+    internal static string GetFileName(git_tree_entry* pEntry)
+    {
+        var pName = git_tree_entry_name(pEntry);
+        return Marshal.PtrToStringUTF8((nint)pName) ?? string.Empty;
+    }
+
+    internal static Lg2ObjectType GetType(git_tree_entry* pEntry)
+    {
+        return (Lg2ObjectType)git_tree_entry_type(pEntry);
+    }
+
+    internal static Lg2FileMode GetFileMode(git_tree_entry* pEntry)
+    {
+        return (Lg2FileMode)git_tree_entry_filemode(pEntry);
+    }
+
+    internal static Lg2FileMode GetFileModeRaw(git_tree_entry* pEntry)
+    {
+        return (Lg2FileMode)git_tree_entry_filemode_raw(pEntry);
     }
 }
 
@@ -75,18 +110,18 @@ public readonly unsafe ref struct Lg2TreeEntryPlainRef : ILg2TreeEntry
         return new Lg2OidPlainRef(pOid);
     }
 
-    public string GetName()
+    public string GetFileName()
     {
         EnsureValid();
 
-        return Lg2TreeEntryExtensions.GetName(Ptr);
+        return Lg2TreeEntry.GetFileName(Ptr);
     }
 
     public Lg2ObjectType GetObjectType()
     {
         EnsureValid();
 
-        return Lg2TreeEntryExtensions.GetType(Ptr);
+        return Lg2TreeEntry.GetType(Ptr);
     }
 }
 
@@ -104,32 +139,18 @@ public unsafe class Lg2TreeEntryOwnedRef : NativeOwnedRef<Lg2Tree, git_tree_entr
         return new Lg2OidPlainRef(pOid);
     }
 
-    public string GetName()
+    public string GetFileName()
     {
         EnsureValid();
 
-        return Lg2TreeEntryExtensions.GetName(_pNative);
+        return Lg2TreeEntry.GetFileName(_pNative);
     }
 
     public Lg2ObjectType GetObjectType()
     {
         EnsureValid();
 
-        return Lg2TreeEntryExtensions.GetType(_pNative);
-    }
-}
-
-public static unsafe class Lg2TreeEntryExtensions
-{
-    internal static string GetName(git_tree_entry* pEntry)
-    {
-        var pName = git_tree_entry_name(pEntry);
-        return Marshal.PtrToStringUTF8((nint)pName) ?? string.Empty;
-    }
-
-    internal static Lg2ObjectType GetType(git_tree_entry* pEntry)
-    {
-        return (Lg2ObjectType)git_tree_entry_type(pEntry);
+        return Lg2TreeEntry.GetType(_pNative);
     }
 }
 

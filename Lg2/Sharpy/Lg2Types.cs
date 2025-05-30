@@ -67,13 +67,13 @@ public ref struct Lg2Global : IDisposable
     }
 }
 
-internal sealed unsafe class Lg2StrArray : IDisposable
+public sealed unsafe class Lg2StrArray : IDisposable
 {
-    git_strarray _strArray = new();
-
-    bool _nativeAllocated = false;
+    internal git_strarray Raw;
 
     bool _disposed = false;
+
+    ~Lg2StrArray() => Dispose(false);
 
     public void Dispose()
     {
@@ -91,56 +91,63 @@ internal sealed unsafe class Lg2StrArray : IDisposable
 
         if (disposing) { } // for managed resource
 
-        if (_nativeAllocated)
-        {
-            fixed (git_strarray* pStrArray = &_strArray)
-            {
-                git_strarray_dispose(pStrArray);
-            }
-        }
-        else
-        {
-            FreeUnmanaged();
-        }
+        FreeUnmanaged();
     }
 
     void FreeUnmanaged()
     {
-        if (_strArray.strings != null)
+        if (Raw.strings != null)
         {
-            for (nuint i = 0; i < _strArray.count; i++)
+            for (nuint i = 0; i < Raw.count; i++)
             {
-                Marshal.FreeCoTaskMem((nint)_strArray.strings[i]);
+                Marshal.FreeCoTaskMem((nint)Raw.strings[i]);
             }
 
-            Marshal.FreeCoTaskMem((nint)_strArray.strings);
+            Marshal.FreeCoTaskMem((nint)Raw.strings);
         }
 
-        _strArray.count = 0;
+        Raw = new();
     }
 
-    ~Lg2StrArray() => Dispose(false);
-
-    internal static Lg2StrArray FromNative(git_strarray strArray)
+    public static Lg2StrArray FromList(List<string> input)
     {
-        var lg2StrArray = new Lg2StrArray { _strArray = strArray, _nativeAllocated = true, };
+        var stringsSize = Marshal.SizeOf(typeof(sbyte*)) * input.Count;
 
-        return lg2StrArray;
+        git_strarray strarray =
+            new()
+            {
+                strings = (sbyte**)Marshal.AllocCoTaskMem(stringsSize),
+                count = (nuint)input.Count,
+            };
+
+        for (int i = 0; i < input.Count; i++)
+        {
+            strarray.strings[i] = (sbyte*)Marshal.StringToCoTaskMemUTF8(input[i]);
+        }
+
+        Lg2StrArray result = new() { Raw = strarray };
+
+        return result;
     }
+}
 
-    internal List<string> ToList()
+internal static unsafe partial class Lg2StrArrayNativeExtensions
+{
+    internal static List<string> ToList(this git_strarray strarray)
     {
         List<string> result = [];
 
-        for (nuint i = 0; i < _strArray.count; i++)
+        for (nuint i = 0; i < strarray.count; i++)
         {
-            var entry = Marshal.PtrToStringUTF8((nint)_strArray.strings[i]);
+            var entry = Marshal.PtrToStringUTF8((nint)strarray.strings[i]);
             result.Add(entry ?? string.Empty);
         }
 
         return result;
     }
 }
+
+public static class Lg2StrArrayExtensions { }
 
 public unsafe ref struct Lg2RawData
 {
