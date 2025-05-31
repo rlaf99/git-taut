@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using ConsoleAppFramework;
 using Lg2.Sharpy;
@@ -219,7 +218,7 @@ partial class GitRemoteHelper
             foreach (var refName in tautManager.GetRefsForTaut())
             {
                 Lg2Oid oid = new();
-                tautManager.TautRepo.GetOidForRef(refName, ref oid);
+                tautManager.TautRepo.GetRefOid(refName, ref oid);
                 var oidText = oid.ToString();
 
                 Console.WriteLine($"{oidText} {refName}");
@@ -279,7 +278,7 @@ partial class GitRemoteHelper
         foreach (var refName in tautManager.GetRefsForTaut())
         {
             Lg2Oid oid = new();
-            tautManager.TautRepo.GetOidForRef(refName, ref oid);
+            tautManager.TautRepo.GetRefOid(refName, ref oid);
             Console.WriteLine($"{oid.ToString()} {refName}");
         }
 

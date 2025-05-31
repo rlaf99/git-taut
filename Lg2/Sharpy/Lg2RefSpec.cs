@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.git_error_code;
@@ -20,17 +21,17 @@ public unsafe class Lg2RefSpec
         git_refspec_free(pNative);
     }
 
-    public void ParseForPush(string input)
+    public static Lg2RefSpec ParseForPush(string input)
     {
-        Parse(input, isFetch: false);
+        return Parse(input, isFetch: false);
     }
 
-    public void ParseForFetch(string input)
+    public static Lg2RefSpec ParseForFetch(string input)
     {
-        Parse(input, isFetch: true);
+        return Parse(input, isFetch: true);
     }
 
-    void Parse(string input, bool isFetch)
+    static Lg2RefSpec Parse(string input, bool isFetch)
     {
         using var u8Input = new Lg2Utf8String(input);
 
@@ -38,11 +39,11 @@ public unsafe class Lg2RefSpec
         var rc = git_refspec_parse(&pRefSpec, u8Input.Ptr, isFetch ? 1 : 0);
         Lg2Exception.RaiseIfNotOk(rc);
 
-        ReleaseHandle();
-        SetHandle((nint)pRefSpec);
+        return new(pRefSpec);
     }
 
-    static bool TryParse(string input, bool isFetch, ref Lg2RefSpec refSpec)
+    // XXX: [NotNullWhen(true)] does not seem to work
+    static bool Parse(string input, bool isFetch, [NotNullWhen(true)] out Lg2RefSpec? refSpec)
     {
         using var u8Input = new Lg2Utf8String(input);
 
@@ -50,25 +51,30 @@ public unsafe class Lg2RefSpec
         var rc = git_refspec_parse(&pRefSpec, u8Input.Ptr, isFetch ? 1 : 0);
         if (rc != (int)GIT_OK)
         {
+            refSpec = default;
+
             return false;
         }
+        else
+        {
+            refSpec = new(pRefSpec);
 
-        refSpec.ReleaseHandle();
-        refSpec.SetHandle((nint)pRefSpec);
-
-        return true;
+            return true;
+        }
     }
 
     public static bool TryParseForPush(string input, out Lg2RefSpec refSpec)
     {
-        refSpec = new();
-        return TryParse(input, isFetch: false, ref refSpec);
+        var success = Parse(input, isFetch: false, out var rs);
+        refSpec = success ? rs! : new();
+        return success;
     }
 
     public static bool TryParseForFetch(string input, out Lg2RefSpec refSpec)
     {
-        refSpec = new();
-        return TryParse(input, isFetch: true, ref refSpec);
+        var success = Parse(input, isFetch: true, out var rs);
+        refSpec = success ? rs! : new();
+        return success;
     }
 }
 

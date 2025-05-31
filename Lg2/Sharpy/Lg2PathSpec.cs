@@ -34,19 +34,10 @@ public unsafe class Lg2PathSpec
         git_pathspec_free(pNative);
     }
 
-    public void Reload(List<string> strings)
+    public static Lg2PathSpec New(List<string> strings)
     {
         var strArray = Lg2StrArray.FromList(strings);
-
-        Reload(strArray);
-    }
-
-    public void Reload(Lg2StrArray strArray)
-    {
-        var pPathSpec = strArray.Raw.NewPathSpec();
-
-        ReleaseHandle();
-        SetHandle((nint)pPathSpec);
+        return New(strArray);
     }
 
     public static Lg2PathSpec New(Lg2StrArray strArray)

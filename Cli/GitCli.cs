@@ -4,6 +4,12 @@ using ZLogger;
 
 namespace Git.Remote.Taut;
 
+class GitCliException : Exception
+{
+    internal GitCliException(string message)
+        : base(message) { }
+}
+
 class GitCli(ILogger<GitCli> logger)
 {
     string _envAlternateObjDirs = string.Empty;
@@ -13,7 +19,7 @@ class GitCli(ILogger<GitCli> logger)
         get { return _alternateObjDirs; }
         set
         {
-            _alternateObjDirs =  [..value];
+            _alternateObjDirs =  [.. value];
             _envAlternateObjDirs = string.Join(Path.PathSeparator, value);
         }
     }
@@ -35,6 +41,14 @@ class GitCli(ILogger<GitCli> logger)
         }
     }
 
+    void CheckExitCode(int exitCode)
+    {
+        if (exitCode != 0)
+        {
+            throw new GitCliException($"Process exited with non-zero code {exitCode}");
+        }
+    }
+
     internal void Execute(params string[] args)
     {
         var startInfo = new ProcessStartInfo("git")
@@ -51,7 +65,7 @@ class GitCli(ILogger<GitCli> logger)
 
         logger.ZLogTrace($"Run git with arguments '{startInfo.Arguments}'");
 
-        Process process = new() { StartInfo = startInfo };
+        using var process = new Process() { StartInfo = startInfo };
 
         static void ErrorDataReceiver(object sender, DataReceivedEventArgs args)
         {
@@ -68,7 +82,8 @@ class GitCli(ILogger<GitCli> logger)
         process.StandardInput.Close();
 
         process.WaitForExit();
-        process.Close();
+
+        CheckExitCode(process.ExitCode);
     }
 
     internal List<string> GetOutputLines(params string[] args)
@@ -89,7 +104,7 @@ class GitCli(ILogger<GitCli> logger)
 
         List<string> result = [];
 
-        Process process = new() { StartInfo = startInfo };
+        using var process = new Process() { StartInfo = startInfo };
 
         void OutputDataReceiver(object sender, DataReceivedEventArgs args)
         {
@@ -116,7 +131,8 @@ class GitCli(ILogger<GitCli> logger)
         process.StandardInput.Close();
 
         process.WaitForExit();
-        process.Close();
+
+        CheckExitCode(process.ExitCode);
 
         return result;
     }

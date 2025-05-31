@@ -1,10 +1,12 @@
+using System.Diagnostics.CodeAnalysis;
 using Lg2.Sharpy;
+using LightningDB;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
 namespace Git.Remote.Taut;
 
-class TautManager(ILogger<TautManager> logger)
+class TautManager(ILogger<TautManager> logger, AesCbc1 aesCbc1)
 {
     const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
 
@@ -37,19 +39,61 @@ class TautManager(ILogger<TautManager> logger)
     }
 
     const string TautenedRefSpecText = "refs/*:refs/tautened/*";
-    Lg2RefSpec _tautnedRefSpec = new();
+
+    [AllowNull]
+    Lg2RefSpec _tautnedRefSpec;
 
     readonly List<string> TautenedPathSpecList = ["*.tt", "*.taut"];
-    Lg2PathSpec _tautenedPathSpec = new();
+
+    [AllowNull]
+    Lg2PathSpec _tautenedPathSpec;
+
+    const string KvStoreDirName = "tautened";
+    const string KvStoreHost2TautFileName = "host2taut";
+    const string KvStoreTaut2HostFileName = "taut2host";
+
+    [AllowNull]
+    LightningEnvironment _kvStoreEnv;
+
+    [AllowNull]
+    LightningDatabase _kvStoreHost2Taut;
+
+    [AllowNull]
+    LightningDatabase _kvStoreTaut2Host;
 
     internal void Open(string repoPath)
     {
         _tautRepo.Open(repoPath);
         _hostRepo.Open(Path.Join(repoPath, ".."));
 
-        _tautnedRefSpec.ParseForPush(TautenedRefSpecText);
+        _tautnedRefSpec = Lg2RefSpec.ParseForPush(TautenedRefSpecText);
 
-        _tautenedPathSpec.Reload(TautenedPathSpecList);
+        _tautenedPathSpec = Lg2PathSpec.New(TautenedPathSpecList);
+
+        void InitKvStore()
+        {
+            var kvStoreDirPath = Path.Join(
+                TautRepoPath,
+                GitRepoLayout.ObjectsInfoDir,
+                KvStoreDirName
+            );
+            Directory.CreateDirectory(kvStoreDirPath);
+
+            var envConfig = new EnvironmentConfiguration() { MaxDatabases = 2 };
+            _kvStoreEnv = new LightningEnvironment(kvStoreDirPath, envConfig);
+            _kvStoreEnv.Open();
+
+            var config = new DatabaseConfiguration { Flags = DatabaseOpenFlags.Create };
+
+            using (var tx = _kvStoreEnv.BeginTransaction())
+            {
+                _kvStoreHost2Taut = tx.OpenDatabase(KvStoreHost2TautFileName, config);
+                _kvStoreTaut2Host = tx.OpenDatabase(KvStoreTaut2HostFileName, config);
+                tx.Commit();
+            }
+        }
+
+        InitKvStore();
 
         logger.ZLogTrace($"{nameof(TautManager)}: {nameof(Open)} '{repoPath}'");
     }
@@ -113,6 +157,28 @@ class TautManager(ILogger<TautManager> logger)
         }
 
         logger.ZLogTrace($"Append '{relPathToHostObjects}' to '{objectsInfoAlternatesFile}'");
+    }
+
+    internal string TautenHostRef(string hostRefName)
+    {
+        // if (_hostRepo.TryLookupRef(hostRefName, out var hostRef) == false)
+        // {
+        //     RaiseInvalidOperation($"Invalide source reference '{hostRefName}'");
+        // }
+
+        // Lg2Oid oid = new();
+        // _hostRepo.GetRefOid(hostRefName, ref oid);
+
+        var revWalk = _hostRepo.NewRevWalk();
+        revWalk.PushRef(hostRefName);
+
+        Lg2Oid oid = new();
+        while (revWalk.Next(ref oid))
+        {
+            // see if oid is in the map
+        }
+
+        throw new NotImplementedException();
     }
 
     internal string MapHostRefToTautened(Lg2Reference hostRef)
@@ -222,5 +288,12 @@ class TautManager(ILogger<TautManager> logger)
 
             TransferTree(rootTree);
         }
+    }
+
+    [DoesNotReturn]
+    void RaiseInvalidOperation(string message)
+    {
+        logger.ZLogError($"{message}");
+        throw new InvalidOperationException(message);
     }
 }

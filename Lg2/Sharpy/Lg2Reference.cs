@@ -207,17 +207,36 @@ unsafe partial class Lg2RepositoryExtensions
         }
     }
 
-    public static void GetOidForRef(this Lg2Repository repo, string refName, ref Lg2Oid oid)
+    public static void GetRefOid(this Lg2Repository repo, string refName, ref Lg2Oid oid)
     {
         repo.EnsureValid();
 
         using var u8RefName = new Lg2Utf8String(refName);
-        int rc;
+
         fixed (git_oid* pOid = &oid.Raw)
         {
-            rc = git_reference_name_to_id(pOid, repo.Ptr, u8RefName.Ptr);
+            var rc = git_reference_name_to_id(pOid, repo.Ptr, u8RefName.Ptr);
+            Lg2Exception.RaiseIfNotOk(rc);
         }
-        Lg2Exception.RaiseIfNotOk(rc);
+    }
+
+    public static bool TryGetRefOid(this Lg2Repository repo, string refName, out Lg2Oid oid)
+    {
+        repo.EnsureValid();
+
+        using var u8RefName = new Lg2Utf8String(refName);
+
+        fixed (git_oid* pOid = &oid.Raw)
+        {
+            var rc = git_reference_name_to_id(pOid, repo.Ptr, u8RefName.Ptr);
+            if (rc == (int)GIT_ENOTFOUND)
+            {
+                return false;
+            }
+            Lg2Exception.RaiseIfNotOk(rc);
+        }
+
+        return true;
     }
 
     public static List<string> GetRefList(this Lg2Repository repo)
