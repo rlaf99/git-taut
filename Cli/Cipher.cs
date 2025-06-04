@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -75,10 +76,17 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
     [AllowNull]
     UserKeyBase _keyBase;
 
-    readonly MemoryStream _buffer = new();
+    bool _initialized = false;
 
-    void Init()
+    public void Init()
     {
+        if (_initialized)
+        {
+            return;
+        }
+
+        _initialized = true;
+
         _aes = Aes.Create();
 
         _aes.Mode = UsedCipherMode;
@@ -89,13 +97,22 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         Debug.Assert(RANDOM_BYTES + VERIFY_KEY_BYTES == CIPHER_BLOCK_BYTES);
 
         logger.ZLogTrace(
-            $"Initalize AES mode '{Enum.GetName(UsedCipherMode)}' padding '{Enum.GetName(UsedPaddingMode)}'"
+            $"Initalize {nameof(Aes256Cbc1)} mode '{Enum.GetName(UsedCipherMode)}' padding '{Enum.GetName(UsedPaddingMode)}'"
         );
     }
 
-    MemoryStream Encrypt(Stream inputStream, bool isBinary)
+    void EnsureInitialized()
     {
-        var outputStream = new MemoryStream();
+        if (_initialized == false)
+        {
+            throw new InvalidOperationException($"{nameof(Aes256Cbc1)} not initailized");
+        }
+    }
+
+    public void Encrypt(Stream outputStream, Stream inputStream, bool isBinary)
+    {
+        EnsureInitialized();
+
         outputStream.Write(TAUTENED_DATA);
         outputStream.Write(RESERVED_DATA);
 
@@ -130,13 +147,11 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         {
             outputStream.Write(readBuf, 0, readLen);
         }
-
-        return outputStream;
     }
 
-    MemoryStream Decrypt(Stream inputStream, bool isBinary)
+    public void Decrypt(Stream outputStream, Stream inputStream, bool isBinary)
     {
-        var outputStream = new MemoryStream();
+        EnsureInitialized();
 
         var tautenedData = new byte[TAUTENED_BYTES];
         var tautenedSize = inputStream.Read(tautenedData);
@@ -194,7 +209,5 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         {
             outputStream.Write(readBuf, 0, readLen);
         }
-
-        return outputStream;
     }
 }

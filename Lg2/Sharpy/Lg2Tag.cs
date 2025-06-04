@@ -45,7 +45,7 @@ unsafe partial class Lg2RepositoryExtensions
         {
             rc = git_tag_lookup(&pTag, repo.Ptr, pOid);
         }
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new Lg2Tag(pTag);
     }

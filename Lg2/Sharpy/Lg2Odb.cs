@@ -1,111 +1,8 @@
-using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
-
-public readonly unsafe ref struct Lg2OidPlainRef
-{
-    internal readonly git_oid* Ptr;
-
-    internal ref git_oid Ref
-    {
-        get
-        {
-            EnsureValid();
-            return ref (*Ptr);
-        }
-    }
-
-    internal Lg2OidPlainRef(git_oid* pOid)
-    {
-        Ptr = pOid;
-    }
-
-    public void EnsureValid()
-    {
-        if (Ptr is null)
-        {
-            throw new InvalidOperationException($"Invalid {nameof(Lg2OidPlainRef)}");
-        }
-    }
-}
-
-public static unsafe class Lg2OidPlainRefExtensions
-{
-    public static ReadOnlySpan<byte> GetBytes(this Lg2OidPlainRef plainRef)
-    {
-        return MemoryMarshal.CreateReadOnlySpan(ref plainRef.Ref.id[0], GIT_OID_MAX_SIZE);
-    }
-}
-
-public unsafe ref struct Lg2Oid
-{
-    internal git_oid Raw;
-
-    public ReadOnlySpan<byte> GetBytes()
-    {
-        return MemoryMarshal.CreateReadOnlySpan(ref Raw.id[0], GIT_OID_MAX_SIZE);
-    }
-
-    public void FromString(string hash)
-    {
-        var u8Hash = new Lg2Utf8String(hash);
-
-        fixed (git_oid* pOid = &Raw)
-        {
-            var rc = git_oid_fromstr(pOid, u8Hash.Ptr);
-            Lg2Exception.RaiseIfNotOk(rc);
-        }
-    }
-
-    public override readonly string ToString()
-    {
-        return Raw.Fmt();
-    }
-
-    public readonly string ToString(int size)
-    {
-        return Raw.NFmt(size);
-    }
-}
-
-internal static unsafe class Lg2OidNativeExtentions
-{
-    internal static string Fmt(ref readonly this git_oid oid)
-    {
-        var buf = stackalloc sbyte[GIT_OID_MAX_HEXSIZE + 1];
-        fixed (git_oid* pOid = &oid)
-        {
-            var rc = git_oid_fmt(buf, pOid);
-            Lg2Exception.RaiseIfNotOk(rc);
-        }
-
-        var result = Marshal.PtrToStringUTF8((nint)buf) ?? string.Empty;
-
-        return result;
-    }
-
-    internal static string NFmt(ref readonly this git_oid oid, int size)
-    {
-        if (size > GIT_OID_MAX_HEXSIZE)
-        {
-            throw new ArgumentOutOfRangeException(nameof(size), $"Value too large");
-        }
-
-        var buf = stackalloc sbyte[size + 1];
-
-        fixed (git_oid* pOid = &oid)
-        {
-            var rc = git_oid_nfmt(buf, (nuint)size, pOid);
-            Lg2Exception.RaiseIfNotOk(rc);
-        }
-
-        var result = Marshal.PtrToStringUTF8((nint)buf) ?? string.Empty;
-
-        return result;
-    }
-}
 
 public unsafe class Lg2OdbObject
     : NativeSafePointer<Lg2OdbObject, git_odb_object>,
@@ -185,12 +82,17 @@ public unsafe class Lg2OdbStream
 
 public static unsafe class Lg2OdbStreamExtensions
 {
-    public static void Read(this Lg2OdbStream rstrm, ref Lg2RawData rawData)
+    public static int Read(this Lg2OdbStream rstrm, scoped ref readonly Lg2RawData rawData)
     {
         rstrm.EnsureValid();
 
-        var rc = git_odb_stream_read(rstrm.Ptr, (sbyte*)rawData.Ptr, (nuint)rawData.Len);
-        Lg2Exception.RaiseIfNotOk(rc);
+        var bytesRead = git_odb_stream_read(rstrm.Ptr, (sbyte*)rawData.Ptr, (nuint)rawData.Len);
+        if (bytesRead < 0)
+        {
+            Lg2Exception.ThrowIfNotOk(bytesRead);
+        }
+
+        return bytesRead;
     }
 
     public static void Write(this Lg2OdbStream wstrm, scoped ref readonly Lg2RawData rawData)
@@ -198,17 +100,17 @@ public static unsafe class Lg2OdbStreamExtensions
         wstrm.EnsureValid();
 
         var rc = git_odb_stream_write(wstrm.Ptr, (sbyte*)rawData.Ptr, (nuint)rawData.Len);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
     }
 
-    public static void FinalizeWrite(this Lg2OdbStream wstrm, ref Lg2Oid oid)
+    public static void FinalizeWrite(this Lg2OdbStream wstrm, scoped ref Lg2Oid oid)
     {
         wstrm.EnsureValid();
 
         fixed (git_oid* pOid = &oid.Raw)
         {
             var rc = git_odb_stream_finalize_write(pOid, wstrm.Ptr);
-            Lg2Exception.RaiseIfNotOk(rc);
+            Lg2Exception.ThrowIfNotOk(rc);
         }
     }
 
@@ -227,7 +129,7 @@ public static unsafe class Lg2OdbStreamExtensions
     }
 }
 
-public class Lg2OdbReadStream : Stream
+public unsafe class Lg2OdbReadStream : Stream
 {
     readonly Lg2OdbStream _rstrm;
 
@@ -254,7 +156,14 @@ public class Lg2OdbReadStream : Stream
 
     public override int Read(byte[] buffer, int offset, int count)
     {
-        throw new NotImplementedException();
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, buffer.Length - offset);
+
+        fixed (byte* ptr = &buffer[offset])
+        {
+            Lg2RawData rawData = new() { Ptr = (nint)ptr, Len = count };
+
+            return _rstrm.Read(ref rawData);
+        }
     }
 
     public override long Seek(long offset, SeekOrigin origin)
@@ -290,7 +199,7 @@ public class Lg2OdbReadStream : Stream
     }
 }
 
-public class Lg2OdbWriteStream : Stream
+public unsafe class Lg2OdbWriteStream : Stream
 {
     readonly Lg2OdbStream _wstrm;
 
@@ -332,7 +241,14 @@ public class Lg2OdbWriteStream : Stream
 
     public override void Write(byte[] buffer, int offset, int count)
     {
-        throw new NotImplementedException();
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, buffer.Length - offset);
+
+        fixed (byte* ptr = &buffer[offset])
+        {
+            Lg2RawData rawData = new() { Ptr = (nint)ptr, Len = count };
+
+            _wstrm.Write(ref rawData);
+        }
     }
 
     bool _disposed;
@@ -378,7 +294,7 @@ public unsafe class Lg2Odb : NativeSafePointer<Lg2Odb, git_odb>, INativeRelease<
 
         git_odb* pOdb = null;
         var rc = git_odb_open(&pOdb, u8ObjectsDir.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pOdb);
     }
@@ -387,7 +303,7 @@ public unsafe class Lg2Odb : NativeSafePointer<Lg2Odb, git_odb>, INativeRelease<
     {
         git_odb* pOdb = null;
         var rc = git_odb_new(&pOdb);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pOdb);
     }
@@ -402,7 +318,7 @@ public unsafe class Lg2Odb : NativeSafePointer<Lg2Odb, git_odb>, INativeRelease<
                 (nuint)rawData.Len,
                 (git_object_t)objType
             );
-            Lg2Exception.RaiseIfNotOk(rc);
+            Lg2Exception.ThrowIfNotOk(rc);
         }
     }
 }
@@ -414,7 +330,7 @@ public static unsafe class Lg2OdbExtenions
         odb.EnsureValid();
 
         var rc = git_odb_refresh(odb.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
     }
 
     public static bool Exists(this Lg2Odb odb, ILg2ObjectInfo objInfo)
@@ -446,7 +362,7 @@ public static unsafe class Lg2OdbExtenions
         fixed (git_oid* pOid = &oid.Raw)
         {
             var rc = git_odb_read(&pOdbObject, odb.Ptr, pOid);
-            Lg2Exception.RaiseIfNotOk(rc);
+            Lg2Exception.ThrowIfNotOk(rc);
         }
 
         return new(pOdbObject);
@@ -459,7 +375,7 @@ public static unsafe class Lg2OdbExtenions
         var oidRef = objInfo.GetOidPlainRef();
         git_odb_object* pOdbObject = null;
         var rc = git_odb_read(&pOdbObject, odb.Ptr, oidRef.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pOdbObject);
     }
@@ -476,7 +392,7 @@ public static unsafe class Lg2OdbExtenions
             (nuint)rawData.Len,
             (git_object_t)objType
         );
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return oid;
     }
@@ -522,7 +438,7 @@ public static unsafe class Lg2OdbExtenions
         return true;
     }
 
-    internal static Lg2OdbReadStream OpenReadStream(this Lg2Odb odb, ILg2ObjectInfo objInfo)
+    public static Lg2OdbReadStream OpenReadStream(this Lg2Odb odb, ILg2ObjectInfo objInfo)
     {
         odb.EnsureValid();
 
@@ -531,24 +447,34 @@ public static unsafe class Lg2OdbExtenions
         nuint len;
         git_object_t type;
         var rc = git_odb_open_rstream(&pOdbStream, &len, &type, odb.Ptr, oidRef.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         Lg2OdbStream strm = new(pOdbStream);
 
         return new(strm);
     }
 
+    public static Lg2OdbWriteStream OpenWriteStream(this Lg2Odb odb, Lg2Blob blob)
+    {
+        return odb.OpenWriteStream(blob.GetRawSize(), blob.GetObjectType());
+    }
+
     internal static Lg2OdbWriteStream OpenWriteStream(
         this Lg2Odb odb,
-        ulong objSize,
+        long objSize,
         Lg2ObjectType objType
     )
     {
         odb.EnsureValid();
 
+        if (objSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(objSize), $"Invalid value '{objSize}'");
+        }
+
         git_odb_stream* pOdbStream = null;
-        var rc = git_odb_open_wstream(&pOdbStream, odb.Ptr, objSize, (git_object_t)objType);
-        Lg2Exception.RaiseIfNotOk(rc);
+        var rc = git_odb_open_wstream(&pOdbStream, odb.Ptr, (ulong)objSize, (git_object_t)objType);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         Lg2OdbStream strm = new(pOdbStream);
 
@@ -564,7 +490,7 @@ unsafe partial class Lg2RepositoryExtensions
 
         git_odb* pOdb = null;
         var rc = git_repository_odb(&pOdb, repo.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pOdb);
     }

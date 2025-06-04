@@ -25,7 +25,7 @@ public unsafe class Lg2Reference
         using var u8RefName = new Lg2Utf8String(refName);
         int valid = default;
         var rc = git_reference_name_is_valid(&valid, u8RefName.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return valid != default;
     }
@@ -38,7 +38,7 @@ public unsafe class Lg2Reference
 
         git_reference* pRef = null;
         var rc = git_reference_set_target(&pRef, Ptr, oidRef.Ptr, u8LogMessage.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         ReleaseHandle();
         SetHandle((nint)pRef);
@@ -154,7 +154,7 @@ unsafe partial class Lg2RepositoryExtensions
             force ? 1 : 0,
             u8LogMessage.Ptr
         );
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pRef);
     }
@@ -216,7 +216,7 @@ unsafe partial class Lg2RepositoryExtensions
         fixed (git_oid* pOid = &oid.Raw)
         {
             var rc = git_reference_name_to_id(pOid, repo.Ptr, u8RefName.Ptr);
-            Lg2Exception.RaiseIfNotOk(rc);
+            Lg2Exception.ThrowIfNotOk(rc);
         }
     }
 
@@ -233,7 +233,7 @@ unsafe partial class Lg2RepositoryExtensions
             {
                 return false;
             }
-            Lg2Exception.RaiseIfNotOk(rc);
+            Lg2Exception.ThrowIfNotOk(rc);
         }
 
         return true;
@@ -245,7 +245,7 @@ unsafe partial class Lg2RepositoryExtensions
 
         git_strarray refs = new();
         var rc = git_reference_list(&refs, repo.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         try
         {
@@ -275,6 +275,6 @@ unsafe partial class Lg2RepositoryExtensions
         using var u8RefName = new Lg2Utf8String(refName);
 
         var result = git_reference_ensure_log(repo.Ptr, u8RefName.Ptr);
-        Lg2Exception.RaiseIfNotOk(result);
+        Lg2Exception.ThrowIfNotOk(result);
     }
 }

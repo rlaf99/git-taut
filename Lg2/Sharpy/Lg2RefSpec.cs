@@ -21,28 +21,27 @@ public unsafe class Lg2RefSpec
         git_refspec_free(pNative);
     }
 
-    public static Lg2RefSpec ParseForPush(string input)
+    public static Lg2RefSpec NewForPush(string input)
     {
-        return Parse(input, isFetch: false);
+        return New(input, isFetch: false);
     }
 
-    public static Lg2RefSpec ParseForFetch(string input)
+    public static Lg2RefSpec NewForFetch(string input)
     {
-        return Parse(input, isFetch: true);
+        return New(input, isFetch: true);
     }
 
-    static Lg2RefSpec Parse(string input, bool isFetch)
+    static Lg2RefSpec New(string input, bool isFetch)
     {
         using var u8Input = new Lg2Utf8String(input);
 
         git_refspec* pRefSpec = null;
         var rc = git_refspec_parse(&pRefSpec, u8Input.Ptr, isFetch ? 1 : 0);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pRefSpec);
     }
 
-    // XXX: [NotNullWhen(true)] does not seem to work
     static bool Parse(string input, bool isFetch, [NotNullWhen(true)] out Lg2RefSpec? refSpec)
     {
         using var u8Input = new Lg2Utf8String(input);
@@ -138,7 +137,7 @@ public static unsafe class Lg2RefSpecExtensions
             {
                 rc = git_refspec_transform(&buf, refSpec.Ptr, u8RefName.Ptr);
             }
-            Lg2Exception.RaiseIfNotOk(rc);
+            Lg2Exception.ThrowIfNotOk(rc);
 
             var result = string.Empty;
 

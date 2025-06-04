@@ -73,7 +73,7 @@ public static unsafe class Lg2PathSpecExtensions
 
         git_pathspec_match_list* pMatchList = null;
         var rc = git_pathspec_match_tree(&pMatchList, tree.Ptr, (uint)flags, pathSpec.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pMatchList);
     }
@@ -86,7 +86,7 @@ unsafe partial class Lg2StrArrayNativeExtensions
         git_pathspec* pPathSpec = null;
 
         var rc = git_pathspec_new(&pPathSpec, &strarray);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return pPathSpec;
     }

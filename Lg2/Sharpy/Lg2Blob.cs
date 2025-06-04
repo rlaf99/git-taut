@@ -87,7 +87,7 @@ unsafe partial class Lg2RepositoryExtensions
         git_blob* pBlob = null;
 
         var rc = git_blob_lookup(&pBlob, repo.Ptr, oidPlainRef.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new Lg2Blob(pBlob);
     }

@@ -28,19 +28,19 @@ public static unsafe class Lg2RevWalkExtensions
 
         using var u8RefName = new Lg2Utf8String(refName);
         var rc = git_revwalk_push_ref(revWalk.Ptr, u8RefName.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
     }
 
-    public static void Push(this Lg2RevWalk revWalk, ref Lg2Oid oid)
+    public static void Push(this Lg2RevWalk revWalk, scoped ref Lg2Oid oid)
     {
         fixed (git_oid* pOid = &oid.Raw)
         {
             var rc = git_revwalk_push(revWalk.Ptr, pOid);
-            Lg2Exception.RaiseIfNotOk(rc);
+            Lg2Exception.ThrowIfNotOk(rc);
         }
     }
 
-    public static bool Next(this Lg2RevWalk revWalk, ref Lg2Oid oid)
+    public static bool Next(this Lg2RevWalk revWalk, scoped ref Lg2Oid oid)
     {
         revWalk.EnsureValid();
 
@@ -54,12 +54,12 @@ public static unsafe class Lg2RevWalkExtensions
         {
             return false;
         }
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return true;
     }
 
-    internal static void Hide(this Lg2RevWalk revWalk, ref Lg2Oid oid)
+    internal static void Hide(this Lg2RevWalk revWalk, scoped ref Lg2Oid oid)
     {
         revWalk.EnsureValid();
 
@@ -68,15 +68,12 @@ public static unsafe class Lg2RevWalkExtensions
         {
             rc = git_revwalk_hide(revWalk.Ptr, pOid);
         }
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
     }
 
     internal static void AddHideCallback(this Lg2RevWalk revWalk)
     {
         revWalk.EnsureValid();
-
-        // TODO
-        // git_revwalk_add_hide_cb();
 
         throw new NotImplementedException();
     }
@@ -90,7 +87,7 @@ unsafe partial class Lg2RepositoryExtensions
 
         git_revwalk* pRevWalk = null;
         var rc = git_revwalk_new(&pRevWalk, repo.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new Lg2RevWalk(pRevWalk);
     }

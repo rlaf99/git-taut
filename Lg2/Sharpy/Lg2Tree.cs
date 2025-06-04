@@ -6,7 +6,7 @@ namespace Lg2.Sharpy;
 
 public interface ILg2TreeEntry : ILg2ObjectInfo
 {
-    string GetFileName();
+    string GetName();
 }
 
 public unsafe class Lg2TreeEntry
@@ -34,18 +34,18 @@ public unsafe class Lg2TreeEntry
         return new Lg2OidPlainRef(pOid);
     }
 
-    public string GetFileName()
+    public string GetName()
     {
         EnsureValid();
 
-        return GetFileName(Ptr);
+        return GetName(Ptr);
     }
 
     public Lg2ObjectType GetObjectType()
     {
         EnsureValid();
 
-        return GetType(Ptr);
+        return GetObjectType(Ptr);
     }
 
     public Lg2FileMode GetFileMode()
@@ -62,13 +62,13 @@ public unsafe class Lg2TreeEntry
         return GetFileModeRaw(Ptr);
     }
 
-    internal static string GetFileName(git_tree_entry* pEntry)
+    internal static string GetName(git_tree_entry* pEntry)
     {
         var pName = git_tree_entry_name(pEntry);
         return Marshal.PtrToStringUTF8((nint)pName) ?? string.Empty;
     }
 
-    internal static Lg2ObjectType GetType(git_tree_entry* pEntry)
+    internal static Lg2ObjectType GetObjectType(git_tree_entry* pEntry)
     {
         return (Lg2ObjectType)git_tree_entry_type(pEntry);
     }
@@ -119,24 +119,27 @@ public readonly unsafe ref struct Lg2TreeEntryPlainRef : ILg2TreeEntry
         return new Lg2OidPlainRef(pOid);
     }
 
-    public string GetFileName()
+    public string GetName()
     {
         EnsureValid();
 
-        return Lg2TreeEntry.GetFileName(Ptr);
+        return Lg2TreeEntry.GetName(Ptr);
     }
 
     public Lg2ObjectType GetObjectType()
     {
         EnsureValid();
 
-        return Lg2TreeEntry.GetType(Ptr);
+        return Lg2TreeEntry.GetObjectType(Ptr);
     }
 }
 
-public unsafe class Lg2TreeEntryOwnedRef : NativeOwnedRef<Lg2Tree, git_tree_entry>, ILg2TreeEntry
+public unsafe class Lg2TreeEntryOwnedRef<TOwner>
+    : NativeOwnedRef<TOwner, git_tree_entry>,
+        ILg2TreeEntry
+    where TOwner : class
 {
-    internal Lg2TreeEntryOwnedRef(Lg2Tree owner, git_tree_entry* pNative)
+    internal Lg2TreeEntryOwnedRef(TOwner owner, git_tree_entry* pNative)
         : base(owner, pNative) { }
 
     public Lg2OidPlainRef GetOidPlainRef()
@@ -148,18 +151,18 @@ public unsafe class Lg2TreeEntryOwnedRef : NativeOwnedRef<Lg2Tree, git_tree_entr
         return new Lg2OidPlainRef(pOid);
     }
 
-    public string GetFileName()
+    public string GetName()
     {
         EnsureValid();
 
-        return Lg2TreeEntry.GetFileName(_pNative);
+        return Lg2TreeEntry.GetName(_pNative);
     }
 
     public Lg2ObjectType GetObjectType()
     {
         EnsureValid();
 
-        return Lg2TreeEntry.GetType(_pNative);
+        return Lg2TreeEntry.GetObjectType(_pNative);
     }
 }
 
@@ -196,11 +199,11 @@ public unsafe class Lg2Tree
 
 public static unsafe class Lg2TreeExtensions
 {
-    public static unsafe IEnumerator<Lg2TreeEntryOwnedRef> GetEnumerator(this Lg2Tree tree)
+    public static unsafe IEnumerator<Lg2TreeEntryOwnedRef<Lg2Tree>> GetEnumerator(this Lg2Tree tree)
     {
         tree.EnsureValid();
 
-        Lg2TreeEntryOwnedRef? ownedRef = null;
+        Lg2TreeEntryOwnedRef<Lg2Tree>? ownedRef;
 
         for (nuint idx = 0; idx < tree.GetEntryCount(); idx++)
         {
@@ -239,7 +242,7 @@ public static unsafe class Lg2TreeExtensions
         return git_tree_entrycount(tree.Ptr);
     }
 
-    public static ILg2TreeEntry GetEntryByIndex(this Lg2Tree tree, nuint index)
+    public static ILg2TreeEntry GetEntry(this Lg2Tree tree, nuint index)
     {
         tree.EnsureValid();
 
@@ -249,10 +252,10 @@ public static unsafe class Lg2TreeExtensions
             throw new ArgumentException($"Invalid {nameof(index)}");
         }
 
-        return new Lg2TreeEntryOwnedRef(tree, pEntry);
+        return new Lg2TreeEntryOwnedRef<Lg2Tree>(tree, pEntry);
     }
 
-    public static ILg2TreeEntry GetEntryByName(this Lg2Tree tree, string name)
+    public static ILg2TreeEntry GetEntry(this Lg2Tree tree, string name)
     {
         tree.EnsureValid();
 
@@ -264,23 +267,121 @@ public static unsafe class Lg2TreeExtensions
             throw new ArgumentException($"Invalid {nameof(name)}");
         }
 
-        return new Lg2TreeEntryOwnedRef(tree, pEntry);
+        return new Lg2TreeEntryOwnedRef<Lg2Tree>(tree, pEntry);
+    }
+}
+
+public unsafe class Lg2TreeBuilder
+    : NativeSafePointer<Lg2TreeBuilder, git_treebuilder>,
+        INativeRelease<git_treebuilder>
+{
+    public Lg2TreeBuilder()
+        : this(default) { }
+
+    internal Lg2TreeBuilder(git_treebuilder* pNative)
+        : base(pNative) { }
+
+    public static unsafe void NativeRelease(git_treebuilder* pNative)
+    {
+        git_treebuilder_free(pNative);
+    }
+}
+
+public static unsafe class Lg2TreeBuilderExtensions
+{
+    public static void Clear(this Lg2TreeBuilder treeBuilder)
+    {
+        treeBuilder.EnsureValid();
+
+        var rc = git_treebuilder_clear(treeBuilder.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+    }
+
+    public static nuint GetEntryCount(this Lg2TreeBuilder treeBuilder)
+    {
+        treeBuilder.EnsureValid();
+
+        var result = git_treebuilder_entrycount(treeBuilder.Ptr);
+
+        return result;
+    }
+
+    public static ILg2TreeEntry GetEntry(this Lg2TreeBuilder treeBuilder, string name)
+    {
+        treeBuilder.EnsureValid();
+
+        using var u8Name = new Lg2Utf8String(name);
+
+        var pEntry = git_treebuilder_get(treeBuilder.Ptr, u8Name.Ptr);
+        if (pEntry is null)
+        {
+            throw new ArgumentException($"Invalid {nameof(name)}");
+        }
+
+        return new Lg2TreeEntryOwnedRef<Lg2TreeBuilder>(treeBuilder, pEntry);
+    }
+
+    // By default the entry that you are inserting will be checked for validity;
+    // that it exists in the object database and is of the correct type.
+    // If you do not want this behavior, set the GIT_OPT_ENABLE_STRICT_OBJECT_CREATION library option to false.
+    public static void Insert(
+        this Lg2TreeBuilder treeBuilder,
+        string name,
+        scoped ref readonly Lg2Oid oid,
+        Lg2FileMode fileMode
+    )
+    {
+        treeBuilder.EnsureValid();
+
+        using var u8Name = new Lg2Utf8String(name);
+
+        fixed (git_oid* pOid = &oid.Raw)
+        {
+            var rc = git_treebuilder_insert(
+                null,
+                treeBuilder.Ptr,
+                u8Name.Ptr,
+                pOid,
+                (git_filemode_t)fileMode
+            );
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+    }
+
+    public static void Remove(this Lg2TreeBuilder treeBuilder, string name)
+    {
+        treeBuilder.EnsureValid();
+
+        using var u8Name = new Lg2Utf8String(name);
+
+        var rc = git_treebuilder_remove(treeBuilder.Ptr, u8Name.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+    }
+
+    public static void Write(this Lg2TreeBuilder treeBuilder, ref Lg2Oid oid)
+    {
+        treeBuilder.EnsureValid();
+
+        fixed (git_oid* pOid = &oid.Raw)
+        {
+            var rc = git_treebuilder_write(pOid, treeBuilder.Ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
     }
 }
 
 unsafe partial class Lg2RepositoryExtensions
 {
-    public static Lg2Tree LookupTree(this Lg2Repository repo, ref Lg2Oid oid)
+    public static Lg2Tree LookupTree(this Lg2Repository repo, scoped ref readonly Lg2Oid oid)
     {
         repo.EnsureValid();
 
         git_tree* pTree = null;
-        int rc;
         fixed (git_oid* pOid = &oid.Raw)
         {
-            rc = git_tree_lookup(&pTree, repo.Ptr, pOid);
+            var rc = git_tree_lookup(&pTree, repo.Ptr, pOid);
+            Lg2Exception.ThrowIfNotOk(rc);
         }
-        Lg2Exception.RaiseIfNotOk(rc);
 
         return new Lg2Tree(pTree);
     }
@@ -293,8 +394,20 @@ unsafe partial class Lg2RepositoryExtensions
 
         git_tree* pTree = null;
         var rc = git_tree_lookup(&pTree, repo.Ptr, oidPlainRef.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new Lg2Tree(pTree);
+    }
+
+    public static Lg2TreeBuilder NewTreeBuilder(this Lg2Repository repo, Lg2Tree tree)
+    {
+        repo.EnsureValid();
+        tree.EnsureValid();
+
+        git_treebuilder* pTreeBuilder = null;
+        var rc = git_treebuilder_new(&pTreeBuilder, repo.Ptr, tree.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(pTreeBuilder);
     }
 }

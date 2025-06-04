@@ -1,7 +1,111 @@
+using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
+
+public readonly unsafe ref struct Lg2OidPlainRef
+{
+    internal readonly git_oid* Ptr;
+
+    internal ref git_oid Ref
+    {
+        get
+        {
+            EnsureValid();
+            return ref (*Ptr);
+        }
+    }
+
+    internal Lg2OidPlainRef(git_oid* pOid)
+    {
+        Ptr = pOid;
+    }
+
+    public void EnsureValid()
+    {
+        if (Ptr is null)
+        {
+            throw new InvalidOperationException($"Invalid {nameof(Lg2OidPlainRef)}");
+        }
+    }
+}
+
+public static unsafe class Lg2OidPlainRefExtensions
+{
+    public static ReadOnlySpan<byte> GetBytes(this Lg2OidPlainRef plainRef)
+    {
+        return MemoryMarshal.CreateReadOnlySpan(ref plainRef.Ref.id[0], GIT_OID_MAX_SIZE);
+    }
+}
+
+public unsafe ref struct Lg2Oid
+{
+    internal git_oid Raw;
+
+    public ReadOnlySpan<byte> GetBytes()
+    {
+        return MemoryMarshal.CreateReadOnlySpan(ref Raw.id[0], GIT_OID_MAX_SIZE);
+    }
+
+    public void FromString(string hash)
+    {
+        var u8Hash = new Lg2Utf8String(hash);
+
+        fixed (git_oid* pOid = &Raw)
+        {
+            var rc = git_oid_fromstr(pOid, u8Hash.Ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+    }
+
+    public override readonly string ToString()
+    {
+        return Raw.Fmt();
+    }
+
+    public readonly string ToString(int size)
+    {
+        return Raw.NFmt(size);
+    }
+}
+
+internal static unsafe class Lg2OidNativeExtentions
+{
+    internal static string Fmt(ref readonly this git_oid oid)
+    {
+        var buf = stackalloc sbyte[GIT_OID_MAX_HEXSIZE + 1];
+        fixed (git_oid* pOid = &oid)
+        {
+            var rc = git_oid_fmt(buf, pOid);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+
+        var result = Marshal.PtrToStringUTF8((nint)buf) ?? string.Empty;
+
+        return result;
+    }
+
+    internal static string NFmt(ref readonly this git_oid oid, int size)
+    {
+        if (size > GIT_OID_MAX_HEXSIZE)
+        {
+            throw new ArgumentOutOfRangeException(nameof(size), $"Value too large");
+        }
+
+        var buf = stackalloc sbyte[size + 1];
+
+        fixed (git_oid* pOid = &oid)
+        {
+            var rc = git_oid_nfmt(buf, (nuint)size, pOid);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+
+        var result = Marshal.PtrToStringUTF8((nint)buf) ?? string.Empty;
+
+        return result;
+    }
+}
 
 public interface ILg2ObjectInfo
 {
@@ -75,7 +179,7 @@ unsafe partial class Lg2RepositoryExtensions
 
         git_object* pObj = null;
         var rc = git_object_lookup(&pObj, repo.Ptr, oidRef.Ptr, (git_object_t)objType);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pObj);
     }

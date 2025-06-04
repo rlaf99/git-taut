@@ -66,8 +66,7 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
         _tautRepo.Open(repoPath);
         _hostRepo.Open(Path.Join(repoPath, ".."));
 
-        _tautnedRefSpec = Lg2RefSpec.ParseForPush(TautenedRefSpecText);
-
+        _tautnedRefSpec = Lg2RefSpec.NewForPush(TautenedRefSpecText);
         _tautenedPathSpec = Lg2PathSpec.New(TautenedPathSpecList);
 
         void InitKvStore()
@@ -94,6 +93,8 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
         }
 
         InitKvStore();
+
+        cipher.Init();
 
         logger.ZLogTrace($"{nameof(TautManager)}: {nameof(Open)} '{repoPath}'");
     }
@@ -205,12 +206,12 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
 
             for (nuint i = 0; i < tree.GetEntryCount(); i++)
             {
-                var entry = tree.GetEntryByIndex(i);
+                var entry = tree.GetEntry(i);
                 var entryObjType = entry.GetObjectType();
 
                 if (entryObjType.IsValid() == false)
                 {
-                    logger.ZLogWarning($"Invalid object type {entryObjType.GetName()}");
+                    logger.ZLogWarning($"Ignore invalid object type {entryObjType.GetName()}");
 
                     continue;
                 }
@@ -225,7 +226,8 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
 
                 if (entryObjType.IsBlob())
                 {
-                    var fileName = entry.GetFileName();
+                    var fileName = entry.GetName();
+
                     if (
                         _tautenedPathSpec.MatchPath(
                             fileName,
@@ -234,7 +236,9 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
                     )
                     {
                         var blob = _hostRepo.LookupBlob(entry);
-                        TautenBlob(blob);
+
+                        Lg2Oid oid = new();
+                        TautenBlob(blob, ref oid);
                     }
                 }
 
@@ -249,9 +253,18 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
         txn.Commit();
     }
 
-    void TautenBlob(Lg2Blob blob)
+    void TautenBlob(Lg2Blob blob, scoped ref Lg2Oid tautenedOid)
     {
-        var rawData = blob.GetRawData();
+        var hostRepoOdb = _hostRepo.GetOdb();
+        var tautRepoOdb = _tautRepo.GetOdb();
+
+        var readStream = hostRepoOdb.OpenReadStream(blob);
+        var isBinary = blob.IsBinary();
+        var writeStream = tautRepoOdb.OpenWriteStream(blob);
+
+        cipher.Encrypt(writeStream, readStream, isBinary);
+
+        writeStream.FinalizeWrite(ref tautenedOid);
     }
 
     internal string MapHostRefToTautened(Lg2Reference hostRef)
@@ -308,8 +321,8 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
 
                 for (nuint idx = 0; idx < tree.GetEntryCount(); idx++)
                 {
-                    var entry = tree.GetEntryByIndex(idx);
-                    var entryFileName = entry.GetFileName();
+                    var entry = tree.GetEntry(idx);
+                    var entryFileName = entry.GetName();
                     var entryOidText = entry.GetOidString();
 
                     var objType = entry.GetObjectType();

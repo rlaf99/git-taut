@@ -20,7 +20,7 @@ public class Lg2Exception : Exception
     internal Lg2Exception(string message)
         : base(message) { }
 
-    internal static unsafe void RaiseIfNotOk(int code)
+    internal static unsafe void ThrowIfNotOk(int code)
     {
         if (code >= 0)
         {
@@ -53,7 +53,7 @@ public ref struct Lg2Global : IDisposable
     public void Init()
     {
         var rc = git_libgit2_init();
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
         initialized = true;
     }
 
@@ -192,14 +192,14 @@ public unsafe partial struct Lg2Trace
         if (_traceOutput is not null)
         {
             var rc = git_trace_set(git_trace_level_t.GIT_TRACE_TRACE, &OutputTrace);
-            Lg2Exception.RaiseIfNotOk(rc);
+            Lg2Exception.ThrowIfNotOk(rc);
 
             _traceOutput($"Set trace output for {nameof(Lg2Trace)}");
         }
         else
         {
             var rc = git_trace_set(git_trace_level_t.GIT_TRACE_NONE, null);
-            Lg2Exception.RaiseIfNotOk(rc);
+            Lg2Exception.ThrowIfNotOk(rc);
         }
     }
 
@@ -266,7 +266,7 @@ public unsafe class Lg2Repository
 
         git_repository* pRepo;
         var rc = git_repository_open(&pRepo, u8Path.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return pRepo;
     }
@@ -289,7 +289,7 @@ public unsafe class Lg2Repository
 
         git_repository* pRepo;
         var rc = git_repository_open(&pRepo, u8Path.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new Lg2Repository(pRepo);
     }

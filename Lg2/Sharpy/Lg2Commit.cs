@@ -53,7 +53,7 @@ public static unsafe class Lg2CommitExtensions
 
         git_tree* pTree = null;
         var rc = git_commit_tree(&pTree, commit.Ptr);
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pTree);
     }
@@ -71,7 +71,7 @@ unsafe partial class Lg2RepositoryExtensions
         {
             rc = git_commit_lookup(&pCommit, repo.Ptr, pOid);
         }
-        Lg2Exception.RaiseIfNotOk(rc);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new Lg2Commit(pCommit);
     }
