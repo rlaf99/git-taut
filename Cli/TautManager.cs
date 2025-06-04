@@ -6,7 +6,7 @@ using ZLogger;
 
 namespace Git.Remote.Taut;
 
-class TautManager(ILogger<TautManager> logger, AesCbc1 aesCbc1)
+class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
 {
     const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
 
@@ -85,11 +85,11 @@ class TautManager(ILogger<TautManager> logger, AesCbc1 aesCbc1)
 
             var config = new DatabaseConfiguration { Flags = DatabaseOpenFlags.Create };
 
-            using (var tx = _kvStoreEnv.BeginTransaction())
+            using (var txn = _kvStoreEnv.BeginTransaction())
             {
-                _kvStoreHost2Taut = tx.OpenDatabase(KvStoreHost2TautFileName, config);
-                _kvStoreTaut2Host = tx.OpenDatabase(KvStoreTaut2HostFileName, config);
-                tx.Commit();
+                _kvStoreHost2Taut = txn.OpenDatabase(KvStoreHost2TautFileName, config);
+                _kvStoreTaut2Host = txn.OpenDatabase(KvStoreTaut2HostFileName, config);
+                txn.Commit();
             }
         }
 
@@ -161,24 +161,97 @@ class TautManager(ILogger<TautManager> logger, AesCbc1 aesCbc1)
 
     internal string TautenHostRef(string hostRefName)
     {
-        // if (_hostRepo.TryLookupRef(hostRefName, out var hostRef) == false)
-        // {
-        //     RaiseInvalidOperation($"Invalide source reference '{hostRefName}'");
-        // }
-
-        // Lg2Oid oid = new();
-        // _hostRepo.GetRefOid(hostRefName, ref oid);
-
         var revWalk = _hostRepo.NewRevWalk();
         revWalk.PushRef(hostRefName);
+
+        using var txn = _kvStoreEnv.BeginTransaction();
 
         Lg2Oid oid = new();
         while (revWalk.Next(ref oid))
         {
-            // see if oid is in the map
+            var oidBytes = oid.GetBytes();
+
+            if (txn.ContainsKey(_kvStoreHost2Taut, oidBytes))
+            {
+                continue;
+            }
+
+            var commit = _tautRepo.LookupCommit(ref oid);
+
+            var commitOidStr8 = oid.ToString(8);
+            var commitSummary = commit.GetSummary();
+
+            logger.ZLogTrace($"Start tautening commit {commitOidStr8} {commitSummary}");
+
+            var rootTree = commit.GetTree();
+            TautenTree(rootTree);
         }
 
+        txn.Commit();
+
         throw new NotImplementedException();
+    }
+
+    internal void TautenTree(Lg2Tree rootTree)
+    {
+        Queue<Lg2Tree> unprocessed = new();
+        unprocessed.Enqueue(rootTree);
+
+        using var txn = _kvStoreEnv.BeginTransaction();
+
+        while (unprocessed.Count > 0)
+        {
+            var tree = unprocessed.Dequeue();
+
+            for (nuint i = 0; i < tree.GetEntryCount(); i++)
+            {
+                var entry = tree.GetEntryByIndex(i);
+                var entryObjType = entry.GetObjectType();
+
+                if (entryObjType.IsValid() == false)
+                {
+                    logger.ZLogWarning($"Invalid object type {entryObjType.GetName()}");
+
+                    continue;
+                }
+
+                var oidRef = entry.GetOidPlainRef();
+                var oidBytes = oidRef.GetBytes();
+
+                if (txn.ContainsKey(_kvStoreHost2Taut, oidBytes))
+                {
+                    continue;
+                }
+
+                if (entryObjType.IsBlob())
+                {
+                    var fileName = entry.GetFileName();
+                    if (
+                        _tautenedPathSpec.MatchPath(
+                            fileName,
+                            Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE
+                        )
+                    )
+                    {
+                        var blob = _hostRepo.LookupBlob(entry);
+                        TautenBlob(blob);
+                    }
+                }
+
+                if (entryObjType.IsTree())
+                {
+                    var subTree = _tautRepo.LookupTree(entry);
+                    unprocessed.Enqueue(subTree);
+                }
+            }
+        }
+
+        txn.Commit();
+    }
+
+    void TautenBlob(Lg2Blob blob)
+    {
+        var rawData = blob.GetRawData();
     }
 
     internal string MapHostRefToTautened(Lg2Reference hostRef)
@@ -259,7 +332,7 @@ class TautManager(ILogger<TautManager> logger, AesCbc1 aesCbc1)
 
                     CopyObjectToHost(entry);
 
-                    if (objType == Lg2ObjectType.LG2_OBJECT_TREE)
+                    if (objType.IsTree())
                     {
                         var subTree = _tautRepo.LookupTree(entry);
                         unprocessed.Enqueue(subTree);
@@ -288,12 +361,5 @@ class TautManager(ILogger<TautManager> logger, AesCbc1 aesCbc1)
 
             TransferTree(rootTree);
         }
-    }
-
-    [DoesNotReturn]
-    void RaiseInvalidOperation(string message)
-    {
-        logger.ZLogError($"{message}");
-        throw new InvalidOperationException(message);
     }
 }

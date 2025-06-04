@@ -192,7 +192,7 @@ partial class GitRemoteHelper
         }
         else
         {
-            RaiseInvalidOperation($"Unknown command '{input}'");
+            throw new InvalidOperationException($"Unknown command '{input}'");
         }
 
         var result = _handleGitCommand(input);
@@ -299,14 +299,16 @@ partial class GitRemoteHelper
 
                 if (Lg2RefSpec.TryParseForPush(refSpecText, out var refSpec) == false)
                 {
-                    RaiseInvalidOperation($"Invalid refspec {refSpecText}");
+                    throw new InvalidOperationException($"Invalid refspec {refSpecText}");
                 }
 
                 var srcRefName = refSpec.GetSrc();
 
                 if (tautManager.HostRepo.TryLookupRef(srcRefName, out var srcRef) == false)
                 {
-                    RaiseInvalidOperation($"Invalide source reference '{refSpec.GetSrc()}'");
+                    throw new InvalidOperationException(
+                        $"Invalide source reference '{refSpec.GetSrc()}'"
+                    );
                 }
 
                 var mappedSrcRefName = tautManager.MapHostRefToTautened(srcRef);
@@ -332,9 +334,9 @@ partial class GitRemoteHelper
             return HandleGitCommandResult.Keep;
         }
         {
-            RaiseInvalidOperation($"{nameof(HandleGitCmdPush)}: Invalid input '{input}'");
-
-            return HandleGitCommandResult.Done;
+            throw new InvalidOperationException(
+                $"{nameof(HandleGitCmdPush)}: Invalid input '{input}'"
+            );
         }
     }
 
@@ -394,7 +396,7 @@ partial class GitRemoteHelper
         var gitDir = Environment.GetEnvironmentVariable(KnownEnvironVars.GitDir);
         if (gitDir is null)
         {
-            RaiseInvalidOperation("Git dir is null");
+            throw new InvalidOperationException("Git dir is null");
         }
 
         _hostRepoDir = gitDir;
@@ -432,19 +434,5 @@ partial class GitRemoteHelper
         gitCli.Execute("--git-dir", _tautRepoDir, "fetch", _remote, "+refs/heads/*:refs/heads/*");
 
         logger.ZLogTrace($"Update '{_tautRepoDir}'");
-    }
-
-    [DoesNotReturn]
-    void RaiseInvalidOperation(string message)
-    {
-        logger.ZLogError($"{message}");
-        throw new InvalidOperationException(message);
-    }
-
-    [DoesNotReturn]
-    void RaiseNotImplemented(string message)
-    {
-        logger.ZLogError($"{message}");
-        throw new NotImplementedException(message);
     }
 }

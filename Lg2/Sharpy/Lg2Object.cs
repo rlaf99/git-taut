@@ -14,7 +14,7 @@ public static unsafe class Lg2objInfoExtensions
     public static string GetOidString(this ILg2ObjectInfo objInfo)
     {
         var oidRef = objInfo.GetOidPlainRef();
-        return Lg2Oid.ToString(oidRef.Ptr);
+        return oidRef.Ref.Fmt();
     }
 }
 

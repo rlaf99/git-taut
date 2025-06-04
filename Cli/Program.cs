@@ -30,7 +30,7 @@ var app = ConsoleApp
     {
         services.AddSingleton<GitCli>();
         services.AddSingleton<TautManager>();
-        services.AddSingleton<AesCbc1>();
+        services.AddSingleton<Aes256Cbc1>();
     })
     .ConfigureLogging(
         (config, logging) =>

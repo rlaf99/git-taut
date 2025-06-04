@@ -61,7 +61,7 @@ public static unsafe class Lg2CommitExtensions
 
 unsafe partial class Lg2RepositoryExtensions
 {
-    public static Lg2Commit LookupCommit(this Lg2Repository repo, ref Lg2Oid oid)
+    public static Lg2Commit LookupCommit(this Lg2Repository repo, ref readonly Lg2Oid oid)
     {
         repo.EnsureValid();
 

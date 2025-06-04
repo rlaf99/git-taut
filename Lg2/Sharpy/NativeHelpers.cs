@@ -35,12 +35,20 @@ public abstract unsafe class NativeSafePointer<TDerived, TNative> : SafeHandle
 
     internal TNative* Ptr => (TNative*)handle;
 
+    internal ref TNative Ref
+    {
+        get
+        {
+            EnsureValid();
+            return ref (*Ptr);
+        }
+    }
+
     public void EnsureValid()
     {
         if (IsInvalid)
         {
-            var derivedTypeName = typeof(TDerived).Name;
-            throw new InvalidOperationException($"The instance of {derivedTypeName} is not valid");
+            ThrowHelper.ThrowInvalidNullInstance<TDerived>();
         }
     }
 }
@@ -59,11 +67,22 @@ public abstract unsafe class NativeOwnedRef<TOwner, TNative>
         _pNative = pNative;
     }
 
+    internal TNative* Ptr => _pNative;
+
+    internal ref TNative Ref
+    {
+        get
+        {
+            EnsureValid();
+            return ref (*Ptr);
+        }
+    }
+
     public void EnsureValid()
     {
         if (_ownerWeakRef.TryGetTarget(out _) == false)
         {
-            throw new InvalidOperationException($"The instance of {nameof(TOwner)} is not valid");
+            ThrowHelper.ThrowInvalidNullInstance<TOwner>();
         }
     }
 }

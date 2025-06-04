@@ -9,7 +9,7 @@ namespace Lg2.Sharpy;
 
 public class Lg2Exception : Exception
 {
-    git_error_code _errorCode = GIT_OK;
+    readonly git_error_code _errorCode = GIT_OK;
 
     internal Lg2Exception(git_error_code errorCode, string? message = null)
         : base(message)
@@ -113,12 +113,11 @@ public sealed unsafe class Lg2StrArray : IDisposable
     {
         var stringsSize = Marshal.SizeOf(typeof(sbyte*)) * input.Count;
 
-        git_strarray strarray =
-            new()
-            {
-                strings = (sbyte**)Marshal.AllocCoTaskMem(stringsSize),
-                count = (nuint)input.Count,
-            };
+        git_strarray strarray = new()
+        {
+            strings = (sbyte**)Marshal.AllocCoTaskMem(stringsSize),
+            count = (nuint)input.Count,
+        };
 
         for (int i = 0; i < input.Count; i++)
         {
@@ -133,7 +132,7 @@ public sealed unsafe class Lg2StrArray : IDisposable
 
 internal static unsafe partial class Lg2StrArrayNativeExtensions
 {
-    internal static List<string> ToList(this git_strarray strarray)
+    internal static List<string> ToList(ref readonly this git_strarray strarray)
     {
         List<string> result = [];
 
@@ -151,8 +150,33 @@ public static class Lg2StrArrayExtensions { }
 
 public unsafe ref struct Lg2RawData
 {
-    internal void* Ptr;
-    internal nuint Len;
+    internal nint Ptr;
+    internal long Len;
+}
+
+public static unsafe class Lg2RawDataExtensions
+{
+    public static bool IsInvalid(this Lg2RawData rawData)
+    {
+        if (rawData.Ptr == default || rawData.Len <= 0)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    public static bool IsBinary(this Lg2RawData rawData)
+    {
+        if (rawData.IsInvalid())
+        {
+            throw new InvalidOperationException($"Invalid {nameof(rawData)}");
+        }
+
+        var result = git_blob_data_is_binary((sbyte*)rawData.Ptr, (nuint)rawData.Len);
+
+        return result != 0;
+    }
 }
 
 public unsafe partial struct Lg2Trace

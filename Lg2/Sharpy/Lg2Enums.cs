@@ -26,6 +26,26 @@ public static unsafe class Lg2ObjectTypeExtensions
             || objType == Lg2ObjectType.LG2_OBJECT_TAG;
     }
 
+    public static bool IsTree(this Lg2ObjectType objType)
+    {
+        return objType == Lg2ObjectType.LG2_OBJECT_TREE;
+    }
+
+    public static bool IsCommit(this Lg2ObjectType objType)
+    {
+        return objType == Lg2ObjectType.LG2_OBJECT_COMMIT;
+    }
+
+    public static bool IsBlob(this Lg2ObjectType objType)
+    {
+        return objType == Lg2ObjectType.LG2_OBJECT_BLOB;
+    }
+
+    public static bool IsTag(this Lg2ObjectType objType)
+    {
+        return objType == Lg2ObjectType.LG2_OBJECT_TAG;
+    }
+
     public static string GetName(this Lg2ObjectType objType)
     {
         var pStr = git_object_type2string((git_object_t)objType);

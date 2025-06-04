@@ -88,6 +88,15 @@ public readonly unsafe ref struct Lg2TreeEntryPlainRef : ILg2TreeEntry
 {
     internal readonly git_tree_entry* Ptr;
 
+    internal ref git_tree_entry Ref
+    {
+        get
+        {
+            EnsureValid();
+            return ref (*Ptr);
+        }
+    }
+
     internal Lg2TreeEntryPlainRef(git_tree_entry* pEntry)
     {
         Ptr = pEntry;
