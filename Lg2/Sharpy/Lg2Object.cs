@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
@@ -31,9 +32,14 @@ public readonly unsafe ref struct Lg2OidPlainRef
     }
 }
 
+public unsafe ref struct Lg2OidPlainRefX
+{
+    internal ref git_oid _ref;
+}
+
 public static unsafe class Lg2OidPlainRefExtensions
 {
-    public static ReadOnlySpan<byte> GetBytes(this Lg2OidPlainRef plainRef)
+    public static ReadOnlySpan<byte> GetReadOnlyBytes(this Lg2OidPlainRef plainRef)
     {
         return MemoryMarshal.CreateReadOnlySpan(ref plainRef.Ref.id[0], GIT_OID_MAX_SIZE);
     }
@@ -43,12 +49,17 @@ public unsafe ref struct Lg2Oid
 {
     internal git_oid Raw;
 
-    public ReadOnlySpan<byte> GetBytes()
+    public Lg2OidPlainRef PlainRef
     {
-        return MemoryMarshal.CreateReadOnlySpan(ref Raw.id[0], GIT_OID_MAX_SIZE);
+        get
+        {
+            var ptr = (git_oid*)Unsafe.AsPointer(ref Raw);
+
+            return new(ptr);
+        }
     }
 
-    public void FromString(string hash)
+    public void FromHexDigits(string hash)
     {
         var u8Hash = new Lg2Utf8String(hash);
 
@@ -59,14 +70,27 @@ public unsafe ref struct Lg2Oid
         }
     }
 
-    public override readonly string ToString()
+    public readonly string ToHexDigits()
     {
         return Raw.Fmt();
     }
 
-    public readonly string ToString(int size)
+    public readonly string ToHexDigits(int size)
     {
         return Raw.NFmt(size);
+    }
+}
+
+public static unsafe class Lg2OidExtensions
+{
+    public static ReadOnlySpan<byte> GetReadOnlyBytes(this ref Lg2Oid oid)
+    {
+        return MemoryMarshal.CreateReadOnlySpan(ref oid.Raw.id[0], GIT_OID_MAX_SIZE);
+    }
+
+    public static Span<byte> GetBytes(this ref Lg2Oid oid)
+    {
+        return MemoryMarshal.CreateSpan(ref oid.Raw.id[0], GIT_OID_MAX_SIZE);
     }
 }
 
@@ -115,7 +139,7 @@ public interface ILg2ObjectInfo
 
 public static unsafe class Lg2objInfoExtensions
 {
-    public static string GetOidString(this ILg2ObjectInfo objInfo)
+    public static string GetOidHexDigits(this ILg2ObjectInfo objInfo)
     {
         var oidRef = objInfo.GetOidPlainRef();
         return oidRef.Ref.Fmt();

@@ -1,3 +1,5 @@
+using Lg2.Sharpy;
+using LightningDB;
 using Microsoft.Extensions.Configuration;
 
 namespace Git.Remote.Taut;
@@ -33,7 +35,7 @@ static class GitConfig
     internal const string Fetch_Prune = "fetch.prune";
 }
 
-internal static class ConfigurationExtensions
+static class ConfigurationExtensions
 {
     internal static bool GetGitRemoteTautTrace(this IConfiguration config)
     {
@@ -49,5 +51,36 @@ internal static class ConfigurationExtensions
         }
 
         return true;
+    }
+}
+
+static class LightningExtensions
+{
+    public static bool TryGet(
+        this LightningTransaction txn,
+        LightningDatabase db,
+        ReadOnlySpan<byte> key,
+        ref Lg2Oid oid
+    )
+    {
+        var (rc, _, value) = txn.Get(db, key);
+        if (rc == MDBResultCode.Success)
+        {
+            var source = value.AsSpan();
+            var target = oid.GetBytes();
+
+            if (source.Length != target.Length)
+            {
+                throw new InvalidDataException(
+                    $"Mismatched length, '{source.Length}' != '{target.Length}'"
+                );
+            }
+
+            source.CopyTo(target);
+
+            return true;
+        }
+
+        return false;
     }
 }

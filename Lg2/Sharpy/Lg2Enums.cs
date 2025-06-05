@@ -91,6 +91,12 @@ public enum Lg2FileMode
     LG2_FILEMODE_COMMIT = git_filemode_t.GIT_FILEMODE_COMMIT,
 }
 
+public enum Lg2TreeUpdateAction
+{
+    LG2_TREE_UPDATE_UPSERT = git_tree_update_t.GIT_TREE_UPDATE_UPSERT,
+    LG2_TREE_UPDATE_REMOVE = git_tree_update_t.GIT_TREE_UPDATE_REMOVE,
+}
+
 public enum Lg2TreeWalkMode
 {
     LG2_TREEWALK_PRE = git_treewalk_mode.GIT_TREEWALK_PRE,

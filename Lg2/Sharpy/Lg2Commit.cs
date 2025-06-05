@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Threading.Tasks.Dataflow;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
 
@@ -56,6 +57,42 @@ public static unsafe class Lg2CommitExtensions
         Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pTree);
+    }
+
+    public static Lg2CommitAmend NewAmend(this Lg2Commit commit)
+    {
+        return new(commit);
+    }
+}
+
+public unsafe class Lg2CommitAmend
+{
+    Lg2Commit _commit;
+
+    internal Lg2CommitAmend(Lg2Commit commit)
+    {
+        _commit = commit;
+    }
+
+    public string? Message { get; set; }
+    public Lg2Tree? Tree { get; set; }
+
+    public void Write(ref Lg2Oid oid)
+    {
+        if (Message is null && Tree is null)
+        {
+            throw new InvalidOperationException("Nothing to amend");
+        }
+
+        using var u8Message = Message is null ? null : new Lg2Utf8String(Message);
+        var pMessage = u8Message is null ? null : u8Message.Ptr;
+        var pTree = Tree is null ? null : Tree.Ptr;
+
+        fixed (git_oid* pOid = &oid.Raw)
+        {
+            var rc = git_commit_amend(pOid, _commit.Ptr, null, null, null, null, pMessage, pTree);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
     }
 }
 

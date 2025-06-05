@@ -7,6 +7,12 @@ namespace Lg2.Sharpy;
 public interface ILg2TreeEntry : ILg2ObjectInfo
 {
     string GetName();
+
+    Lg2TreeEntryPlainRef GetTreeEntryPlainRef();
+
+    public Lg2FileMode GetFileMode();
+
+    public Lg2FileMode GetFileModeRaw();
 }
 
 public unsafe class Lg2TreeEntry
@@ -39,6 +45,13 @@ public unsafe class Lg2TreeEntry
         EnsureValid();
 
         return GetName(Ptr);
+    }
+
+    public Lg2TreeEntryPlainRef GetTreeEntryPlainRef()
+    {
+        EnsureValid();
+
+        return new(Ptr);
     }
 
     public Lg2ObjectType GetObjectType()
@@ -84,7 +97,7 @@ public unsafe class Lg2TreeEntry
     }
 }
 
-public readonly unsafe ref struct Lg2TreeEntryPlainRef : ILg2TreeEntry
+public readonly unsafe ref struct Lg2TreeEntryPlainRef
 {
     internal readonly git_tree_entry* Ptr;
 
@@ -108,29 +121,6 @@ public readonly unsafe ref struct Lg2TreeEntryPlainRef : ILg2TreeEntry
         {
             throw new InvalidOperationException($"Invalid {nameof(Lg2TreeEntryPlainRef)}");
         }
-    }
-
-    public Lg2OidPlainRef GetOidPlainRef()
-    {
-        EnsureValid();
-
-        var pOid = git_tree_entry_id(Ptr);
-
-        return new Lg2OidPlainRef(pOid);
-    }
-
-    public string GetName()
-    {
-        EnsureValid();
-
-        return Lg2TreeEntry.GetName(Ptr);
-    }
-
-    public Lg2ObjectType GetObjectType()
-    {
-        EnsureValid();
-
-        return Lg2TreeEntry.GetObjectType(Ptr);
     }
 }
 
@@ -158,11 +148,28 @@ public unsafe class Lg2TreeEntryOwnedRef<TOwner>
         return Lg2TreeEntry.GetName(_pNative);
     }
 
+    public Lg2TreeEntryPlainRef GetTreeEntryPlainRef()
+    {
+        EnsureValid();
+
+        return new(Ptr);
+    }
+
     public Lg2ObjectType GetObjectType()
     {
         EnsureValid();
 
         return Lg2TreeEntry.GetObjectType(_pNative);
+    }
+
+    public Lg2FileMode GetFileMode()
+    {
+        return Lg2TreeEntry.GetFileMode(_pNative);
+    }
+
+    public Lg2FileMode GetFileModeRaw()
+    {
+        return Lg2TreeEntry.GetFileModeRaw(_pNative);
     }
 }
 
@@ -220,19 +227,6 @@ public static unsafe class Lg2TreeExtensions
 
             yield return ownedRef;
         }
-    }
-
-    public static unsafe Lg2TreeEntryPlainRef GetEntryPlainRefByIndex(this Lg2Tree tree, nuint idx)
-    {
-        tree.EnsureValid();
-
-        var pEntry = git_tree_entry_byindex(tree.Ptr, idx);
-        if (pEntry is null)
-        {
-            throw new ArgumentException($"Invalid {nameof(idx)}");
-        }
-
-        return new(pEntry);
     }
 
     public static nuint GetEntryCount(this Lg2Tree tree)
@@ -327,7 +321,7 @@ public static unsafe class Lg2TreeBuilderExtensions
     public static void Insert(
         this Lg2TreeBuilder treeBuilder,
         string name,
-        scoped ref readonly Lg2Oid oid,
+        Lg2OidPlainRef oidRef,
         Lg2FileMode fileMode
     )
     {
@@ -335,17 +329,14 @@ public static unsafe class Lg2TreeBuilderExtensions
 
         using var u8Name = new Lg2Utf8String(name);
 
-        fixed (git_oid* pOid = &oid.Raw)
-        {
-            var rc = git_treebuilder_insert(
-                null,
-                treeBuilder.Ptr,
-                u8Name.Ptr,
-                pOid,
-                (git_filemode_t)fileMode
-            );
-            Lg2Exception.ThrowIfNotOk(rc);
-        }
+        var rc = git_treebuilder_insert(
+            null,
+            treeBuilder.Ptr,
+            u8Name.Ptr,
+            oidRef.Ptr,
+            (git_filemode_t)fileMode
+        );
+        Lg2Exception.ThrowIfNotOk(rc);
     }
 
     public static void Remove(this Lg2TreeBuilder treeBuilder, string name)
@@ -370,8 +361,36 @@ public static unsafe class Lg2TreeBuilderExtensions
     }
 }
 
+public class Lg2TreeUpdate
+{
+    git_tree_update _raw;
+
+    public Lg2TreeUpdateAction Action
+    {
+        get { return (Lg2TreeUpdateAction)_raw.action; }
+        set { _raw.action = (git_tree_update_t)value; }
+    }
+
+    public Lg2FileMode FileMode
+    {
+        get { return (Lg2FileMode)_raw.filemode; }
+        set { _raw.filemode = (git_filemode_t)value; }
+    }
+}
+
 unsafe partial class Lg2RepositoryExtensions
 {
+    public static Lg2Tree LookupTree(this Lg2Repository repo, Lg2OidPlainRef oidRef)
+    {
+        repo.EnsureValid();
+
+        git_tree* pTree = null;
+        var rc = git_tree_lookup(&pTree, repo.Ptr, oidRef.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(pTree);
+    }
+
     public static Lg2Tree LookupTree(this Lg2Repository repo, scoped ref readonly Lg2Oid oid)
     {
         repo.EnsureValid();
@@ -409,5 +428,18 @@ unsafe partial class Lg2RepositoryExtensions
         Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pTreeBuilder);
+    }
+
+    public static Lg2Object GetTreeEntryObject(this Lg2Repository repo, ILg2TreeEntry treeEntry)
+    {
+        repo.EnsureValid();
+
+        var plainRef = treeEntry.GetTreeEntryPlainRef();
+
+        git_object* pObj = null;
+        var rc = git_tree_entry_to_object(&pObj, repo.Ptr, plainRef.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(pObj);
     }
 }

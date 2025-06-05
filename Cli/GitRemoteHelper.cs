@@ -219,7 +219,7 @@ partial class GitRemoteHelper
             {
                 Lg2Oid oid = new();
                 tautManager.TautRepo.GetRefOid(refName, ref oid);
-                var oidText = oid.ToString();
+                var oidText = oid.ToHexDigits();
 
                 Console.WriteLine($"{oidText} {refName}");
 
@@ -263,7 +263,7 @@ partial class GitRemoteHelper
         var args = CmdFetchArgs.Parse(input[cmdFetch.Length..].TrimStart());
 
         Lg2Oid oid = new();
-        oid.FromString(args.Hash);
+        oid.FromHexDigits(args.Hash);
         tautManager.TransferCommitToHost(ref oid);
 
         return HandleGitCommandResult.Keep;
@@ -279,7 +279,7 @@ partial class GitRemoteHelper
         {
             Lg2Oid oid = new();
             tautManager.TautRepo.GetRefOid(refName, ref oid);
-            Console.WriteLine($"{oid.ToString()} {refName}");
+            Console.WriteLine($"{oid.ToHexDigits()} {refName}");
         }
 
         Console.WriteLine();
