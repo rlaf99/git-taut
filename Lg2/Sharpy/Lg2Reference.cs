@@ -43,6 +43,16 @@ public unsafe class Lg2Reference
         ReleaseHandle();
         SetHandle((nint)pRef);
     }
+
+    public void Delete()
+    {
+        EnsureValid();
+
+        var rc = git_reference_delete(Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        ReleaseHandle();
+    }
 }
 
 public static unsafe class Lg2ReferenceExtensions
@@ -133,9 +143,9 @@ public static unsafe class Lg2ReferenceExtensions
 
 unsafe partial class Lg2RepositoryExtensions
 {
-    public static Lg2Reference NewReference(
+    public static Lg2Reference NewRef(
         this Lg2Repository repo,
-        string name,
+        string refName,
         Lg2OidPlainRef oidRef,
         bool force,
         string logMessage
@@ -143,18 +153,68 @@ unsafe partial class Lg2RepositoryExtensions
     {
         repo.EnsureValid();
 
-        using var u8Name = new Lg2Utf8String(name);
+        using var u8Name = new Lg2Utf8String(refName);
         using var u8LogMessage = new Lg2Utf8String(logMessage);
         git_reference* pRef = null;
         var rc = git_reference_create(
             &pRef,
             repo.Ptr,
-            u8Name,
+            u8Name.Ptr,
             oidRef.Ptr,
             force ? 1 : 0,
             u8LogMessage.Ptr
         );
         Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(pRef);
+    }
+
+    public static void DeleteRef(this Lg2Repository repo, string refName)
+    {
+        repo.EnsureValid();
+
+        using var u8RefName = new Lg2Utf8String(refName);
+        var rc = git_reference_remove(repo.Ptr, u8RefName.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+    }
+
+    public static Lg2Reference SetRef(
+        this Lg2Repository repo,
+        string refName,
+        Lg2OidPlainRef oidRef,
+        string logMessage
+    )
+    {
+        repo.EnsureValid();
+
+        using var u8LogMessage = new Lg2Utf8String(logMessage);
+        using var u8RefName = new Lg2Utf8String(refName);
+        git_reference* pRef = null;
+
+        var rc = git_reference_lookup(&pRef, repo.Ptr, u8RefName.Ptr);
+        if (rc != 0)
+        {
+            if (rc == (int)GIT_ENOTFOUND)
+            {
+                rc = git_reference_create(
+                    &pRef,
+                    repo.Ptr,
+                    u8RefName.Ptr,
+                    oidRef.Ptr,
+                    1,
+                    u8LogMessage.Ptr
+                );
+            }
+
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+        else
+        {
+            var pBase = pRef;
+            pRef = null;
+            rc = git_reference_set_target(&pRef, pBase, oidRef.Ptr, u8LogMessage.Ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
 
         return new(pRef);
     }
@@ -171,8 +231,13 @@ unsafe partial class Lg2RepositoryExtensions
         git_reference* pRef = null;
         var rc = git_reference_lookup(&pRef, repo.Ptr, u8RefName.Ptr);
 
-        if (rc != (int)GIT_OK)
+        if (rc != 0)
         {
+            if (rc != (int)GIT_ENOTFOUND)
+            {
+                Lg2Exception.ThrowIfNotOk(rc);
+            }
+
             reference = new Lg2Reference(default);
             return false;
         }
@@ -268,13 +333,13 @@ unsafe partial class Lg2RepositoryExtensions
         return result != 0;
     }
 
-    public static void EnsureRefLog(this Lg2Repository repo, string refName)
+    public static void SetRefLog(this Lg2Repository repo, string refName)
     {
         repo.EnsureValid();
 
         using var u8RefName = new Lg2Utf8String(refName);
 
-        var result = git_reference_ensure_log(repo.Ptr, u8RefName.Ptr);
-        Lg2Exception.ThrowIfNotOk(result);
+        var rc = git_reference_ensure_log(repo.Ptr, u8RefName.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
     }
 }

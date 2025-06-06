@@ -22,7 +22,7 @@ public unsafe class Lg2RevWalk
 
 public static unsafe class Lg2RevWalkExtensions
 {
-    public static void PushRef(this Lg2RevWalk revWalk, string refName)
+    public static void Push(this Lg2RevWalk revWalk, string refName)
     {
         revWalk.EnsureValid();
 
@@ -31,13 +31,12 @@ public static unsafe class Lg2RevWalkExtensions
         Lg2Exception.ThrowIfNotOk(rc);
     }
 
-    public static void Push(this Lg2RevWalk revWalk, scoped ref Lg2Oid oid)
+    public static void Push(this Lg2RevWalk revWalk, Lg2OidPlainRef plainRef)
     {
-        fixed (git_oid* pOid = &oid.Raw)
-        {
-            var rc = git_revwalk_push(revWalk.Ptr, pOid);
-            Lg2Exception.ThrowIfNotOk(rc);
-        }
+        revWalk.EnsureValid();
+
+        var rc = git_revwalk_push(revWalk.Ptr, plainRef.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
     }
 
     public static bool Next(this Lg2RevWalk revWalk, scoped ref Lg2Oid oid)
@@ -67,13 +66,6 @@ public static unsafe class Lg2RevWalkExtensions
             rc = git_revwalk_hide(revWalk.Ptr, pOid);
         }
         Lg2Exception.ThrowIfNotOk(rc);
-    }
-
-    internal static void AddHideCallback(this Lg2RevWalk revWalk)
-    {
-        revWalk.EnsureValid();
-
-        throw new NotImplementedException();
     }
 }
 

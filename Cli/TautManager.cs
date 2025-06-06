@@ -1,12 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
 using Lg2.Sharpy;
-using LightningDB;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
 namespace Git.Taut;
 
-class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
+class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1 cipher)
 {
     const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
 
@@ -48,19 +47,6 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
     [AllowNull]
     Lg2PathSpec _tautenedPathSpec;
 
-    const string KvStoreDirName = "tautened";
-    const string KvStoreHost2TautFileName = "host2taut";
-    const string KvStoreTaut2HostFileName = "taut2host";
-
-    [AllowNull]
-    LightningEnvironment _kvStoreEnv;
-
-    [AllowNull]
-    LightningDatabase _kvStoreHost2Taut;
-
-    [AllowNull]
-    LightningDatabase _kvStoreTaut2Host;
-
     internal void Open(string repoPath)
     {
         _tautRepo.Open(repoPath);
@@ -69,30 +55,8 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
         _tautnedRefSpec = Lg2RefSpec.NewForPush(TautenedRefSpecText);
         _tautenedPathSpec = Lg2PathSpec.New(TautenedPathSpecList);
 
-        void InitKvStore()
-        {
-            var kvStoreDirPath = Path.Join(
-                TautRepoPath,
-                GitRepoLayout.ObjectsInfoDir,
-                KvStoreDirName
-            );
-            Directory.CreateDirectory(kvStoreDirPath);
-
-            var envConfig = new EnvironmentConfiguration() { MaxDatabases = 2 };
-            _kvStoreEnv = new LightningEnvironment(kvStoreDirPath, envConfig);
-            _kvStoreEnv.Open();
-
-            var config = new DatabaseConfiguration { Flags = DatabaseOpenFlags.Create };
-
-            using (var txn = _kvStoreEnv.BeginTransaction())
-            {
-                _kvStoreHost2Taut = txn.OpenDatabase(KvStoreHost2TautFileName, config);
-                _kvStoreTaut2Host = txn.OpenDatabase(KvStoreTaut2HostFileName, config);
-                txn.Commit();
-            }
-        }
-
-        InitKvStore();
+        var kvStoreLocation = Path.Join(TautRepoPath, GitRepoLayout.ObjectsInfoDir);
+        kvStore.Init(kvStoreLocation);
 
         cipher.Init();
 
@@ -162,11 +126,13 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
 
     internal string TautenHostRef(string hostRefName)
     {
-        var revWalk = _hostRepo.NewRevWalk();
-        revWalk.PushRef(hostRefName);
+        Lg2Oid hostRefOid = new();
+        _hostRepo.GetRefOid(hostRefName, ref hostRefOid);
 
-        Lg2Oid oid = new();
-        while (revWalk.Next(ref oid))
+        var revWalk = _hostRepo.NewRevWalk();
+        revWalk.Push(hostRefOid.PlainRef);
+
+        for (Lg2Oid oid = new(); revWalk.Next(ref oid); )
         {
             var commit = _tautRepo.LookupCommit(oid.PlainRef);
 
@@ -175,10 +141,26 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
 
             logger.ZLogTrace($"Start tautening commit {commitOidHex8} {commitSummary}");
 
-            TautenCommit(commit);
+            var resultCommit = TautenCommit(commit);
+
+            if (resultCommit != commit)
+            {
+                kvStore.SetTautened(commit.GetOidPlainRef(), resultCommit.GetOidPlainRef());
+
+                var resultCommitOidText = resultCommit.GetOidHexDigits();
+
+                logger.ZLogTrace($"Tauten commit {commitOidHex8} into {resultCommitOidText}");
+            }
         }
 
-        throw new NotImplementedException();
+        Lg2Oid resultOid = new();
+        kvStore.GetTautened(hostRefOid.PlainRef, ref resultOid);
+        var resultRefName = _tautnedRefSpec.TransformToTarget(hostRefName);
+        var refLogMessage = $"Tauten host ref '{hostRefName}' to '{resultRefName}'";
+
+        _tautRepo.SetRef(resultRefName, resultOid.PlainRef, refLogMessage);
+
+        return resultRefName;
     }
 
     internal Lg2Commit TautenCommit(Lg2Commit commit)
@@ -186,7 +168,7 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
         var commitOidRef = commit.GetOidPlainRef();
 
         Lg2Oid existingOid = new();
-        if (TryGetTautened(commitOidRef, ref existingOid))
+        if (kvStore.TryGetTautened(commitOidRef, ref existingOid))
         {
             var resultCommit = _tautRepo.LookupCommit(existingOid.PlainRef);
 
@@ -214,22 +196,22 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
         return commit;
     }
 
-    internal bool TryGetTautened(Lg2OidPlainRef oidRef, ref Lg2Oid resultOid)
-    {
-        var oidBytes = oidRef.GetReadOnlyBytes();
+    // internal bool TryGetTautened(Lg2OidPlainRef oidRef, ref Lg2Oid resultOid)
+    // {
+    //     var oidBytes = oidRef.GetReadOnlyBytes();
 
-        using var txn = _kvStoreEnv.BeginTransaction();
-        var result = txn.TryGet(_kvStoreHost2Taut, oidBytes, ref resultOid);
-        txn.Commit();
+    //     using var txn = _kvStoreEnv.BeginTransaction();
+    //     var result = txn.TryGet(_kvStoreHost2Taut, oidBytes, ref resultOid);
+    //     txn.Commit();
 
-        return result;
-    }
+    //     return result;
+    // }
 
     internal async Task<Lg2Tree> TautenTreeInPostOrderAsync(Lg2Tree tree)
     {
         Lg2Oid existingOid = new();
 
-        if (TryGetTautened(tree.GetOidPlainRef(), ref existingOid))
+        if (kvStore.TryGetTautened(tree.GetOidPlainRef(), ref existingOid))
         {
             var tautenedTree = _tautRepo.LookupTree(existingOid.PlainRef);
 
@@ -316,6 +298,11 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
 
     void TautenBlob(Lg2Blob blob, scoped ref Lg2Oid tautenedOid)
     {
+        if (kvStore.TryGetTautened(blob.GetOidPlainRef(), ref tautenedOid))
+        {
+            return;
+        }
+
         using var hostRepoOdb = _hostRepo.GetOdb();
         using var tautRepoOdb = _tautRepo.GetOdb();
 
@@ -338,7 +325,7 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
         if (_tautRepo.TryLookupRef(mappedSrcRefName, out var mappedSrcRef) == false)
         {
             var logMessage = $"Create a mapped reference '{mappedSrcRefName}'";
-            mappedSrcRef = _tautRepo.NewReference(mappedSrcRefName, srcRefOid, false, logMessage);
+            mappedSrcRef = _tautRepo.NewRef(mappedSrcRefName, srcRefOid, false, logMessage);
 
             logger.ZLogTrace($"{logMessage}");
         }
@@ -416,18 +403,16 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
         }
 
         using var revWalk = _tautRepo.NewRevWalk();
-        revWalk.Push(ref commitOid);
+        revWalk.Push(commitOid.PlainRef);
 
-        Lg2Oid oid = new();
-
-        while (revWalk.Next(ref oid))
+        for (Lg2Oid oid = new(); revWalk.Next(ref oid); )
         {
             var commit = _tautRepo.LookupCommit(oid.PlainRef);
 
-            var commitOidStr8 = oid.ToHexDigits(8);
+            var commitOidHex8 = oid.ToHexDigits(8);
             var commitSummary = commit.GetSummary();
 
-            logger.ZLogTrace($"Start transferring commit {commitOidStr8} {commitSummary}");
+            logger.ZLogTrace($"Start transferring commit {commitOidHex8} {commitSummary}");
 
             CopyObjectToHost(commit);
 

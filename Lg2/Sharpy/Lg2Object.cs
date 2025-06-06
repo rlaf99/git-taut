@@ -32,11 +32,6 @@ public readonly unsafe ref struct Lg2OidPlainRef
     }
 }
 
-public unsafe ref struct Lg2OidPlainRefX
-{
-    internal ref git_oid _ref;
-}
-
 public static unsafe class Lg2OidPlainRefExtensions
 {
     public static ReadOnlySpan<byte> GetReadOnlyBytes(this Lg2OidPlainRef plainRef)

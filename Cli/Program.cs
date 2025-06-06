@@ -30,6 +30,7 @@ var app = ConsoleApp
     {
         services.AddSingleton<GitCli>();
         services.AddSingleton<TautManager>();
+        services.AddSingleton<KeyValueStore>();
         services.AddSingleton<Aes256Cbc1>();
     })
     .ConfigureLogging(
@@ -63,7 +64,7 @@ var app = ConsoleApp
                 options.FullMode = BackgroundBufferFullMode.Block;
             });
 
-            if (config.GetGitRemoteTautTrace())
+            if (config.GetGitTautTrace())
             {
                 logging.SetMinimumLevel(LogLevel.Trace);
             }

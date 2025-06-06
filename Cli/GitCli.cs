@@ -41,7 +41,7 @@ class GitCli(ILogger<GitCli> logger)
         }
     }
 
-    void CheckExitCode(int exitCode)
+    void EnsureExitCode(int exitCode)
     {
         if (exitCode != 0)
         {
@@ -83,7 +83,7 @@ class GitCli(ILogger<GitCli> logger)
 
         process.WaitForExit();
 
-        CheckExitCode(process.ExitCode);
+        EnsureExitCode(process.ExitCode);
     }
 
     internal List<string> GetOutputLines(params string[] args)
@@ -132,7 +132,7 @@ class GitCli(ILogger<GitCli> logger)
 
         process.WaitForExit();
 
-        CheckExitCode(process.ExitCode);
+        EnsureExitCode(process.ExitCode);
 
         return result;
     }
