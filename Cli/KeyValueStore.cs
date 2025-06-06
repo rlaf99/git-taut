@@ -12,14 +12,14 @@ class KeyValueStore(ILogger<KeyValueStore> logger)
     LightningEnvironment _dbEnv;
 
     [AllowNull]
-    LightningDatabase _host2TautDb;
+    LightningDatabase _tautenedDb;
 
     [AllowNull]
-    LightningDatabase _taut2HostDb;
+    LightningDatabase _regainedDb;
 
-    const string DbDirectoryName = "tautened";
-    const string Host2TautDbName = "host2taut";
-    const string Taut2HostDbName = "taut2host";
+    const string DbDirectoryName = "taut";
+    const string Host2TautDbName = "tautened";
+    const string Taut2HostDbName = "regained";
 
     [AllowNull]
     string _dbPath;
@@ -40,8 +40,8 @@ class KeyValueStore(ILogger<KeyValueStore> logger)
 
         using (var txn = _dbEnv.BeginTransaction())
         {
-            _host2TautDb = txn.OpenDatabase(Host2TautDbName, dbConfig);
-            _taut2HostDb = txn.OpenDatabase(Taut2HostDbName, dbConfig);
+            _tautenedDb = txn.OpenDatabase(Host2TautDbName, dbConfig);
+            _regainedDb = txn.OpenDatabase(Taut2HostDbName, dbConfig);
 
             txn.Commit();
         }
@@ -52,7 +52,7 @@ class KeyValueStore(ILogger<KeyValueStore> logger)
     internal bool TryGetTautened(Lg2OidPlainRef oidRef, ref Lg2Oid resultOid)
     {
         using var txn = _dbEnv.BeginTransaction();
-        var result = txn.TryGet(_host2TautDb, oidRef, ref resultOid);
+        var result = txn.TryGet(_tautenedDb, oidRef, ref resultOid);
         txn.Commit();
 
         return result;
@@ -61,14 +61,14 @@ class KeyValueStore(ILogger<KeyValueStore> logger)
     internal void GetTautened(Lg2OidPlainRef oidRef, ref Lg2Oid resultOid)
     {
         using var txn = _dbEnv.BeginTransaction();
-        txn.Get(_host2TautDb, oidRef, ref resultOid);
+        txn.Get(_tautenedDb, oidRef, ref resultOid);
         txn.Commit();
     }
 
-    internal void SetTautened(Lg2OidPlainRef hostOidRef, Lg2OidPlainRef tautOidRef)
+    internal void PutTautened(Lg2OidPlainRef hostOidRef, Lg2OidPlainRef tautOidRef)
     {
         using var txn = _dbEnv.BeginTransaction();
-        txn.Put(_host2TautDb, hostOidRef, tautOidRef);
+        txn.Put(_tautenedDb, hostOidRef, tautOidRef);
         txn.Commit();
     }
 }

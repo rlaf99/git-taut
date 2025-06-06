@@ -33,17 +33,7 @@ public unsafe class Lg2Blob
         return Lg2ObjectType.LG2_OBJECT_BLOB;
     }
 
-    // public static bool DataIsBinary(sbyte* pData, nuint size)
-    // {
-    //     if (pData is null || size == 0)
-    //     {
-    //         throw new ArgumentException($"Invalid input");
-    //     }
-
-    //     var val = git_blob_data_is_binary(pData, size);
-
-    //     return val != 0;
-    // }
+    public static implicit operator Lg2OidPlainRef(Lg2Blob blob) => blob.GetOidPlainRef();
 }
 
 public static unsafe class Lg2BlobExtensions
@@ -80,13 +70,13 @@ public static unsafe class Lg2BlobExtensions
 
 unsafe partial class Lg2RepositoryExtensions
 {
-    public static Lg2Blob LookupBlob(this Lg2Repository repo, ILg2ObjectInfo objInfo)
+    public static Lg2Blob LookupBlob(this Lg2Repository repo, Lg2OidPlainRef plainRef)
     {
-        var oidPlainRef = objInfo.GetOidPlainRef();
+        repo.EnsureValid();
 
         git_blob* pBlob = null;
 
-        var rc = git_blob_lookup(&pBlob, repo.Ptr, oidPlainRef.Ptr);
+        var rc = git_blob_lookup(&pBlob, repo.Ptr, plainRef.Ptr);
         Lg2Exception.ThrowIfNotOk(rc);
 
         return new Lg2Blob(pBlob);

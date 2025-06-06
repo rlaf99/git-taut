@@ -34,6 +34,16 @@ public readonly unsafe ref struct Lg2OidPlainRef
 
 public static unsafe class Lg2OidPlainRefExtensions
 {
+    public static string GetOidHexDigits(this Lg2OidPlainRef plainRef)
+    {
+        return plainRef.Ref.Fmt();
+    }
+
+    public static string GetOidHexDigits(this Lg2OidPlainRef plainRef, int size)
+    {
+        return plainRef.Ref.NFmt(size);
+    }
+
     public static ReadOnlySpan<byte> GetReadOnlyBytes(this Lg2OidPlainRef plainRef)
     {
         return MemoryMarshal.CreateReadOnlySpan(ref plainRef.Ref.id[0], GIT_OID_MAX_SIZE);
@@ -74,6 +84,9 @@ public unsafe ref struct Lg2Oid
     {
         return Raw.NFmt(size);
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static implicit operator Lg2OidPlainRef(Lg2Oid oid) => oid.PlainRef;
 }
 
 public static unsafe class Lg2OidExtensions
@@ -138,6 +151,12 @@ public static unsafe class Lg2objInfoExtensions
     {
         var oidRef = objInfo.GetOidPlainRef();
         return oidRef.Ref.Fmt();
+    }
+
+    public static string GetOidHexDigits(this ILg2ObjectInfo objInfo, int size)
+    {
+        var oidRef = objInfo.GetOidPlainRef();
+        return oidRef.Ref.NFmt(size);
     }
 }
 

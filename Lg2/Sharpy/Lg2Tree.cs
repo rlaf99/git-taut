@@ -95,6 +95,8 @@ public unsafe class Lg2TreeEntry
     {
         return (Lg2FileMode)git_tree_entry_filemode_raw(pEntry);
     }
+
+    public static implicit operator Lg2OidPlainRef(Lg2TreeEntry entry) => entry.GetOidPlainRef();
 }
 
 public readonly unsafe ref struct Lg2TreeEntryPlainRef
@@ -171,6 +173,9 @@ public unsafe class Lg2TreeEntryOwnedRef<TOwner>
     {
         return Lg2TreeEntry.GetFileModeRaw(_pNative);
     }
+
+    public static implicit operator Lg2OidPlainRef(Lg2TreeEntryOwnedRef<TOwner> ownedRef) =>
+        ownedRef.GetOidPlainRef();
 }
 
 public unsafe class Lg2Tree
@@ -202,6 +207,8 @@ public unsafe class Lg2Tree
     {
         return Lg2ObjectType.LG2_OBJECT_TREE;
     }
+
+    public static implicit operator Lg2OidPlainRef(Lg2Tree tree) => tree.GetOidPlainRef();
 }
 
 public static unsafe class Lg2TreeExtensions
@@ -236,7 +243,7 @@ public static unsafe class Lg2TreeExtensions
         return git_tree_entrycount(tree.Ptr);
     }
 
-    public static ILg2TreeEntry GetEntry(this Lg2Tree tree, nuint index)
+    public static Lg2TreeEntryOwnedRef<Lg2Tree> GetEntry(this Lg2Tree tree, nuint index)
     {
         tree.EnsureValid();
 
@@ -246,10 +253,10 @@ public static unsafe class Lg2TreeExtensions
             throw new ArgumentException($"Invalid {nameof(index)}");
         }
 
-        return new Lg2TreeEntryOwnedRef<Lg2Tree>(tree, pEntry);
+        return new(tree, pEntry);
     }
 
-    public static ILg2TreeEntry GetEntry(this Lg2Tree tree, string name)
+    public static Lg2TreeEntryOwnedRef<Lg2Tree> GetEntry(this Lg2Tree tree, string name)
     {
         tree.EnsureValid();
 
@@ -261,7 +268,7 @@ public static unsafe class Lg2TreeExtensions
             throw new ArgumentException($"Invalid {nameof(name)}");
         }
 
-        return new Lg2TreeEntryOwnedRef<Lg2Tree>(tree, pEntry);
+        return new(tree, pEntry);
     }
 }
 

@@ -263,7 +263,7 @@ partial class GitRemoteHelper
 
         Lg2Oid oid = new();
         oid.FromHexDigits(args.Hash);
-        tautManager.TransferCommitToHost(ref oid);
+        tautManager.RegainCommit(ref oid);
 
         return HandleGitCommandResult.Keep;
     }

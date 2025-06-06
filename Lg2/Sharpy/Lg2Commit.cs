@@ -33,6 +33,8 @@ public unsafe class Lg2Commit
     {
         return Lg2ObjectType.LG2_OBJECT_COMMIT;
     }
+
+    public static implicit operator Lg2OidPlainRef(Lg2Commit commit) => commit.GetOidPlainRef();
 }
 
 public static unsafe class Lg2CommitExtensions
