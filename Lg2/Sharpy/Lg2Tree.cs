@@ -391,33 +391,6 @@ unsafe partial class Lg2RepositoryExtensions
         return new(pTree);
     }
 
-    public static Lg2Tree LookupTree(this Lg2Repository repo, scoped ref readonly Lg2Oid oid)
-    {
-        repo.EnsureValid();
-
-        git_tree* pTree = null;
-        fixed (git_oid* pOid = &oid.Raw)
-        {
-            var rc = git_tree_lookup(&pTree, repo.Ptr, pOid);
-            Lg2Exception.ThrowIfNotOk(rc);
-        }
-
-        return new Lg2Tree(pTree);
-    }
-
-    public static Lg2Tree LookupTree(this Lg2Repository repo, ILg2ObjectInfo objInfo)
-    {
-        repo.EnsureValid();
-
-        var oidPlainRef = objInfo.GetOidPlainRef();
-
-        git_tree* pTree = null;
-        var rc = git_tree_lookup(&pTree, repo.Ptr, oidPlainRef.Ptr);
-        Lg2Exception.ThrowIfNotOk(rc);
-
-        return new Lg2Tree(pTree);
-    }
-
     public static Lg2TreeBuilder NewTreeBuilder(this Lg2Repository repo, Lg2Tree tree)
     {
         repo.EnsureValid();

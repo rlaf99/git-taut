@@ -2,7 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
-namespace Git.Remote.Taut;
+namespace Git.Taut;
 
 class GitCliException : Exception
 {

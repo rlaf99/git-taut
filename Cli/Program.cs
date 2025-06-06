@@ -1,5 +1,5 @@
 ﻿using ConsoleAppFramework;
-using Git.Remote.Taut;
+using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -74,21 +74,25 @@ var app = ConsoleApp
         }
     );
 
-app.UseFilter<CustomFilter>();
+app.UseFilter<ExtraFilter>();
 
 app.Add<GitRemoteHelper>();
-app.Add(
-    "--print-info",
-    () =>
+app.Add<ExtraCommands>();
+
+app.Run(args);
+
+class ExtraCommands
+{
+    /// <summary>Print internal information.</summary>
+    [Command("--internal-info")]
+    public void PrintInfo()
     {
         var lg2Version = Lg2Global.Version;
         ConsoleApp.Log($"LibGit2 Version: {lg2Version}");
     }
-);
+}
 
-app.Run(args);
-
-internal class CustomFilter(IServiceProvider serviceProvider, ConsoleAppFilter next)
+internal class ExtraFilter(IServiceProvider serviceProvider, ConsoleAppFilter next)
     : ConsoleAppFilter(next)
 {
     void SetLg2TraceOutput()

@@ -4,7 +4,7 @@ using LightningDB;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
-namespace Git.Remote.Taut;
+namespace Git.Taut;
 
 class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
 {
@@ -168,27 +168,29 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
         Lg2Oid oid = new();
         while (revWalk.Next(ref oid))
         {
-            var commit = _tautRepo.LookupCommit(ref oid);
-
-            TautenCommit(commit);
+            var commit = _tautRepo.LookupCommit(oid.PlainRef);
 
             var commitOidHex8 = oid.ToHexDigits(8);
             var commitSummary = commit.GetSummary();
 
             logger.ZLogTrace($"Start tautening commit {commitOidHex8} {commitSummary}");
+
+            TautenCommit(commit);
         }
 
         throw new NotImplementedException();
     }
 
-    internal void TautenCommit(Lg2Commit commit)
+    internal Lg2Commit TautenCommit(Lg2Commit commit)
     {
         var commitOidRef = commit.GetOidPlainRef();
 
-        Lg2Oid resultOid = new();
-        if (TryGetTautened(commitOidRef, ref resultOid))
+        Lg2Oid existingOid = new();
+        if (TryGetTautened(commitOidRef, ref existingOid))
         {
-            return;
+            var resultCommit = _tautRepo.LookupCommit(existingOid.PlainRef);
+
+            return resultCommit;
         }
 
         var tree = commit.GetTree();
@@ -198,10 +200,18 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
 
         if (tree != resultTree)
         {
+            Lg2Oid resultOid = new();
+
             var amend = commit.NewAmend();
             amend.Tree = resultTree;
             amend.Write(ref resultOid);
+
+            var resultCommit = _tautRepo.LookupCommit(resultOid.PlainRef);
+
+            return resultCommit;
         }
+
+        return commit;
     }
 
     internal bool TryGetTautened(Lg2OidPlainRef oidRef, ref Lg2Oid resultOid)
@@ -238,7 +248,7 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
 
             if (entryObjType.IsTree())
             {
-                var subTree = _tautRepo.LookupTree(entry);
+                var subTree = _tautRepo.LookupTree(entry.GetOidPlainRef());
                 var resultSubTree = await TautenTreeInPostOrderAsync(subTree);
 
                 if (subTree != resultSubTree)
@@ -273,95 +283,35 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
             }
         }
 
-        if (treeBuilder.GetEntryCount() == 0)
+        if (treeBuilder.GetEntryCount() > 0)
         {
-            return tree;
-        }
-
-        for (nuint i = 0; i < tree.GetEntryCount(); i++)
-        {
-            if (tautenedSet.Contains(i) == false)
-            {
-                var entry = tree.GetEntry(i);
-                var entryObjType = entry.GetObjectType();
-
-                if (entryObjType.IsTree() || entryObjType.IsBlob())
-                {
-                    var entryName = entry.GetName();
-                    var entryOidRef = entry.GetOidPlainRef();
-                    var entryFileMode = entry.GetFileModeRaw();
-
-                    treeBuilder.Insert(entryName, entryOidRef, entryFileMode);
-                }
-            }
-        }
-
-        Lg2Oid resultOid = new();
-        treeBuilder.Write(ref resultOid);
-
-        var resultTree = _tautRepo.LookupTree(resultOid.PlainRef);
-
-        return resultTree;
-    }
-
-    internal void TautenTree(Lg2Tree rootTree)
-    {
-        Queue<Lg2Tree> unprocessed = new();
-        unprocessed.Enqueue(rootTree);
-
-        using var txn = _kvStoreEnv.BeginTransaction();
-
-        while (unprocessed.Count > 0)
-        {
-            var tree = unprocessed.Dequeue();
-
             for (nuint i = 0; i < tree.GetEntryCount(); i++)
             {
-                var entry = tree.GetEntry(i);
-                var entryObjType = entry.GetObjectType();
-
-                if (entryObjType.IsValid() == false)
+                if (tautenedSet.Contains(i) == false)
                 {
-                    logger.ZLogWarning($"Ignore invalid object type {entryObjType.GetName()}");
+                    var entry = tree.GetEntry(i);
+                    var entryObjType = entry.GetObjectType();
 
-                    continue;
-                }
-
-                var oidRef = entry.GetOidPlainRef();
-                var oidBytes = oidRef.GetReadOnlyBytes();
-
-                if (txn.ContainsKey(_kvStoreHost2Taut, oidBytes))
-                {
-                    continue;
-                }
-
-                if (entryObjType.IsBlob())
-                {
-                    var fileName = entry.GetName();
-
-                    if (
-                        _tautenedPathSpec.MatchPath(
-                            fileName,
-                            Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE
-                        )
-                    )
+                    if (entryObjType.IsTree() || entryObjType.IsBlob())
                     {
-                        var blob = _hostRepo.LookupBlob(entry);
+                        var entryName = entry.GetName();
+                        var entryOidRef = entry.GetOidPlainRef();
+                        var entryFileMode = entry.GetFileModeRaw();
 
-                        Lg2Oid oid = new();
-                        TautenBlob(blob, ref oid);
+                        treeBuilder.Insert(entryName, entryOidRef, entryFileMode);
                     }
                 }
-
-                if (entryObjType.IsTree())
-                {
-                    var subTree = _tautRepo.LookupTree(entry);
-                    unprocessed.Enqueue(subTree);
-                }
             }
+
+            Lg2Oid resultOid = new();
+            treeBuilder.Write(ref resultOid);
+
+            var resultTree = _tautRepo.LookupTree(resultOid.PlainRef);
+
+            return resultTree;
         }
 
-        txn.Commit();
+        return tree;
     }
 
     void TautenBlob(Lg2Blob blob, scoped ref Lg2Oid tautenedOid)
@@ -458,7 +408,7 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
 
                     if (objType.IsTree())
                     {
-                        var subTree = _tautRepo.LookupTree(entry);
+                        var subTree = _tautRepo.LookupTree(entry.GetOidPlainRef());
                         unprocessed.Enqueue(subTree);
                     }
                 }
@@ -472,7 +422,7 @@ class TautManager(ILogger<TautManager> logger, Aes256Cbc1 cipher)
 
         while (revWalk.Next(ref oid))
         {
-            var commit = _tautRepo.LookupCommit(ref oid);
+            var commit = _tautRepo.LookupCommit(oid.PlainRef);
 
             var commitOidStr8 = oid.ToHexDigits(8);
             var commitSummary = commit.GetSummary();

@@ -1,10 +1,9 @@
-using System.Diagnostics.CodeAnalysis;
 using ConsoleAppFramework;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
-namespace Git.Remote.Taut;
+namespace Git.Taut;
 
 partial class GitRemoteHelper(
     ILogger<GitRemoteHelper> logger,
@@ -357,11 +356,11 @@ partial class GitRemoteHelper
     string _tautRepoDir = default!;
 
     /// <summary>
-    /// Invoked by Git and act as a remote helper.
+    /// Act as a Git remote helper.
     /// </summary>
     /// <param name="remote">Remote name.</param>
     /// <param name="address">Remote address.</param>
-    [Command("")]
+    [Command("--remote-helper")]
     public void HandleGitCommands([Argument] string remote, [Argument] string address)
     {
         _remote = remote;

@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Threading.Tasks.Dataflow;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
 
@@ -98,18 +97,14 @@ public unsafe class Lg2CommitAmend
 
 unsafe partial class Lg2RepositoryExtensions
 {
-    public static Lg2Commit LookupCommit(this Lg2Repository repo, ref readonly Lg2Oid oid)
+    public static Lg2Commit LookupCommit(this Lg2Repository repo, Lg2OidPlainRef oidRef)
     {
         repo.EnsureValid();
 
         git_commit* pCommit = null;
-        int rc;
-        fixed (git_oid* pOid = &oid.Raw)
-        {
-            rc = git_commit_lookup(&pCommit, repo.Ptr, pOid);
-        }
+        var rc = git_commit_lookup(&pCommit, repo.Ptr, oidRef.Ptr);
         Lg2Exception.ThrowIfNotOk(rc);
 
-        return new Lg2Commit(pCommit);
+        return new(pCommit);
     }
 }

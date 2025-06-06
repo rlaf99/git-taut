@@ -44,17 +44,15 @@ public static unsafe class Lg2RevWalkExtensions
     {
         revWalk.EnsureValid();
 
-        var rc = (int)GIT_OK;
         fixed (git_oid* pOid = &oid.Raw)
         {
-            rc = git_revwalk_next(pOid, revWalk.Ptr);
+            var rc = git_revwalk_next(pOid, revWalk.Ptr);
+            if (rc == (int)GIT_ITEROVER)
+            {
+                return false;
+            }
+            Lg2Exception.ThrowIfNotOk(rc);
         }
-
-        if (rc == (int)GIT_ITEROVER)
-        {
-            return false;
-        }
-        Lg2Exception.ThrowIfNotOk(rc);
 
         return true;
     }

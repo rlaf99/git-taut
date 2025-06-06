@@ -1,1 +1,1 @@
-## git-remote-taut
+## git-taut

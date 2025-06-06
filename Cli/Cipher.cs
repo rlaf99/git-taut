@@ -1,12 +1,11 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
-namespace Git.Remote.Taut;
+namespace Git.Taut;
 
 class UserKeyBase
 {

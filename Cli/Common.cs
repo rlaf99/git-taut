@@ -2,18 +2,18 @@ using Lg2.Sharpy;
 using LightningDB;
 using Microsoft.Extensions.Configuration;
 
-namespace Git.Remote.Taut;
+namespace Git.Taut;
 
 static class ProgramInfo
 {
-    internal const string CommandName = "git-remote-taut";
+    internal const string CommandName = "git-taut";
 }
 
 static class KnownEnvironVars
 {
     internal const string GitDir = "GIT_DIR";
 
-    internal const string GitRemoteTautTrace = "GIT_REMOTE_TAUT_TRACE";
+    internal const string GitRemoteTautTrace = "GIT_TAUT_TRACE";
 
     internal const string GitAlternateObjectDirectories = "GIT_ALTERNATE_OBJECT_DIRECTORIES";
 }
