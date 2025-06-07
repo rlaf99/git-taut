@@ -48,6 +48,18 @@ public static unsafe class Lg2OidPlainRefExtensions
     {
         return MemoryMarshal.CreateReadOnlySpan(ref plainRef.Ref.id[0], GIT_OID_MAX_SIZE);
     }
+
+    public static bool Equals(this Lg2OidPlainRef plainRef, Lg2OidPlainRef other)
+    {
+        if (plainRef.Ptr == other.Ptr)
+        {
+            return true;
+        }
+
+        var result = git_oid_cmp(plainRef.Ptr, other.Ptr);
+
+        return result == 0;
+    }
 }
 
 public unsafe ref struct Lg2Oid
@@ -64,6 +76,16 @@ public unsafe ref struct Lg2Oid
         }
     }
 
+    public bool Equals(scoped ref Lg2Oid other)
+    {
+        var ptr1 = (git_oid*)Unsafe.AsPointer(ref Raw);
+        var ptr2 = (git_oid*)Unsafe.AsPointer(ref other.Raw);
+
+        var result = git_oid_cmp(ptr1, ptr2);
+
+        return result == 0;
+    }
+
     public void FromHexDigits(string hash)
     {
         var u8Hash = new Lg2Utf8String(hash);
@@ -75,22 +97,22 @@ public unsafe ref struct Lg2Oid
         }
     }
 
-    public readonly string ToHexDigits()
-    {
-        return Raw.Fmt();
-    }
-
-    public readonly string ToHexDigits(int size)
-    {
-        return Raw.NFmt(size);
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static implicit operator Lg2OidPlainRef(Lg2Oid oid) => oid.PlainRef;
 }
 
 public static unsafe class Lg2OidExtensions
 {
+    public static string ToHexDigits(this ref Lg2Oid oid)
+    {
+        return oid.Raw.Fmt();
+    }
+
+    public static string ToHexDigits(this ref Lg2Oid oid, int size)
+    {
+        return oid.Raw.NFmt(size);
+    }
+
     public static ReadOnlySpan<byte> GetReadOnlyBytes(this ref Lg2Oid oid)
     {
         return MemoryMarshal.CreateReadOnlySpan(ref oid.Raw.id[0], GIT_OID_MAX_SIZE);
@@ -106,16 +128,19 @@ internal static unsafe class Lg2OidNativeExtentions
 {
     internal static string Fmt(ref readonly this git_oid oid)
     {
-        var buf = stackalloc sbyte[GIT_OID_MAX_HEXSIZE + 1];
+        const int NULL = 1;
+
+        var pBuf = stackalloc sbyte[GIT_OID_MAX_HEXSIZE + NULL];
+
         fixed (git_oid* pOid = &oid)
         {
-            var rc = git_oid_fmt(buf, pOid);
+            var rc = git_oid_fmt(pBuf, pOid);
             Lg2Exception.ThrowIfNotOk(rc);
         }
 
-        var result = Marshal.PtrToStringUTF8((nint)buf) ?? string.Empty;
+        var result = Marshal.PtrToStringUTF8((nint)pBuf);
 
-        return result;
+        return result!;
     }
 
     internal static string NFmt(ref readonly this git_oid oid, int size)
@@ -125,17 +150,36 @@ internal static unsafe class Lg2OidNativeExtentions
             throw new ArgumentOutOfRangeException(nameof(size), $"Value too large");
         }
 
-        var buf = stackalloc sbyte[size + 1];
+        const int NULL = 1;
+
+        var pBuf = stackalloc sbyte[size + NULL];
 
         fixed (git_oid* pOid = &oid)
         {
-            var rc = git_oid_nfmt(buf, (nuint)size, pOid);
+            var rc = git_oid_nfmt(pBuf, (nuint)size, pOid);
             Lg2Exception.ThrowIfNotOk(rc);
         }
 
-        var result = Marshal.PtrToStringUTF8((nint)buf) ?? string.Empty;
+        var result = Marshal.PtrToStringUTF8((nint)pBuf);
 
-        return result;
+        return result!;
+    }
+
+    internal static string PathFmt(ref readonly this git_oid oid)
+    {
+        const int SLASH_AND_NULL = 1 + 1;
+
+        var pBuf = stackalloc sbyte[GIT_OID_MAX_HEXSIZE + SLASH_AND_NULL];
+
+        fixed (git_oid* pOid = &oid)
+        {
+            var rc = git_oid_pathfmt(pBuf, pOid);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+
+        var result = Marshal.PtrToStringUTF8((nint)pBuf);
+
+        return result!;
     }
 }
 
@@ -157,6 +201,22 @@ public static unsafe class Lg2objInfoExtensions
     {
         var oidRef = objInfo.GetOidPlainRef();
         return oidRef.Ref.NFmt(size);
+    }
+
+    public static bool HasSameOid(this ILg2ObjectInfo objInfo, ILg2ObjectInfo other)
+    {
+        var objType = objInfo.GetObjectType();
+        var otherObjType = other.GetObjectType();
+
+        if (objType != otherObjType)
+        {
+            return false;
+        }
+
+        var oidRef = objInfo.GetOidPlainRef();
+        var otherOidRef = other.GetOidPlainRef();
+
+        return oidRef.Equals(otherOidRef);
     }
 }
 
@@ -193,15 +253,7 @@ public unsafe class Lg2Object
     }
 }
 
-public static unsafe class Lg2ObjectExtensions
-{
-    public static Lg2ObjectType GetObjectType(this Lg2Object obj)
-    {
-        obj.EnsureValid();
-
-        return (Lg2ObjectType)git_object_type(obj.Ptr);
-    }
-}
+public static unsafe class Lg2ObjectExtensions { }
 
 unsafe partial class Lg2RepositoryExtensions
 {

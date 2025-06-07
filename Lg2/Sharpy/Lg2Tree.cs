@@ -322,9 +322,6 @@ public static unsafe class Lg2TreeBuilderExtensions
         return new Lg2TreeEntryOwnedRef<Lg2TreeBuilder>(treeBuilder, pEntry);
     }
 
-    // By default the entry that you are inserting will be checked for validity;
-    // that it exists in the object database and is of the correct type.
-    // If you do not want this behavior, set the GIT_OPT_ENABLE_STRICT_OBJECT_CREATION library option to false.
     public static void Insert(
         this Lg2TreeBuilder treeBuilder,
         string name,

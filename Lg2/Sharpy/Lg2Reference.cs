@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.git_error_code;
@@ -138,6 +139,71 @@ public static unsafe class Lg2ReferenceExtensions
         var result = git_reference_is_note(reference.Ptr);
 
         return result != 0;
+    }
+}
+
+public unsafe class Lg2RefIterator
+    : NativeSafePointer<Lg2RefIterator, git_reference_iterator>,
+        INativeRelease<git_reference_iterator>
+{
+    public Lg2RefIterator()
+        : this(default) { }
+
+    internal Lg2RefIterator(git_reference_iterator* pNative)
+        : base(pNative) { }
+
+    public static unsafe void NativeRelease(git_reference_iterator* pNative)
+    {
+        git_reference_iterator_free(pNative);
+    }
+}
+
+public static unsafe class Lg2RefIteratorExtensions
+{
+    public static bool Next(this Lg2RefIterator iter, out Lg2Reference reference)
+    {
+        iter.EnsureValid();
+
+        git_reference* ptr = null;
+        var rc = git_reference_next(&ptr, iter.Ptr);
+        if (rc != 0)
+        {
+            if (rc != (int)GIT_ITEROVER)
+            {
+                Lg2Exception.ThrowIfNotOk(rc);
+            }
+
+            reference = new();
+            return false;
+        }
+        else
+        {
+            reference = new(ptr);
+            return true;
+        }
+    }
+
+    public static bool NextName(this Lg2RefIterator iter, out string refName)
+    {
+        iter.EnsureValid();
+
+        sbyte* ptr = null;
+        var rc = git_reference_next_name(&ptr, iter.Ptr);
+        if (rc != 0)
+        {
+            if (rc != (int)GIT_ITEROVER)
+            {
+                Lg2Exception.ThrowIfNotOk(rc);
+            }
+
+            refName = string.Empty;
+            return false;
+        }
+        else
+        {
+            refName = Marshal.PtrToStringUTF8((nint)ptr)!;
+            return true;
+        }
     }
 }
 
@@ -320,6 +386,30 @@ unsafe partial class Lg2RepositoryExtensions
         {
             git_strarray_dispose(&refs);
         }
+    }
+
+    public static Lg2RefIterator NewRefIterator(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        git_reference_iterator* ptr = null;
+        var rc = git_reference_iterator_new(&ptr, repo.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(ptr);
+    }
+
+    public static Lg2RefIterator NewRefIteratorGlob(this Lg2Repository repo, string glob)
+    {
+        repo.EnsureValid();
+
+        using var u8Glob = new Lg2Utf8String(glob);
+
+        git_reference_iterator* ptr = null;
+        var rc = git_reference_iterator_glob_new(&ptr, repo.Ptr, u8Glob.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(ptr);
     }
 
     public static bool HasRefLog(this Lg2Repository repo, string refName)

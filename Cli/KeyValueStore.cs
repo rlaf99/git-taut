@@ -49,10 +49,37 @@ class KeyValueStore(ILogger<KeyValueStore> logger)
         logger.ZLogTrace($"Initialize {nameof(KeyValueStore)}");
     }
 
+    internal bool HasTautened(Lg2OidPlainRef oidRef)
+    {
+        using var txn = _dbEnv.BeginTransaction();
+        var result = txn.ContainsKey(_tautenedDb, oidRef);
+        txn.Commit();
+
+        return result;
+    }
+
+    internal bool HasRegained(Lg2OidPlainRef oidRef)
+    {
+        using var txn = _dbEnv.BeginTransaction();
+        var result = txn.ContainsKey(_regainedDb, oidRef);
+        txn.Commit();
+
+        return result;
+    }
+
     internal bool TryGetTautened(Lg2OidPlainRef oidRef, ref Lg2Oid resultOid)
     {
         using var txn = _dbEnv.BeginTransaction();
         var result = txn.TryGet(_tautenedDb, oidRef, ref resultOid);
+        txn.Commit();
+
+        return result;
+    }
+
+    internal bool TryGetRegained(Lg2OidPlainRef oidRef, ref Lg2Oid resultOid)
+    {
+        using var txn = _dbEnv.BeginTransaction();
+        var result = txn.TryGet(_regainedDb, oidRef, ref resultOid);
         txn.Commit();
 
         return result;
@@ -65,16 +92,40 @@ class KeyValueStore(ILogger<KeyValueStore> logger)
         txn.Commit();
     }
 
+    internal void GetRegained(Lg2OidPlainRef oidRef, ref Lg2Oid resultOid)
+    {
+        using var txn = _dbEnv.BeginTransaction();
+        txn.Get(_regainedDb, oidRef, ref resultOid);
+        txn.Commit();
+    }
+
     internal void PutTautened(Lg2OidPlainRef hostOidRef, Lg2OidPlainRef tautOidRef)
     {
         using var txn = _dbEnv.BeginTransaction();
         txn.Put(_tautenedDb, hostOidRef, tautOidRef);
         txn.Commit();
     }
+
+    internal void PutRegained(Lg2OidPlainRef tautOidRef, Lg2OidPlainRef hostOidRef)
+    {
+        using var txn = _dbEnv.BeginTransaction();
+        txn.Put(_regainedDb, tautOidRef, hostOidRef);
+        txn.Commit();
+    }
 }
 
 static class LightningExtensions
 {
+    internal static bool ContainsKey(
+        this LightningTransaction txn,
+        LightningDatabase db,
+        Lg2OidPlainRef oidRef
+    )
+    {
+        var key = oidRef.GetReadOnlyBytes();
+        return txn.ContainsKey(db, key);
+    }
+
     internal static bool TryGet(
         this LightningTransaction txn,
         LightningDatabase db,

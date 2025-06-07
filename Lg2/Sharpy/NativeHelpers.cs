@@ -35,6 +35,9 @@ public abstract unsafe class NativeSafePointer<TDerived, TNative> : SafeHandle
 
     internal TNative* Ptr => (TNative*)handle;
 
+    // must be public
+    // internal static implicit operator TNative*(NativeSafePointer<TDerived, TNative> sp) => sp.Ptr;
+
     internal ref TNative Ref
     {
         get

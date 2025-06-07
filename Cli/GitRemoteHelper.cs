@@ -214,16 +214,10 @@ partial class GitRemoteHelper
     {
         void HandleList()
         {
-            foreach (var refName in tautManager.GetRefsForTaut())
-            {
-                Lg2Oid oid = new();
-                tautManager.TautRepo.GetRefOid(refName, ref oid);
-                var oidText = oid.ToHexDigits();
+            tautManager.RegainHostRefs();
 
-                Console.WriteLine($"{oidText} {refName}");
-
-                logger.ZLogTrace($"{nameof(HandleGitCmdList)}: {oidText} {refName}");
-            }
+            var refList = tautManager.OrdinaryTautRefs;
+            foreach (var refName in refList) { }
 
             Console.WriteLine();
         }
@@ -274,7 +268,7 @@ partial class GitRemoteHelper
 
         tautManager.Open(_tautRepoDir);
 
-        foreach (var refName in tautManager.GetRefsForTaut())
+        foreach (var refName in tautManager.OrdinaryTautRefs)
         {
             Lg2Oid oid = new();
             tautManager.TautRepo.GetRefOid(refName, ref oid);
@@ -414,11 +408,7 @@ partial class GitRemoteHelper
 
         logger.ZLogTrace($"Clone '{_remote}' to '{_tautRepoDir}'");
 
-        tautManager.Open(_tautRepoDir);
-
-        tautManager.TautRepoAddHostObjects();
-        tautManager.TautRepoSetDefaultConfig();
-        tautManager.TautRepoSetDefaultDescription();
+        tautManager.Open(_tautRepoDir, newSetup: true);
     }
 
     void GitFetchTaut()

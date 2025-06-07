@@ -102,3 +102,12 @@ public enum Lg2TreeWalkMode
     LG2_TREEWALK_PRE = git_treewalk_mode.GIT_TREEWALK_PRE,
     LG2_TREEWALK_POST = git_treewalk_mode.GIT_TREEWALK_POST,
 }
+
+[Flags]
+public enum Lg2SortFlags
+{
+    LG2_SORT_NONE = git_sort_t.GIT_SORT_NONE,
+    LG2_SORT_TOPOLOGICAL = git_sort_t.GIT_SORT_TOPOLOGICAL,
+    LG2_SORT_TIME = git_sort_t.GIT_SORT_TIME,
+    LG2_SORT_REVERSE = git_sort_t.GIT_SORT_REVERSE,
+}

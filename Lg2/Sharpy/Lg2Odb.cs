@@ -332,37 +332,32 @@ public static unsafe class Lg2OdbExtenions
         Lg2Exception.ThrowIfNotOk(rc);
     }
 
-    public static bool Exists(this Lg2Odb odb, ILg2ObjectInfo objInfo)
+    public static bool Exists(this Lg2Odb odb, Lg2OidPlainRef oidRef)
     {
         odb.EnsureValid();
 
-        var oidRef = objInfo.GetOidPlainRef();
         var val = git_odb_exists(odb.Ptr, oidRef.Ptr);
 
         return val != 0;
     }
 
-    public static bool ExistsExt(this Lg2Odb odb, ILg2ObjectInfo objInfo, Lg2OdbLookupFlags flags)
+    public static bool ExistsExt(this Lg2Odb odb, Lg2OidPlainRef oidRef, Lg2OdbLookupFlags flags)
     {
         odb.EnsureValid();
 
-        var oidRef = objInfo.GetOidPlainRef();
         var val = git_odb_exists_ext(odb.Ptr, oidRef.Ptr, (uint)flags);
 
         return val != 0;
     }
 
-    public static Lg2OdbObject Read(this Lg2Odb odb, ref Lg2Oid oid)
+    public static Lg2OdbObject Read(this Lg2Odb odb, Lg2OidPlainRef oidRef)
     {
         odb.EnsureValid();
 
         git_odb_object* pOdbObject = null;
 
-        fixed (git_oid* pOid = &oid.Raw)
-        {
-            var rc = git_odb_read(&pOdbObject, odb.Ptr, pOid);
-            Lg2Exception.ThrowIfNotOk(rc);
-        }
+        var rc = git_odb_read(&pOdbObject, odb.Ptr, oidRef.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pOdbObject);
     }
@@ -396,22 +391,10 @@ public static unsafe class Lg2OdbExtenions
         return oid;
     }
 
-    public static void CopyObjectToAnother(
-        this Lg2Odb thisOdb,
-        Lg2Odb thatOdb,
-        ref Lg2Oid oid,
-        out Lg2ObjectType objType
-    )
-    {
-        var odbObject = thisOdb.Read(ref oid);
-        objType = odbObject.GetObjectType();
-        thatOdb.Write(odbObject.GetRawData(), objType);
-    }
-
     public static bool TryCopyObjectToAnother(
-        this Lg2Odb thisOdb,
-        Lg2Odb thatOdb,
-        ILg2ObjectInfo objInfo,
+        this Lg2Odb odb,
+        Lg2Odb another,
+        Lg2OidPlainRef oidRef,
         bool refreshThatOdb = false
     )
     {
@@ -419,11 +402,11 @@ public static unsafe class Lg2OdbExtenions
 
         if (refreshThatOdb)
         {
-            alreadyExists = thatOdb.Exists(objInfo);
+            alreadyExists = another.Exists(oidRef);
         }
         else
         {
-            alreadyExists = thatOdb.ExistsExt(objInfo, Lg2OdbLookupFlags.LG2_ODB_LOOKUP_NO_REFRESH);
+            alreadyExists = another.ExistsExt(oidRef, Lg2OdbLookupFlags.LG2_ODB_LOOKUP_NO_REFRESH);
         }
 
         if (alreadyExists)
@@ -431,8 +414,8 @@ public static unsafe class Lg2OdbExtenions
             return false;
         }
 
-        var odbObject = thisOdb.Read(objInfo);
-        thatOdb.Write(odbObject.GetRawData(), odbObject.GetObjectType());
+        var odbObject = odb.Read(oidRef);
+        another.Write(odbObject.GetRawData(), odbObject.GetObjectType());
 
         return true;
     }

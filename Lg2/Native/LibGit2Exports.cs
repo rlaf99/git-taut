@@ -1157,6 +1157,24 @@ namespace Lg2.Native
         public static extern int git_revwalk_add_hide_cb(git_revwalk* walk, [NativeTypeName("git_revwalk_hide_cb")] delegate* unmanaged[Cdecl]<git_oid*, void*, int> hide_cb, void* payload);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_signature_new(git_signature** @out, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* email, [NativeTypeName("git_time_t")] long time, int offset);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_signature_now(git_signature** @out, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* email);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_signature_default(git_signature** @out, git_repository* repo);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_signature_from_buffer(git_signature** @out, [NativeTypeName("const char *")] sbyte* buf);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_signature_dup(git_signature** dest, [NativeTypeName("const git_signature *")] git_signature* sig);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_signature_free(git_signature* sig);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_tag_lookup(git_tag** @out, git_repository* repo, [NativeTypeName("const git_oid *")] git_oid* id);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

@@ -240,9 +240,8 @@ public unsafe class Lg2Utf8String : SafeHandle
 
     internal sbyte* Ptr => (sbyte*)handle;
 
-    public static implicit operator sbyte*(Lg2Utf8String str) => (sbyte*)str.handle;
-
-    public static implicit operator Lg2Utf8String(string str) => new(str);
+    // must be public
+    // internal static implicit operator sbyte*(Lg2Utf8String str) => (sbyte*)str.handle;
 }
 
 public unsafe class Lg2Repository

@@ -57,7 +57,7 @@ public static unsafe class Lg2PathSpecExtensions
         pathSpec.EnsureValid();
 
         using var u8Path = new Lg2Utf8String(path);
-        var result = git_pathspec_matches_path(pathSpec.Ptr, (uint)flags, u8Path);
+        var result = git_pathspec_matches_path(pathSpec.Ptr, (uint)flags, u8Path.Ptr);
 
         return result != 0;
     }
