@@ -9,13 +9,15 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 {
     const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
 
-    readonly Lg2Repository _tautRepo = new();
+    [AllowNull]
+    Lg2Repository _tautRepo;
 
-    readonly Lg2Repository _hostRepo = new();
+    [AllowNull]
+    Lg2Repository _hostRepo;
 
-    internal Lg2Repository TautRepo => _tautRepo;
+    internal Lg2Repository TautRepo => _tautRepo!;
 
-    internal Lg2Repository HostRepo => _hostRepo;
+    internal Lg2Repository HostRepo => _hostRepo!;
 
     string? _tautRepoPath = null;
     internal string TautRepoPath
@@ -42,12 +44,22 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
     const string TautenedRefSpecText = "refs/*:refs/tautened/*";
     const string RegainedRefSpecText = "refs/*:refs/regained/*";
+    const string RemoteRefSpecText = "refs/*:refs/remotes/*";
 
     [AllowNull]
     Lg2RefSpec _tautenedRefSpec;
 
+    internal Lg2RefSpec TautenedRefSpec => _tautenedRefSpec!;
+
     [AllowNull]
     Lg2RefSpec _regainedRefSpec;
+
+    internal Lg2RefSpec RegainedRefSpec => _regainedRefSpec!;
+
+    [AllowNull]
+    Lg2RefSpec _remoteRefSpec;
+
+    internal Lg2RefSpec RemoteRefSpec => _remoteRefSpec!;
 
     readonly List<string> targetPathSpecList = ["*.tt", "*.taut"];
 
@@ -56,11 +68,12 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
     internal void Open(string repoPath, bool newSetup = false)
     {
-        _tautRepo.Open(repoPath);
-        _hostRepo.Open(Path.Join(repoPath, ".."));
+        _tautRepo = Lg2Repository.New(repoPath);
+        _hostRepo = Lg2Repository.New(Path.Join(repoPath, ".."));
 
         _tautenedRefSpec = Lg2RefSpec.NewForPush(TautenedRefSpecText);
         _regainedRefSpec = Lg2RefSpec.NewForFetch(RegainedRefSpecText);
+        _remoteRefSpec = Lg2RefSpec.NewForPush(RemoteRefSpecText);
 
         _targetPathSpec = Lg2PathSpec.New(targetPathSpecList);
 
@@ -123,7 +136,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 writer.WriteLine(relPathToHostObjects);
             }
 
-            logger.ZLogTrace($"Append '{relPathToHostObjects}' to '{objectsInfoAlternatesFile}'");
+            logger.ZLogTrace($"Write '{relPathToHostObjects}' to '{objectsInfoAlternatesFile}'");
         }
 
         AddHostObjects();
@@ -161,9 +174,9 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         }
     }
 
-    internal List<string> OrdinaryTautRefs => FilterSpecialRefs(_tautRepo.GetRefList());
+    internal List<string> OrdinaryTautRefs => FilterTautSpecificRefs(_tautRepo.GetRefList());
 
-    List<string> FilterSpecialRefs(List<string> refList)
+    List<string> FilterTautSpecificRefs(List<string> refList)
     {
         var result = new List<string>();
 
@@ -185,35 +198,74 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         return result;
     }
 
-    void StoreTautened(Lg2OidPlainRef source, Lg2OidPlainRef target)
+    List<string> FilterRemoteRefs(List<string> refList)
     {
+        var result = new List<string>();
+
+        foreach (var refName in refList)
+        {
+            if (_remoteRefSpec.DstMatches(refName))
+            {
+                continue;
+            }
+
+            result.Add(refName);
+        }
+
+        return result;
+    }
+
+    void StoreTautened(ILg2ObjectInfo objInfo, Lg2OidPlainRef target)
+    {
+        var source = objInfo.GetOidPlainRef();
+
         kvStore.PutTautened(source, target);
 
         if (logger.IsEnabled(LogLevel.Trace))
         {
-            var sourceOidHex8 = source.GetOidHexDigits(8);
+            var sourceOidText = source.GetOidHexDigits();
             var targetOidText = target.GetOidHexDigits();
+            var objTypeName = objInfo.GetObjectType().GetName();
 
-            logger.ZLogTrace($"Tauten {sourceOidHex8} into {targetOidText}");
+            if (sourceOidText == targetOidText)
+            {
+                logger.ZLogTrace($"Tauten {targetOidText} from same {objTypeName}");
+            }
+            else
+            {
+                logger.ZLogTrace($"Tauten {targetOidText} from {objTypeName} {sourceOidText[..8]}");
+            }
         }
     }
 
-    void StoreRegained(Lg2OidPlainRef source, Lg2OidPlainRef target)
+    void StoreRegained(ILg2ObjectInfo objInfo, Lg2OidPlainRef target)
     {
+        var source = objInfo.GetOidPlainRef();
+
         kvStore.PutRegained(source, target);
 
         if (logger.IsEnabled(LogLevel.Trace))
         {
-            var sourceOidHex8 = source.GetOidHexDigits(8);
+            var sourceOidText = source.GetOidHexDigits();
             var targetOidText = target.GetOidHexDigits();
+            var objTypeName = objInfo.GetObjectType().GetName();
 
-            logger.ZLogTrace($"Regain {targetOidText} from {sourceOidHex8}");
+            if (sourceOidText == targetOidText)
+            {
+                logger.ZLogTrace($"Regain {targetOidText} from same {objTypeName}");
+            }
+            else
+            {
+                logger.ZLogTrace($"Regain {targetOidText} from {objTypeName} {sourceOidText[..8]}");
+            }
         }
     }
 
     internal void RegainHostRefs()
     {
-        var tautRefList = FilterSpecialRefs(_tautRepo.GetRefList());
+        logger.ZLogTrace($"Start regaining host refs");
+
+        var tautRefList = FilterTautSpecificRefs(_tautRepo.GetRefList());
 
         var revWalk = _tautRepo.NewRevWalk();
 
@@ -224,10 +276,12 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         );
 
         revWalk.HideGlob(RegainedRefGlob);
+        logger.ZLogTrace($"RevWalk.Hide {RegainedRefGlob}");
 
         foreach (var refName in tautRefList)
         {
             revWalk.Push(refName);
+            logger.ZLogTrace($"RevWalk.Push {refName}");
         }
 
         for (var oid = new Lg2Oid(); revWalk.Next(ref oid); )
@@ -239,12 +293,12 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
             if (kvStore.HasRegained(tautCommit))
             {
-                logger.ZLogTrace($"Ignore regained commit {commitOidHex8} {commitSummary}");
+                logger.ZLogTrace($"Ignore regained commit {commitOidHex8} '{commitSummary}'");
 
                 continue;
             }
 
-            logger.ZLogTrace($"Start regaining commit {commitOidHex8} {commitSummary}");
+            logger.ZLogTrace($"Start regaining commit {commitOidHex8} '{commitSummary}'");
 
             RegainCommit(tautCommit);
         }
@@ -261,11 +315,18 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
             var regainedRefName = _regainedRefSpec.TransformToTarget(refName);
 
-            var message = $"Regained {hostOidHex8} from {tautOidHex8}";
-
-            _tautRepo.SetRef(regainedRefName, hostOid, message);
-
-            logger.ZLogTrace($"{message}");
+            if (tautOid.Equals(ref hostOid))
+            {
+                var message = $"Regain {refName} {hostOidHex8} from same object";
+                _tautRepo.SetRef(regainedRefName, hostOid, message);
+                logger.ZLogTrace($"{message}");
+            }
+            else
+            {
+                var message = $"Regain {refName} {hostOidHex8} from {tautOidHex8}";
+                _tautRepo.SetRef(regainedRefName, hostOid, message);
+                logger.ZLogTrace($"{message}");
+            }
         }
     }
 
@@ -273,13 +334,14 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
     {
         var tautTree = tautCommit.GetTree();
         var tautTreeOidHex8 = tautTree.GetOidHexDigits(8);
+        var tautTreePath = string.Empty;
 
         if (kvStore.HasRegained(tautTree))
         {
-            logger.ZLogTrace($"Ignore regained tree {tautTreeOidHex8}");
+            logger.ZLogTrace($"Ignore regained tree {tautTreeOidHex8} '{tautTreePath}'");
         }
         {
-            logger.ZLogTrace($"Start regaining tree {tautTreeOidHex8}");
+            logger.ZLogTrace($"Start regaining tree {tautTreeOidHex8} '{tautTreePath}'");
 
             var task = RegainTreeAsync(tautTree);
             task.GetAwaiter().GetResult();
@@ -301,6 +363,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         foreach (var parent in tautParents)
         {
             kvStore.GetRegained(parent, ref oid);
+
             var hostCommit = _hostRepo.LookupCommit(oid);
             hostParents.Add(hostCommit);
         }
@@ -310,11 +373,31 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         StoreRegained(tautCommit, oid);
     }
 
+    void RegainObjectByCopy(ILg2ObjectInfo objInfo)
+    {
+        using var tautRepoOdb = _tautRepo.GetOdb();
+        using var hostRepoOdb = _hostRepo.GetOdb();
+
+        tautRepoOdb.CopyObjectIfNotExists(hostRepoOdb, objInfo.GetOidPlainRef());
+
+        StoreRegained(objInfo, objInfo.GetOidPlainRef());
+    }
+
+    void TautenObjectByCopy(ILg2ObjectInfo objInfo)
+    {
+        using var tautRepoOdb = _tautRepo.GetOdb();
+        using var hostRepoOdb = _hostRepo.GetOdb();
+
+        hostRepoOdb.CopyObjectIfNotExists(tautRepoOdb, objInfo.GetOidPlainRef());
+
+        StoreTautened(objInfo, objInfo.GetOidPlainRef());
+    }
+
     async Task RegainTreeAsync(Lg2Tree tautTree)
     {
         await Task.Yield(); // prevent it from running synchronously
 
-        var treeBuilder = new Lg2TreeBuilder();
+        var treeBuilder = _tautRepo.NewTreeBuilder();
         var regainedSet = new HashSet<nuint>();
 
         for (nuint i = 0; i < tautTree.GetEntryCount(); i++)
@@ -323,9 +406,12 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             var entryName = entry.GetName();
             var entryFileMode = entry.GetFileModeRaw();
             var entryObjType = entry.GetObjectType();
+            var entryOidHex8 = entry.GetOidHexDigits(8);
 
             if (entryObjType.IsTree())
             {
+                logger.ZLogTrace($"Start regaining tree {entryOidHex8} '{entryName}'");
+
                 if (kvStore.HasRegained(entry) == false)
                 {
                     var tree = _tautRepo.LookupTree(entry);
@@ -340,15 +426,24 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             }
             else if (entryObjType.IsBlob())
             {
-                var oid = new Lg2Oid();
-                if (kvStore.TryGetRegained(entry, ref oid) == false)
-                {
-                    var blob = _tautRepo.LookupBlob(entry);
-                    RegainBlob(blob, ref oid);
-                }
+                logger.ZLogTrace($"Start regaining blob {entryOidHex8} '{entryName}'");
 
-                treeBuilder.Insert(entryName, oid, entryFileMode);
-                regainedSet.Add(i);
+                if (_targetPathSpec.MatchPath(entryName, Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE))
+                {
+                    var oid = new Lg2Oid();
+                    if (kvStore.TryGetRegained(entry, ref oid) == false)
+                    {
+                        var blob = _tautRepo.LookupBlob(entry);
+                        RegainBlob(blob, ref oid);
+                    }
+
+                    treeBuilder.Insert(entryName, oid, entryFileMode);
+                    regainedSet.Add(i);
+                }
+                else
+                {
+                    RegainObjectByCopy(entry);
+                }
             }
             else
             {
@@ -382,18 +477,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         }
         else
         {
-            var tautRepoOdb = _tautRepo.GetOdb();
-            var hostRepoOdb = _hostRepo.GetOdb();
-
-            if (tautRepoOdb.TryCopyObjectToAnother(hostRepoOdb, tautTree))
-            {
-                var objTypeName = tautTree.GetObjectType().GetName();
-                var oidText = tautTree.GetOidHexDigits();
-
-                logger.ZLogTrace($"Write {objTypeName} {oidText} to host");
-            }
-
-            StoreRegained(tautTree, tautTree);
+            RegainObjectByCopy(tautTree);
         }
     }
 
@@ -415,7 +499,9 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
     internal void TautenHostRefs()
     {
-        var hostRefList = _hostRepo.GetRefList();
+        logger.ZLogTrace($"Start tautening host refs");
+
+        var hostRefList = FilterRemoteRefs(_hostRepo.GetRefList());
 
         var revWalk = _hostRepo.NewRevWalk();
 
@@ -426,10 +512,12 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         );
 
         revWalk.HideGlob(TautenedRefGlob);
+        logger.ZLogTrace($"RevWalk.Hide {TautenedRefGlob}");
 
         foreach (var refName in hostRefList)
         {
             revWalk.Push(refName);
+            logger.ZLogTrace($"RevWalk.Push {refName}");
         }
 
         for (var oid = new Lg2Oid(); revWalk.Next(ref oid); )
@@ -441,12 +529,12 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
             if (kvStore.HasTautened(hostCommit))
             {
-                logger.ZLogTrace($"Ignore tautened commit {commitOidHex8} {commitSummary}");
+                logger.ZLogTrace($"Ignore tautened commit {commitOidHex8} '{commitSummary}'");
 
                 continue;
             }
 
-            logger.ZLogTrace($"Start tautening commit {commitOidHex8} {commitSummary}");
+            logger.ZLogTrace($"Start tautening commit {commitOidHex8} '{commitSummary}'");
 
             TautenCommit(hostCommit);
         }
@@ -463,25 +551,33 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
             var tautenedRefName = _tautenedRefSpec.TransformToTarget(refName);
 
-            var message = $"Tautened {hostOidHex8} into {tautOidHex8}";
-
-            _tautRepo.SetRef(tautenedRefName, tautOid, message);
-
-            logger.ZLogTrace($"{message}");
+            if (hostOid.Equals(ref tautOid))
+            {
+                var message = $"Tauten {refName} {hostOidHex8} into same object";
+                _tautRepo.SetRef(tautenedRefName, tautOid, message);
+                logger.ZLogTrace($"{message}");
+            }
+            else
+            {
+                var message = $"Tauten {refName} {hostOidHex8} into {tautOidHex8}";
+                _tautRepo.SetRef(tautenedRefName, tautOid, message);
+                logger.ZLogTrace($"{message}");
+            }
         }
     }
 
-    internal void TautenCommit(Lg2Commit hostCommit)
+    void TautenCommit(Lg2Commit hostCommit)
     {
         var hostTree = hostCommit.GetTree();
         var hostTreeOidHex8 = hostTree.GetOidHexDigits(8);
+        var hostTreePath = string.Empty;
 
         if (kvStore.HasTautened(hostTree))
         {
-            logger.ZLogTrace($"Ignore tautened tree {hostTreeOidHex8}");
+            logger.ZLogTrace($"Ignore tautened tree {hostTreeOidHex8} '{hostTreePath}'");
         }
         {
-            logger.ZLogTrace($"Start tautening tree {hostTreeOidHex8}");
+            logger.ZLogTrace($"Start tautening tree {hostTreeOidHex8} '{hostTreePath}'");
 
             var task = TautenTreeAsync(hostTree);
             task.GetAwaiter().GetResult();
@@ -498,9 +594,11 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         var hostParents = hostCommit.GetParents();
 
         var tautParents = new List<Lg2Commit>();
+
         foreach (var parent in hostParents)
         {
             kvStore.GetTautened(parent, ref oid);
+
             var tautCommit = _tautRepo.LookupCommit(oid);
             tautParents.Add(tautCommit);
         }
@@ -511,11 +609,11 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
     }
 
     // The whole point of making this async is to avoid stack overflow when the tree is too deep.
-    internal async Task TautenTreeAsync(Lg2Tree hostTree)
+    async Task TautenTreeAsync(Lg2Tree hostTree)
     {
         await Task.Yield(); // prevent it from running synchronously
 
-        var treeBuilder = new Lg2TreeBuilder();
+        var treeBuilder = _tautRepo.NewTreeBuilder();
         var tautenedSet = new HashSet<nuint>();
 
         for (nuint i = 0; i < hostTree.GetEntryCount(); i++)
@@ -524,9 +622,12 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             var entryName = entry.GetName();
             var entryObjType = entry.GetObjectType();
             var entryFileMode = entry.GetFileModeRaw();
+            var entryOidHex8 = entry.GetOidHexDigits(8);
 
             if (entryObjType.IsTree())
             {
+                logger.ZLogTrace($"Start tautening tree {entryOidHex8} '{entryName}'");
+
                 if (kvStore.HasTautened(entry) == false)
                 {
                     var tree = _hostRepo.LookupTree(entry);
@@ -541,6 +642,8 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             }
             else if (entryObjType.IsBlob())
             {
+                logger.ZLogTrace($"Start tautening blob {entryOidHex8} '{entryName}'");
+
                 if (_targetPathSpec.MatchPath(entryName, Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE))
                 {
                     var oid = new Lg2Oid();
@@ -552,6 +655,10 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
                     treeBuilder.Insert(entryName, oid, entryFileMode);
                     tautenedSet.Add(i);
+                }
+                else
+                {
+                    TautenObjectByCopy(entry);
                 }
             }
             else
@@ -586,7 +693,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         }
         else
         {
-            StoreTautened(hostTree, hostTree);
+            TautenObjectByCopy(hostTree);
         }
     }
 
@@ -638,7 +745,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         void CopyObjectToHost(ILg2ObjectInfo objInfo)
         {
-            if (tautRepoOdb.TryCopyObjectToAnother(hostRepoOdb, objInfo.GetOidPlainRef()))
+            if (tautRepoOdb.CopyObjectIfNotExists(hostRepoOdb, objInfo.GetOidPlainRef()))
             {
                 var typeName = objInfo.GetObjectType().GetName();
 

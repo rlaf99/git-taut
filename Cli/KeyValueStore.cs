@@ -6,7 +6,7 @@ using ZLogger;
 
 namespace Git.Taut;
 
-class KeyValueStore(ILogger<KeyValueStore> logger)
+sealed class KeyValueStore(ILogger<KeyValueStore> logger) : IDisposable
 {
     [AllowNull]
     LightningEnvironment _dbEnv;
@@ -111,6 +111,29 @@ class KeyValueStore(ILogger<KeyValueStore> logger)
         using var txn = _dbEnv.BeginTransaction();
         txn.Put(_regainedDb, tautOidRef, hostOidRef);
         txn.Commit();
+    }
+
+    bool _disposed = false;
+
+    void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            _disposed = true;
+
+            if (disposing)
+            {
+                _tautenedDb?.Dispose();
+                _regainedDb?.Dispose();
+                _dbEnv?.Dispose();
+            } // managed resource
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }
 

@@ -257,12 +257,14 @@ unsafe partial class Lg2RepositoryExtensions
         repo.EnsureValid();
         tree.EnsureValid();
 
+        var pCommits = stackalloc git_commit*[parents.Count];
+
         for (int i = 0; i < parents.Count; i++)
         {
             parents[i].EnsureValid();
+            pCommits[i] = parents[i].Ptr;
         }
 
-        var pCommits = stackalloc git_commit*[parents.Count];
         using var u8Message = new Lg2Utf8String(message);
 
         fixed (git_oid* pOid = &oid.Raw)

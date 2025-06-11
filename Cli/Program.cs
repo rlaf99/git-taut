@@ -46,7 +46,7 @@ var app = ConsoleApp
                 options.UsePlainTextFormatter(formatter =>
                 {
                     formatter.SetPrefixFormatter(
-                        $"{0} {1}[{2:short}]\t",
+                        $"{0} {1}[{2:short}]\t\t",
                         (in MessageTemplate template, in LogInfo info) =>
                             template.Format(
                                 info.Timestamp.Local.ToString("hh:mm:ss.ffffff"),
@@ -80,7 +80,7 @@ app.UseFilter<ExtraFilter>();
 app.Add<GitRemoteHelper>();
 app.Add<ExtraCommands>();
 
-app.Run(args);
+await app.RunAsync(args);
 
 class ExtraCommands
 {

@@ -395,13 +395,13 @@ unsafe partial class Lg2RepositoryExtensions
         return new(pTree);
     }
 
-    public static Lg2TreeBuilder NewTreeBuilder(this Lg2Repository repo, Lg2Tree tree)
+    public static Lg2TreeBuilder NewTreeBuilder(this Lg2Repository repo, Lg2Tree? tree = null)
     {
         repo.EnsureValid();
-        tree.EnsureValid();
+        tree?.EnsureValid();
 
         git_treebuilder* pTreeBuilder = null;
-        var rc = git_treebuilder_new(&pTreeBuilder, repo.Ptr, tree.Ptr);
+        var rc = git_treebuilder_new(&pTreeBuilder, repo.Ptr, tree is null ? default : tree.Ptr);
         Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pTreeBuilder);

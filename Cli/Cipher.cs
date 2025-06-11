@@ -96,7 +96,7 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         Debug.Assert(RANDOM_BYTES + VERIFY_KEY_BYTES == CIPHER_BLOCK_BYTES);
 
         logger.ZLogTrace(
-            $"Initalize {nameof(Aes256Cbc1)} mode '{Enum.GetName(UsedCipherMode)}' padding '{Enum.GetName(UsedPaddingMode)}'"
+            $"initialize {nameof(Aes256Cbc1)} mode '{Enum.GetName(UsedCipherMode)}' padding '{Enum.GetName(UsedPaddingMode)}'"
         );
     }
 

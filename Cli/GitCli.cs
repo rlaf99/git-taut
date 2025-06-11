@@ -19,7 +19,7 @@ class GitCli(ILogger<GitCli> logger)
         get { return _alternateObjDirs; }
         set
         {
-            _alternateObjDirs =  [.. value];
+            _alternateObjDirs = [.. value];
             _envAlternateObjDirs = string.Join(Path.PathSeparator, value);
         }
     }
@@ -63,7 +63,7 @@ class GitCli(ILogger<GitCli> logger)
 
         SetEnvironmentAlternativeObjectDirectories(startInfo);
 
-        logger.ZLogTrace($"Run git with arguments '{startInfo.Arguments}'");
+        logger.ZLogTrace($"Running git with arguments '{startInfo.Arguments}'");
 
         using var process = new Process() { StartInfo = startInfo };
 
@@ -100,7 +100,7 @@ class GitCli(ILogger<GitCli> logger)
 
         SetEnvironmentAlternativeObjectDirectories(startInfo);
 
-        logger.ZLogTrace($"Run git with arguments '{startInfo.Arguments}'");
+        logger.ZLogTrace($"Running git with arguments '{startInfo.Arguments}'");
 
         List<string> result = [];
 

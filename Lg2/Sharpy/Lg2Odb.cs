@@ -391,7 +391,7 @@ public static unsafe class Lg2OdbExtenions
         return oid;
     }
 
-    public static bool TryCopyObjectToAnother(
+    public static bool CopyObjectIfNotExists(
         this Lg2Odb odb,
         Lg2Odb another,
         Lg2OidPlainRef oidRef,

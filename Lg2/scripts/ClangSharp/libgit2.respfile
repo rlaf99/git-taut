@@ -60,7 +60,8 @@ thirdparty/libgit2/include/git2/signature.h
 
 
 --file
-thirdparty/libgit2/include/git2.h
+Lg2/scripts/ClangSharp/git2headers.h
+
 
 # --file-directory
 

@@ -42,7 +42,7 @@ public class Lg2Exception : Exception
     }
 }
 
-public ref struct Lg2Global : IDisposable
+public sealed class Lg2Global : IDisposable
 {
     public static readonly string Version = Encoding.UTF8.GetString(LIBGIT2_VERSION);
 
@@ -57,7 +57,7 @@ public ref struct Lg2Global : IDisposable
         initialized = true;
     }
 
-    public readonly void Dispose()
+    public void Dispose()
     {
         if (initialized)
         {
@@ -239,9 +239,6 @@ public unsafe class Lg2Utf8String : SafeHandle
     }
 
     internal sbyte* Ptr => (sbyte*)handle;
-
-    // must be public
-    // internal static implicit operator sbyte*(Lg2Utf8String str) => (sbyte*)str.handle;
 }
 
 public unsafe class Lg2Repository
@@ -259,32 +256,32 @@ public unsafe class Lg2Repository
         git_repository_free(pNative);
     }
 
-    static git_repository* OpenRaw(string repoPath)
-    {
-        using var u8Path = new Lg2Utf8String(repoPath);
+    // static git_repository* OpenRaw(string repoPath)
+    // {
+    //     using var u8Path = new Lg2Utf8String(repoPath);
 
-        git_repository* pRepo;
-        var rc = git_repository_open(&pRepo, u8Path.Ptr);
-        Lg2Exception.ThrowIfNotOk(rc);
+    //     git_repository* pRepo;
+    //     var rc = git_repository_open(&pRepo, u8Path.Ptr);
+    //     Lg2Exception.ThrowIfNotOk(rc);
 
-        return pRepo;
-    }
+    //     return pRepo;
+    // }
 
-    public void Open(string repoPath)
-    {
-        if (IsInvalid == false)
-        {
-            throw new InvalidOperationException($"{nameof(Lg2Repository)} is already opened");
-        }
+    // public void Open(string repoPath)
+    // {
+    //     if (IsInvalid == false)
+    //     {
+    //         throw new InvalidOperationException($"{nameof(Lg2Repository)} is already opened");
+    //     }
 
-        var pRepo = OpenRaw(repoPath);
+    //     var pRepo = OpenRaw(repoPath);
 
-        SetHandle((nint)pRepo);
-    }
+    //     SetHandle((nint)pRepo);
+    // }
 
     public static Lg2Repository New(string repoPath)
     {
-        var u8Path = new Lg2Utf8String(repoPath);
+        using var u8Path = new Lg2Utf8String(repoPath);
 
         git_repository* pRepo;
         var rc = git_repository_open(&pRepo, u8Path.Ptr);

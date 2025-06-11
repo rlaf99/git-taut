@@ -210,27 +210,37 @@ partial class GitRemoteHelper
         return HandleGitCommandResult.Done;
     }
 
-    HandleGitCommandResult HandleGitCmdList(string input)
+    void UpdateAndListRegainedRefs()
     {
-        void HandleList()
+        tautManager.RegainHostRefs();
+
+        var refList = tautManager.OrdinaryTautRefs;
+        foreach (var refName in refList)
         {
-            tautManager.RegainHostRefs();
+            var regainedRefName = tautManager.RegainedRefSpec.TransformToTarget(refName);
+            var oid = new Lg2Oid();
+            tautManager.TautRepo.GetRefOid(regainedRefName, ref oid);
+            var oidText = oid.ToHexDigits();
 
-            var refList = tautManager.OrdinaryTautRefs;
-            foreach (var refName in refList) { }
+            logger.ZLogTrace($"{nameof(HandleGitCmdList)}: {oidText} {refName}");
 
-            Console.WriteLine();
+            Console.WriteLine($"{oidText} {refName}");
         }
 
+        Console.WriteLine();
+    }
+
+    HandleGitCommandResult HandleGitCmdList(string input)
+    {
         if (Directory.EnumerateFileSystemEntries(_tautRepoDir).Any())
         {
             GitFetchTaut();
-            HandleList();
+            UpdateAndListRegainedRefs();
         }
         else
         {
             GitCloneTaut();
-            HandleList();
+            UpdateAndListRegainedRefs();
         }
 
         return HandleGitCommandResult.Done;
@@ -264,16 +274,9 @@ partial class GitRemoteHelper
 
     HandleGitCommandResult HandleGitCmdListForPush(string input)
     {
-        GitUpdateTaut();
+        GitFetchTaut();
 
-        tautManager.Open(_tautRepoDir);
-
-        foreach (var refName in tautManager.OrdinaryTautRefs)
-        {
-            Lg2Oid oid = new();
-            tautManager.TautRepo.GetRefOid(refName, ref oid);
-            Console.WriteLine($"{oid.ToHexDigits()} {refName}");
-        }
+        UpdateAndListRegainedRefs();
 
         Console.WriteLine();
 
@@ -284,6 +287,10 @@ partial class GitRemoteHelper
     {
         void HandleBatch()
         {
+            tautManager.TautenHostRefs();
+
+            throw new NotImplementedException();
+
             foreach (var pushCmd in _pushBatch)
             {
                 logger.ZLogTrace($"Handling '{pushCmd}'");
@@ -355,7 +362,11 @@ partial class GitRemoteHelper
     /// <param name="remote">Remote name.</param>
     /// <param name="address">Remote address.</param>
     [Command("--remote-helper")]
-    public void HandleGitCommands([Argument] string remote, [Argument] string address)
+    public async Task HandleGitCommandsAsync(
+        [Argument] string remote,
+        [Argument] string address,
+        CancellationToken cancellationToken
+    )
     {
         _remote = remote;
         _address = address;
@@ -366,9 +377,14 @@ partial class GitRemoteHelper
 
         for (; ; )
         {
-            var input = Console.ReadLine();
+            var input = await Console.In.ReadLineAsync(cancellationToken);
+
             if (input is null)
             {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    logger.ZLogTrace($"{ProgramInfo.CommandName} cancelled");
+                }
                 break;
             }
 
@@ -413,15 +429,10 @@ partial class GitRemoteHelper
 
     void GitFetchTaut()
     {
-        tautManager.Open(_tautRepoDir);
-
-        GitUpdateTaut();
-    }
-
-    void GitUpdateTaut()
-    {
         gitCli.Execute("--git-dir", _tautRepoDir, "fetch", _remote, "+refs/heads/*:refs/heads/*");
 
         logger.ZLogTrace($"Update '{_tautRepoDir}'");
+
+        tautManager.Open(_tautRepoDir);
     }
 }
