@@ -51,6 +51,9 @@ partial class GitRemoteHelper
         const string optForce = "force";
         internal bool ForceUpdate = false;
 
+        const string optDryRun = "dry-run";
+        internal bool DryRun = false;
+
         internal void HandleNameValue(string nameValue)
         {
             bool GetBooleanValue(string opt)
@@ -100,10 +103,18 @@ partial class GitRemoteHelper
             }
             else if (nameValue.StartsWith(optForce))
             {
-                ForceUpdate = GetBooleanValue("force");
+                ForceUpdate = GetBooleanValue(optForce);
                 Console.WriteLine("ok");
 
                 TraceOptionUpdate(optForce, ForceUpdate);
+            }
+            else if (nameValue.StartsWith(optDryRun))
+            {
+                DryRun = GetBooleanValue(optDryRun);
+
+                Console.WriteLine("ok");
+
+                TraceOptionUpdate(optDryRun, DryRun);
             }
             else
             {
@@ -210,10 +221,8 @@ partial class GitRemoteHelper
         return HandleGitCommandResult.Done;
     }
 
-    void UpdateAndListRegainedRefs()
+    void ListRegainedRefs()
     {
-        tautManager.RegainHostRefs();
-
         var refList = tautManager.OrdinaryTautRefs;
         foreach (var refName in refList)
         {
@@ -222,12 +231,10 @@ partial class GitRemoteHelper
             tautManager.TautRepo.GetRefOid(regainedRefName, ref oid);
             var oidText = oid.ToHexDigits();
 
-            logger.ZLogTrace($"{nameof(HandleGitCmdList)}: {oidText} {refName}");
+            logger.ZLogTrace($"{nameof(ListRegainedRefs)}: {oidText} {refName}");
 
             Console.WriteLine($"{oidText} {refName}");
         }
-
-        Console.WriteLine();
     }
 
     HandleGitCommandResult HandleGitCmdList(string input)
@@ -235,13 +242,21 @@ partial class GitRemoteHelper
         if (Directory.EnumerateFileSystemEntries(_tautRepoDir).Any())
         {
             GitFetchTaut();
-            UpdateAndListRegainedRefs();
+
+            tautManager.RegainHostRefs();
+
+            ListRegainedRefs();
         }
         else
         {
             GitCloneTaut();
-            UpdateAndListRegainedRefs();
+
+            tautManager.RegainHostRefs();
+
+            ListRegainedRefs();
         }
+
+        Console.WriteLine();
 
         return HandleGitCommandResult.Done;
     }
@@ -253,12 +268,8 @@ partial class GitRemoteHelper
             if (_options.CheckConnectivity)
             {
                 Console.WriteLine("connectivity-ok");
-                Console.WriteLine();
             }
-            else
-            {
-                Console.WriteLine();
-            }
+            Console.WriteLine();
 
             return HandleGitCommandResult.Done;
         }
@@ -276,7 +287,9 @@ partial class GitRemoteHelper
     {
         GitFetchTaut();
 
-        UpdateAndListRegainedRefs();
+        tautManager.TautenHostRefs();
+
+        ListRegainedRefs();
 
         Console.WriteLine();
 
@@ -285,15 +298,15 @@ partial class GitRemoteHelper
 
     HandleGitCommandResult HandleGitCmdPush(string input)
     {
+        const string functionName = nameof(HandleGitCmdPush);
+
         void HandleBatch()
         {
-            tautManager.TautenHostRefs();
-
-            throw new NotImplementedException();
+            tautManager.RegainHostRefs();
 
             foreach (var pushCmd in _pushBatch)
             {
-                logger.ZLogTrace($"Handling '{pushCmd}'");
+                logger.ZLogTrace($"{functionName} '{pushCmd}'");
 
                 var refSpecText = pushCmd[cmdPush.Length..].TrimStart();
 
@@ -304,18 +317,25 @@ partial class GitRemoteHelper
 
                 var srcRefName = refSpec.GetSrc();
 
-                if (tautManager.HostRepo.TryLookupRef(srcRefName, out var srcRef) == false)
+                var tauntenedSrcRefName = tautManager.TautenedRefSpec.TransformToTarget(srcRefName);
+
+                var refSpecTextToUse = refSpec.ToString(replaceSrc: tauntenedSrcRefName);
+
+                if (_options.DryRun)
                 {
-                    throw new InvalidOperationException(
-                        $"Invalide source reference '{refSpec.GetSrc()}'"
+                    gitCli.Execute(
+                        "--git-dir",
+                        _tautRepoDir,
+                        "push",
+                        "--dry-run",
+                        _remote,
+                        refSpecTextToUse
                     );
                 }
-
-                var mappedSrcRefName = tautManager.MapHostRefToTautened(srcRef);
-
-                var refSpecTextToUse = refSpec.ToString(replaceSrc: mappedSrcRefName);
-
-                gitCli.Execute("--git-dir", _tautRepoDir, "push", _remote, refSpecTextToUse);
+                else
+                {
+                    gitCli.Execute("--git-dir", _tautRepoDir, "push", _remote, refSpecTextToUse);
+                }
             }
 
             Console.WriteLine();

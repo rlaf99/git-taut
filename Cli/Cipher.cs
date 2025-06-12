@@ -9,8 +9,6 @@ namespace Git.Taut;
 
 class UserKeyBase
 {
-    internal const int ITERATION_COUNT = 64007;
-
     [AllowNull]
     byte[] _hashedPass;
 
@@ -20,8 +18,10 @@ class UserKeyBase
         {
             if (_hashedPass is null)
             {
-                throw new InvalidOperationException($"No user password hashed");
+                var userPassBytes = GetUserPasswordInBytes();
+                _hashedPass = SHA256.HashData(userPassBytes);
             }
+
             return _hashedPass;
         }
     }
@@ -31,18 +31,12 @@ class UserKeyBase
         return Encoding.UTF8.GetBytes("Hello!");
     }
 
-    void Generate()
-    {
-        var userPassBytes = GetUserPasswordInBytes();
-        _hashedPass = SHA256.HashData(userPassBytes);
-    }
-
-    internal byte[] GenerateCipherKeyData(ReadOnlySpan<byte> salt, int keyLength)
+    internal byte[] GenerateCipherKey(ReadOnlySpan<byte> salt, int keyLength, int iteration)
     {
         return Rfc2898DeriveBytes.Pbkdf2(
             _hashedPass,
             salt,
-            ITERATION_COUNT,
+            iteration,
             HashAlgorithmName.SHA256,
             keyLength
         );
@@ -60,6 +54,8 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         TAUTENED_BYTES + RESERVED_BYTES + RANDOM_BYTES + VERIFY_KEY_BYTES;
     internal const int CIPHER_BLOCK_BYTES = 16;
     internal const int CIPHER_KEY_BYTES = 32;
+
+    internal const int KEY_ITERATION_COUNT = 64007;
 
 #pragma warning disable IDE0300 // Simplify collection initialization
     internal static readonly byte[] TAUTENED_DATA = new byte[TAUTENED_BYTES] { 0, 9, 9, 0xa1 };
@@ -108,6 +104,14 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         }
     }
 
+    public int GetEncryptedLength(int inputSize)
+    {
+        var cipherTextSize = _aes.GetCiphertextLengthCbc(inputSize, _aes.Padding);
+        var result = cipherTextSize + CIPHER_TEXT_OFFSET;
+
+        return result;
+    }
+
     public void Encrypt(Stream outputStream, Stream inputStream, bool isBinary)
     {
         EnsureInitialized();
@@ -125,12 +129,11 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         outputStream.Write(randomData);
 
         var verifyKeyData = new Span<byte>(ivData, RANDOM_BYTES, VERIFY_KEY_BYTES);
-        var verifyKeyBytes = HMACSHA256.HashData(_keyBase.HashedPass, randomData, verifyKeyData);
-        Debug.Assert(verifyKeyBytes == VERIFY_KEY_BYTES);
+        HKDF.Expand(HashAlgorithmName.SHA256, _keyBase.HashedPass, verifyKeyData, randomData);
 
         outputStream.Write(verifyKeyData);
 
-        _aes.Key = _keyBase.GenerateCipherKeyData(randomData, CIPHER_KEY_BYTES);
+        _aes.Key = _keyBase.GenerateCipherKey(randomData, CIPHER_KEY_BYTES, KEY_ITERATION_COUNT);
         _aes.IV = ivData;
 
         using var cryptoStream = new CryptoStream(
@@ -186,13 +189,21 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
             throw new InvalidDataException($"Cannot read {nameof(VERIFY_KEY_BYTES)}");
         }
 
-        var expectedVerifiKeyData = HMACSHA256.HashData(_keyBase.HashedPass, randomData);
+        var expectedVerifiKeyData = new byte[VERIFY_KEY_BYTES];
+
+        HKDF.Expand(
+            HashAlgorithmName.SHA256,
+            _keyBase.HashedPass,
+            expectedVerifiKeyData,
+            randomData
+        );
+
         if (verifyKeyData.SequenceEqual(expectedVerifiKeyData) == false)
         {
             throw new InvalidDataException($"Failed to verify key");
         }
 
-        _aes.Key = _keyBase.GenerateCipherKeyData(randomData, CIPHER_KEY_BYTES);
+        _aes.Key = _keyBase.GenerateCipherKey(randomData, CIPHER_KEY_BYTES, KEY_ITERATION_COUNT);
         _aes.IV = ivData;
 
         using var cryptoStream = new CryptoStream(

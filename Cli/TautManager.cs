@@ -397,7 +397,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
     {
         await Task.Yield(); // prevent it from running synchronously
 
-        var treeBuilder = _tautRepo.NewTreeBuilder();
+        var treeBuilder = _hostRepo.NewTreeBuilder();
         var regainedSet = new HashSet<nuint>();
 
         for (nuint i = 0; i < tautTree.GetEntryCount(); i++)
@@ -486,13 +486,17 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var tautRepoOdb = _tautRepo.GetOdb();
         using var hostRepoOdb = _hostRepo.GetOdb();
 
+        using var writeStream = hostRepoOdb.OpenWriteStream(
+            blob.GetRawSize(),
+            blob.GetObjectType()
+        );
+
         using var readStream = tautRepoOdb.OpenReadStream(blob);
-        using var writeStream = hostRepoOdb.OpenWriteStream(blob);
         var isBinary = blob.IsBinary();
 
         cipher.Decrypt(writeStream, readStream, isBinary);
 
-        writeStream.FinalizeWrite(ref resultOid);
+        writeStream.FinalizeWrite(ref resultOid, squeezeDeclaredBytes: true);
 
         StoreRegained(blob, resultOid);
     }
@@ -511,8 +515,16 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 | Lg2SortFlags.LG2_SORT_REVERSE
         );
 
-        revWalk.HideGlob(TautenedRefGlob);
-        logger.ZLogTrace($"RevWalk.Hide {TautenedRefGlob}");
+        var tautenedRefIter = _tautRepo.NewRefIteratorGlob(TautenedRefGlob);
+        for (string refName; tautenedRefIter.NextName(out refName); )
+        {
+            Lg2Oid tautOid = new();
+            _tautRepo.GetRefOid(refName, ref tautOid);
+            Lg2Oid hostOid = new();
+            kvStore.GetRegained(tautOid, ref hostOid);
+            revWalk.Hide(hostOid);
+            logger.ZLogTrace($"RevWalk.Hide {hostOid.ToHexDigits(8)} ({refName})");
+        }
 
         foreach (var refName in hostRefList)
         {
@@ -545,25 +557,30 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             _hostRepo.GetRefOid(refName, ref hostOid);
             var hostOidHex8 = hostOid.ToHexDigits(8);
 
-            var tautOid = new Lg2Oid();
-            kvStore.GetTautened(hostOid, ref tautOid);
-            var tautOidHex8 = tautOid.ToHexDigits(8);
+            var tautenedOid = new Lg2Oid();
+            kvStore.GetTautened(hostOid, ref tautenedOid);
+            var tautenedOidHex8 = tautenedOid.ToHexDigits(8);
 
             var tautenedRefName = _tautenedRefSpec.TransformToTarget(refName);
 
-            if (hostOid.Equals(ref tautOid))
+            if (hostOid.Equals(ref tautenedOid))
             {
-                var message = $"Tauten {refName} {hostOidHex8} into same object";
-                _tautRepo.SetRef(tautenedRefName, tautOid, message);
+                var message = $"Tauten {refName} {tautenedOidHex8} from same object";
+                _tautRepo.SetRef(tautenedRefName, tautenedOid, message);
                 logger.ZLogTrace($"{message}");
             }
             else
             {
-                var message = $"Tauten {refName} {hostOidHex8} into {tautOidHex8}";
-                _tautRepo.SetRef(tautenedRefName, tautOid, message);
+                var message = $"Tauten {refName} {tautenedOidHex8} from {hostOidHex8}";
+                _tautRepo.SetRef(tautenedRefName, tautenedOid, message);
                 logger.ZLogTrace($"{message}");
             }
         }
+
+        var hostHeadRef = _hostRepo.GetHead();
+        var hostHeadRefName = hostHeadRef.GetName();
+        var tautHeadRefName = _tautenedRefSpec.TransformToTarget(hostHeadRefName);
+        _tautRepo.SetHead(tautHeadRefName);
     }
 
     void TautenCommit(Lg2Commit hostCommit)
@@ -702,8 +719,9 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var hostRepoOdb = _hostRepo.GetOdb();
         using var tautRepoOdb = _tautRepo.GetOdb();
 
+        var outputSize = cipher.GetEncryptedLength((int)blob.GetRawSize());
+        using var writeStream = tautRepoOdb.OpenWriteStream(outputSize, blob.GetObjectType());
         using var readStream = hostRepoOdb.OpenReadStream(blob);
-        using var writeStream = tautRepoOdb.OpenWriteStream(blob);
         var isBinary = blob.IsBinary();
 
         cipher.Encrypt(writeStream, readStream, isBinary);
@@ -711,31 +729,6 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         writeStream.FinalizeWrite(ref resultOid);
 
         StoreTautened(blob, resultOid);
-    }
-
-    internal string MapHostRefToTautened(Lg2Reference hostRef)
-    {
-        var srcRefName = hostRef.GetName();
-        var srcRefOid = hostRef.GetTarget();
-
-        var mappedSrcRefName = _tautenedRefSpec.TransformToTarget(srcRefName);
-
-        if (_tautRepo.TryLookupRef(mappedSrcRefName, out var mappedSrcRef) == false)
-        {
-            var logMessage = $"Create a mapped reference '{mappedSrcRefName}'";
-            mappedSrcRef = _tautRepo.NewRef(mappedSrcRefName, srcRefOid, false, logMessage);
-
-            logger.ZLogTrace($"{logMessage}");
-        }
-        else
-        {
-            var logMessage = $"Update mapped reference '{mappedSrcRefName}'";
-            mappedSrcRef.SetTarget(srcRefOid, logMessage);
-
-            logger.ZLogTrace($"{logMessage}");
-        }
-
-        return mappedSrcRefName;
     }
 
     internal void RegainCommit(ref Lg2Oid commitOid)

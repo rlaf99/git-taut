@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using Lg2.Sharpy;
 using LightningDB;
 using Microsoft.Extensions.Logging;
@@ -103,6 +104,7 @@ sealed class KeyValueStore(ILogger<KeyValueStore> logger) : IDisposable
     {
         using var txn = _dbEnv.BeginTransaction();
         txn.Put(_tautenedDb, hostOidRef, tautOidRef);
+        txn.PutSame(_regainedDb, tautOidRef, hostOidRef);
         txn.Commit();
     }
 
@@ -110,6 +112,7 @@ sealed class KeyValueStore(ILogger<KeyValueStore> logger) : IDisposable
     {
         using var txn = _dbEnv.BeginTransaction();
         txn.Put(_regainedDb, tautOidRef, hostOidRef);
+        txn.PutSame(_tautenedDb, hostOidRef, tautOidRef);
         txn.Commit();
     }
 
@@ -221,6 +224,45 @@ static class LightningExtensions
         if (rc != MDBResultCode.Success)
         {
             throw new InvalidOperationException($"Failed to put value");
+        }
+    }
+
+    internal static void PutSame(
+        this LightningTransaction txn,
+        LightningDatabase db,
+        Lg2OidPlainRef sourceOidRef,
+        Lg2OidPlainRef targetOidRef
+    )
+    {
+        var key = sourceOidRef.GetReadOnlyBytes();
+        var val = targetOidRef.GetReadOnlyBytes();
+
+        var (rc, _, value) = txn.Get(db, key);
+        if (rc == MDBResultCode.Success)
+        {
+            var storedValue = value.AsSpan();
+
+            if (storedValue.SequenceEqual(val) == false)
+            {
+                var valString = Encoding.UTF8.GetString(val);
+                var storedValueString = Encoding.UTF8.GetString(storedValue);
+
+                throw new InvalidDataException(
+                    $"{valString} does not match stored {storedValueString}"
+                );
+            }
+        }
+        else
+        {
+            if (rc != MDBResultCode.NotFound)
+            {
+                throw new InvalidOperationException($"Failed to get value");
+            }
+            rc = txn.Put(db, key, val);
+            if (rc != MDBResultCode.Success)
+            {
+                throw new InvalidOperationException($"Failed to put value");
+            }
         }
     }
 }

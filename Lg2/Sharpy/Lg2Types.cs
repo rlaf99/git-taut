@@ -310,4 +310,25 @@ public static unsafe partial class Lg2RepositoryExtensions
 
         return result;
     }
+
+    public static Lg2Reference GetHead(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        git_reference* pRef = null;
+        var rc = git_repository_head(&pRef, repo.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(pRef);
+    }
+
+    public static void SetHead(this Lg2Repository repo, string refName)
+    {
+        repo.EnsureValid();
+
+        using var u8Refname = new Lg2Utf8String(refName);
+
+        var rc = git_repository_set_head(repo.Ptr, u8Refname.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+    }
 }

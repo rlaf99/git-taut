@@ -81,11 +81,11 @@ public unsafe class Lg2OdbStream
 
 public static unsafe class Lg2OdbStreamExtensions
 {
-    public static int Read(this Lg2OdbStream rstrm, scoped ref readonly Lg2RawData rawData)
+    public static int Read(this Lg2OdbStream strm, scoped ref readonly Lg2RawData rawData)
     {
-        rstrm.EnsureValid();
+        strm.EnsureValid();
 
-        var bytesRead = git_odb_stream_read(rstrm.Ptr, (sbyte*)rawData.Ptr, (nuint)rawData.Len);
+        var bytesRead = git_odb_stream_read(strm.Ptr, (sbyte*)rawData.Ptr, (nuint)rawData.Len);
         if (bytesRead < 0)
         {
             Lg2Exception.ThrowIfNotOk(bytesRead);
@@ -94,23 +94,38 @@ public static unsafe class Lg2OdbStreamExtensions
         return bytesRead;
     }
 
-    public static void Write(this Lg2OdbStream wstrm, scoped ref readonly Lg2RawData rawData)
+    public static void Write(this Lg2OdbStream strm, scoped ref readonly Lg2RawData rawData)
     {
-        wstrm.EnsureValid();
+        strm.EnsureValid();
 
-        var rc = git_odb_stream_write(wstrm.Ptr, (sbyte*)rawData.Ptr, (nuint)rawData.Len);
+        var rc = git_odb_stream_write(strm.Ptr, (sbyte*)rawData.Ptr, (nuint)rawData.Len);
         Lg2Exception.ThrowIfNotOk(rc);
     }
 
-    public static void FinalizeWrite(this Lg2OdbStream wstrm, scoped ref Lg2Oid oid)
+    public static void FinalizeWrite(this Lg2OdbStream strm, scoped ref Lg2Oid oid)
     {
-        wstrm.EnsureValid();
+        strm.EnsureValid();
 
         fixed (git_oid* pOid = &oid.Raw)
         {
-            var rc = git_odb_stream_finalize_write(pOid, wstrm.Ptr);
+            var rc = git_odb_stream_finalize_write(pOid, strm.Ptr);
             Lg2Exception.ThrowIfNotOk(rc);
         }
+    }
+
+    internal static void SqueezeDeclaredBytes(this Lg2OdbStream strm)
+    {
+        strm.EnsureValid();
+
+        var received = strm.Ptr->received_bytes;
+        var declared = strm.Ptr->declared_size;
+
+        if (received > declared)
+        {
+            throw new InvalidOperationException($"Received {received} > declared {declared}");
+        }
+
+        strm.Ptr->declared_size = received;
     }
 
     public static long GetDeclaredBytes(this Lg2OdbStream strm)
@@ -267,8 +282,13 @@ public unsafe class Lg2OdbWriteStream : Stream
         base.Dispose(disposing);
     }
 
-    public void FinalizeWrite(ref Lg2Oid oid)
+    public void FinalizeWrite(ref Lg2Oid oid, bool squeezeDeclaredBytes = false)
     {
+        if (squeezeDeclaredBytes)
+        {
+            _wstrm.SqueezeDeclaredBytes();
+        }
+
         _wstrm.FinalizeWrite(ref oid);
         _wstrm.Close();
     }
@@ -436,12 +456,7 @@ public static unsafe class Lg2OdbExtenions
         return new(strm);
     }
 
-    public static Lg2OdbWriteStream OpenWriteStream(this Lg2Odb odb, Lg2Blob blob)
-    {
-        return odb.OpenWriteStream(blob.GetRawSize(), blob.GetObjectType());
-    }
-
-    internal static Lg2OdbWriteStream OpenWriteStream(
+    public static Lg2OdbWriteStream OpenWriteStream(
         this Lg2Odb odb,
         long objSize,
         Lg2ObjectType objType
