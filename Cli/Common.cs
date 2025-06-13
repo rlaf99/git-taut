@@ -18,6 +18,7 @@ static class KnownEnvironVars
 
 static class GitRepoLayout
 {
+    internal const string TautRepoDir = "taut";
     internal const string ObjectsDir = "Objects";
     internal static readonly string ObjectsInfoDir = Path.Join(ObjectsDir, "info");
     internal static readonly string ObjectsInfoAlternatesFile = Path.Join(

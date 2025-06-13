@@ -168,7 +168,7 @@ static class LightningExtensions
         }
 
         var source = value.AsSpan();
-        var target = oid.GetBytes();
+        var target = oid.GetSpan();
 
         if (source.Length != target.Length)
         {
@@ -198,7 +198,7 @@ static class LightningExtensions
         }
 
         var source = value.AsSpan();
-        var target = oid.GetBytes();
+        var target = oid.GetSpan();
 
         if (source.Length != target.Length)
         {
@@ -244,11 +244,14 @@ static class LightningExtensions
 
             if (storedValue.SequenceEqual(val) == false)
             {
-                var valString = Encoding.UTF8.GetString(val);
-                var storedValueString = Encoding.UTF8.GetString(storedValue);
+                var targetOidText = targetOidRef.GetOidHexDigits();
+
+                Lg2Oid oid = new();
+                oid.FromRaw(storedValue);
+                var storedOidText = oid.ToHexDigits();
 
                 throw new InvalidDataException(
-                    $"{valString} does not match stored {storedValueString}"
+                    $"{targetOidText} does not match stored {storedOidText}"
                 );
             }
         }

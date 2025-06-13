@@ -49,6 +49,20 @@ class GitCli(ILogger<GitCli> logger)
         }
     }
 
+    internal int Run(params string[] args)
+    {
+        var startInfo = new ProcessStartInfo("git") { Arguments = string.Join(" ", args) };
+
+        logger.ZLogTrace($"Running git with {args.Length} arguments '{startInfo.Arguments}'");
+
+        using var process = new Process() { StartInfo = startInfo };
+
+        process.Start();
+        process.WaitForExit();
+
+        return process.ExitCode;
+    }
+
     internal void Execute(params string[] args)
     {
         var startInfo = new ProcessStartInfo("git")
@@ -63,7 +77,7 @@ class GitCli(ILogger<GitCli> logger)
 
         SetEnvironmentAlternativeObjectDirectories(startInfo);
 
-        logger.ZLogTrace($"Running git with arguments '{startInfo.Arguments}'");
+        logger.ZLogTrace($"Running git with {args.Length} arguments '{startInfo.Arguments}'");
 
         using var process = new Process() { StartInfo = startInfo };
 
@@ -100,7 +114,7 @@ class GitCli(ILogger<GitCli> logger)
 
         SetEnvironmentAlternativeObjectDirectories(startInfo);
 
-        logger.ZLogTrace($"Running git with arguments '{startInfo.Arguments}'");
+        logger.ZLogTrace($"Running git with {args.Length} arguments '{startInfo.Arguments}'");
 
         List<string> result = [];
 
