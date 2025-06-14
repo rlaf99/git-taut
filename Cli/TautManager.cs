@@ -378,19 +378,12 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var tautRepoOdb = _tautRepo.GetOdb();
         using var hostRepoOdb = _hostRepo.GetOdb();
 
-        tautRepoOdb.CopyObjectIfNotExists(hostRepoOdb, objInfo.GetOidPlainRef());
+        var copied = tautRepoOdb.CopyObjectIfNotExists(hostRepoOdb, objInfo.GetOidPlainRef());
 
-        StoreRegained(objInfo, objInfo.GetOidPlainRef());
-    }
-
-    void TautenObjectByCopy(ILg2ObjectInfo objInfo)
-    {
-        using var tautRepoOdb = _tautRepo.GetOdb();
-        using var hostRepoOdb = _hostRepo.GetOdb();
-
-        hostRepoOdb.CopyObjectIfNotExists(tautRepoOdb, objInfo.GetOidPlainRef());
-
-        StoreTautened(objInfo, objInfo.GetOidPlainRef());
+        if (copied)
+        {
+            StoreRegained(objInfo, objInfo.GetOidPlainRef());
+        }
     }
 
     async Task RegainTreeAsync(Lg2Tree tautTree)
@@ -486,17 +479,18 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var tautRepoOdb = _tautRepo.GetOdb();
         using var hostRepoOdb = _hostRepo.GetOdb();
 
-        using var writeStream = hostRepoOdb.OpenWriteStream(
-            blob.GetRawSize(),
-            blob.GetObjectType()
-        );
-
         using var readStream = tautRepoOdb.OpenReadStream(blob);
         var isBinary = blob.IsBinary();
 
-        cipher.Decrypt(writeStream, readStream, isBinary);
+        var decryptor = cipher.CreateDecryptor(readStream, isBinary);
 
-        writeStream.FinalizeWrite(ref resultOid, squeezeDeclaredBytes: true);
+        var outputLength = decryptor.GetOutputLength();
+
+        using var writeStream = hostRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
+
+        decryptor.WriteToEnd(writeStream);
+
+        writeStream.FinalizeWrite(ref resultOid);
 
         StoreRegained(blob, resultOid);
     }
@@ -673,10 +667,6 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                     treeBuilder.Insert(entryName, oid, entryFileMode);
                     tautenedSet.Add(i);
                 }
-                else
-                {
-                    TautenObjectByCopy(entry);
-                }
             }
             else
             {
@@ -708,10 +698,6 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
             StoreTautened(hostTree, oid);
         }
-        else
-        {
-            TautenObjectByCopy(hostTree);
-        }
     }
 
     void TautenBlob(Lg2Blob blob, scoped ref Lg2Oid resultOid)
@@ -719,12 +705,17 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var hostRepoOdb = _hostRepo.GetOdb();
         using var tautRepoOdb = _tautRepo.GetOdb();
 
-        var outputSize = cipher.GetEncryptedLength((int)blob.GetRawSize());
-        using var writeStream = tautRepoOdb.OpenWriteStream(outputSize, blob.GetObjectType());
         using var readStream = hostRepoOdb.OpenReadStream(blob);
         var isBinary = blob.IsBinary();
 
-        cipher.Encrypt(writeStream, readStream, isBinary);
+        logger.ZLogDebug($"readStream.Length {readStream.Length}");
+
+        var encryptor = cipher.CreateEncryptor(readStream, isBinary);
+        var outputLength = encryptor.GetOutputLength();
+
+        using var writeStream = tautRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
+
+        encryptor.WriteToEnd(writeStream);
 
         writeStream.FinalizeWrite(ref resultOid);
 

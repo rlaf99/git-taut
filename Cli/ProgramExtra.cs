@@ -46,13 +46,21 @@ internal class ExtraCommands
         try
         {
             using var fileStream = File.OpenRead(file);
+            var decryptor = cipher.CreateDecryptor(fileStream, false);
+
             using var outputStream = Console.OpenStandardOutput();
-            cipher.Decrypt(outputStream, fileStream, false);
+            decryptor.WriteToEnd(outputStream);
         }
         catch (Exception ex)
         {
             ConsoleApp.LogError($"Failed to regain '{file}': {ex.Message}");
 
+#if DEBUG
+            if (ex.StackTrace is not null)
+            {
+                ConsoleApp.LogError($"{ex.StackTrace}");
+            }
+#endif
             throw new OperationCanceledException();
         }
     }

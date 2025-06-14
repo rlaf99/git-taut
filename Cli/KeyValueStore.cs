@@ -1,7 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Text;
+using System.Runtime.InteropServices;
 using Lg2.Sharpy;
 using LightningDB;
+using LightningDB.Native;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
@@ -191,10 +192,10 @@ static class LightningExtensions
     {
         var key = oidRef.GetReadOnlyBytes();
         var (rc, _, value) = txn.Get(db, key);
-
         if (rc != MDBResultCode.Success)
         {
-            throw new InvalidOperationException($"Failed to get value");
+            var mdbError = Marshal.PtrToStringUTF8(Lmdb.mdb_strerror((int)rc));
+            throw new InvalidOperationException($"Failed to get: {mdbError}");
         }
 
         var source = value.AsSpan();
@@ -220,10 +221,11 @@ static class LightningExtensions
         var key = sourceOidRef.GetReadOnlyBytes();
         var val = targetOidRef.GetReadOnlyBytes();
 
-        var rc = txn.Put(db, key, val);
+        var rc = txn.Put(db, key, val, PutOptions.NoOverwrite);
         if (rc != MDBResultCode.Success)
         {
-            throw new InvalidOperationException($"Failed to put value");
+            var mdbError = Marshal.PtrToStringUTF8(Lmdb.mdb_strerror((int)rc));
+            throw new InvalidOperationException($"Failed to put: {mdbError}");
         }
     }
 
@@ -259,12 +261,14 @@ static class LightningExtensions
         {
             if (rc != MDBResultCode.NotFound)
             {
-                throw new InvalidOperationException($"Failed to get value");
+                var mdbError = Marshal.PtrToStringUTF8(Lmdb.mdb_strerror((int)rc));
+                throw new InvalidOperationException($"Failed to get: {mdbError}");
             }
-            rc = txn.Put(db, key, val);
+            rc = txn.Put(db, key, val, PutOptions.NoOverwrite);
             if (rc != MDBResultCode.Success)
             {
-                throw new InvalidOperationException($"Failed to put value");
+                var mdbError = Marshal.PtrToStringUTF8(Lmdb.mdb_strerror((int)rc));
+                throw new InvalidOperationException($"Failed to put: {mdbError}");
             }
         }
     }
