@@ -619,7 +619,6 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         StoreTautened(hostCommit, oid);
     }
 
-    // The whole point of making this async is to avoid stack overflow when the tree is too deep.
     async Task TautenTreeAsync(Lg2Tree hostTree)
     {
         await Task.Yield(); // prevent it from running synchronously
@@ -706,9 +705,8 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var tautRepoOdb = _tautRepo.GetOdb();
 
         using var readStream = hostRepoOdb.OpenReadStream(blob);
-        var isBinary = blob.IsBinary();
 
-        logger.ZLogDebug($"readStream.Length {readStream.Length}");
+        var isBinary = blob.IsBinary();
 
         var encryptor = cipher.CreateEncryptor(readStream, isBinary);
         var outputLength = encryptor.GetOutputLength();
@@ -720,87 +718,5 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         writeStream.FinalizeWrite(ref resultOid);
 
         StoreTautened(blob, resultOid);
-    }
-
-    internal void RegainCommit(ref Lg2Oid commitOid)
-    {
-        using var hostRepoOdb = _hostRepo.GetOdb();
-        using var tautRepoOdb = _tautRepo.GetOdb();
-
-        void CopyObjectToHost(ILg2ObjectInfo objInfo)
-        {
-            if (tautRepoOdb.CopyObjectIfNotExists(hostRepoOdb, objInfo.GetOidPlainRef()))
-            {
-                var typeName = objInfo.GetObjectType().GetName();
-
-                logger.ZLogTrace($"Write {typeName} {objInfo.GetOidHexDigits()} to host");
-            }
-        }
-
-        void RegainTree(Lg2Tree rootTree)
-        {
-            var unprocessed = new Queue<Lg2Tree>();
-            unprocessed.Enqueue(rootTree);
-
-            while (unprocessed.Count > 0)
-            {
-                var tree = unprocessed.Dequeue();
-                var treeOidText = tree.GetOidHexDigits();
-
-                CopyObjectToHost(tree);
-
-                for (nuint idx = 0; idx < tree.GetEntryCount(); idx++)
-                {
-                    var entry = tree.GetEntry(idx);
-                    var entryName = entry.GetName();
-                    var entryOidText = entry.GetOidHexDigits();
-
-                    var objType = entry.GetObjectType();
-                    if (objType.IsValid() == false)
-                    {
-                        logger.ZLogWarning(
-                            $"Invalid object type {objType.GetName()} for tree entry '{entryName}"
-                        );
-                        continue;
-                    }
-                    if (
-                        _targetPathSpec.MatchPath(
-                            entryName,
-                            Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE
-                        )
-                    )
-                    {
-                        logger.ZLogDebug($"{entryName} should be tautened");
-                    }
-
-                    CopyObjectToHost(entry);
-
-                    if (objType.IsTree())
-                    {
-                        var subTree = _tautRepo.LookupTree(entry);
-                        unprocessed.Enqueue(subTree);
-                    }
-                }
-            }
-        }
-
-        using var revWalk = _tautRepo.NewRevWalk();
-        revWalk.Push(commitOid);
-
-        for (var oid = new Lg2Oid(); revWalk.Next(ref oid); )
-        {
-            var commit = _tautRepo.LookupCommit(oid);
-
-            var commitOidHex8 = oid.ToHexDigits(8);
-            var commitSummary = commit.GetSummary();
-
-            logger.ZLogTrace($"Start transferring commit {commitOidHex8} {commitSummary}");
-
-            CopyObjectToHost(commit);
-
-            var rootTree = commit.GetTree();
-
-            RegainTree(rootTree);
-        }
     }
 }

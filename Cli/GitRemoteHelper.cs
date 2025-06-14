@@ -156,6 +156,7 @@ partial class GitRemoteHelper
 
 partial class GitRemoteHelper
 {
+    List<string> _fetchBatch = [];
     List<string> _pushBatch = [];
 
     enum HandleGitCommandResult
@@ -263,24 +264,52 @@ partial class GitRemoteHelper
 
     HandleGitCommandResult HandleGitCmdFetch(string input)
     {
-        if (input.Length == 0)
+        var functionName = nameof(HandleGitCmdFetch);
+
+        void HandleBatch()
         {
+            foreach (var fetchCmd in _fetchBatch)
+            {
+                var args = CmdFetchArgs.Parse(fetchCmd[cmdFetch.Length..].TrimStart());
+
+                var regainedRefName = tautManager.RegainedRefSpec.TransformToTarget(args.Name);
+                Lg2Oid oid = new();
+                tautManager.TautRepo.GetRefOid(regainedRefName, ref oid);
+                var regainedOidText = oid.ToHexDigits();
+
+                if (args.Hash != regainedOidText)
+                {
+                    throw new InvalidOperationException(
+                        $"{functionName}: requested {args.Hash} does not match regained {regainedOidText}"
+                    );
+                }
+            }
+
             if (_options.CheckConnectivity)
             {
                 Console.WriteLine("connectivity-ok");
             }
             Console.WriteLine();
+        }
+
+        if (input.Length == 0)
+        {
+            HandleBatch();
 
             return HandleGitCommandResult.Done;
         }
+        else if (input.StartsWith(cmdFetch))
+        {
+            _fetchBatch.Add(input);
 
-        var args = CmdFetchArgs.Parse(input[cmdFetch.Length..].TrimStart());
-
-        Lg2Oid oid = new();
-        oid.FromHexDigits(args.Hash);
-        tautManager.RegainCommit(ref oid);
-
-        return HandleGitCommandResult.Keep;
+            return HandleGitCommandResult.Keep;
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                $"{nameof(HandleGitCmdFetch)}: Invalid input '{input}'"
+            );
+        }
     }
 
     HandleGitCommandResult HandleGitCmdListForPush(string input)

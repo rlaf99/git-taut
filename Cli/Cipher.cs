@@ -107,8 +107,7 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
 
     internal int GetEncryptedLength(int intputSize)
     {
-        var plainTextSize = intputSize + PLAIN_TEXT_LENGTH_BYTES;
-        var cipherTextSize = _aes.GetCiphertextLengthCbc(plainTextSize, _aes.Padding);
+        var cipherTextSize = _aes.GetCiphertextLengthCbc(intputSize, _aes.Padding);
         var result = cipherTextSize + CIPHER_TEXT_OFFSET;
 
         return result;
@@ -133,86 +132,96 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         return _aes.CreateEncryptor();
     }
 
-    internal class Encryptor : IDisposable
+    internal class EncryptorInputStream : Stream
     {
-        internal class WrappedInput(Stream inputStream) : Stream
+        readonly Stream _sourceInput;
+        long _totalRead;
+        readonly byte[] _lengthData;
+        int _lengthDataRead;
+
+        internal EncryptorInputStream(Stream sourceInput)
         {
-            bool _lengthDataProvided;
+            ArgumentOutOfRangeException.ThrowIfLessThan(sourceInput.Length, 0);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(sourceInput.Length, int.MaxValue);
 
-            public override bool CanRead => inputStream.CanRead;
+            _sourceInput = sourceInput;
 
-            public override bool CanSeek => false;
+            var length = (int)sourceInput.Length;
+            _lengthData = BitConverter.GetBytes(length);
+            Debug.Assert(_lengthData.Length == PLAIN_TEXT_LENGTH_BYTES);
 
-            public override bool CanWrite => false;
-
-            public override long Length => PLAIN_TEXT_LENGTH_BYTES + inputStream.Length;
-
-            public override long Position
+            if (BitConverter.IsLittleEndian)
             {
-                get
-                {
-                    if (_lengthDataProvided)
-                    {
-                        return PLAIN_TEXT_LENGTH_BYTES + inputStream.Position;
-                    }
-                    else
-                    {
-                        return 0;
-                    }
-                }
-                set => throw new NotSupportedException();
-            }
-
-            public override void Flush()
-            {
-                if (_lengthDataProvided)
-                {
-                    inputStream.Flush();
-                }
-            }
-
-            public override int Read(byte[] buffer, int offset, int count)
-            {
-                if (_lengthDataProvided == false)
-                {
-                    _lengthDataProvided = true;
-
-                    var length = (int)inputStream.Length;
-                    var lengthData = BitConverter.GetBytes(length);
-
-                    if (BitConverter.IsLittleEndian)
-                    {
-                        Array.Reverse(lengthData);
-                    }
-
-                    Debug.Assert(lengthData.Length == PLAIN_TEXT_LENGTH_BYTES);
-
-                    lengthData.CopyTo(buffer, offset);
-
-                    return PLAIN_TEXT_LENGTH_BYTES;
-                }
-
-                return inputStream.Read(buffer, offset, count);
-            }
-
-            public override long Seek(long offset, SeekOrigin origin)
-            {
-                throw new NotSupportedException();
-            }
-
-            public override void SetLength(long value)
-            {
-                throw new NotSupportedException();
-            }
-
-            public override void Write(byte[] buffer, int offset, int count)
-            {
-                throw new NotSupportedException();
+                Array.Reverse(_lengthData);
             }
         }
 
+        public override bool CanRead => _sourceInput.CanRead;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => _lengthData.Length + _sourceInput.Length;
+
+        public override long Position
+        {
+            get => _totalRead;
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+            if (_totalRead > _lengthData.Length)
+            {
+                _sourceInput.Flush();
+            }
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int dataRead;
+
+            if (_lengthDataRead != _lengthData.Length)
+            {
+                var target = buffer.AsSpan(offset, count);
+
+                dataRead = 0;
+                while (_lengthDataRead < _lengthData.Length && dataRead < target.Length)
+                {
+                    target[dataRead++] = _lengthData[_lengthDataRead++];
+                }
+            }
+            else
+            {
+                dataRead = _sourceInput.Read(buffer, offset, count);
+            }
+
+            _totalRead += dataRead;
+
+            return dataRead;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    internal class Encryptor : IDisposable
+    {
         readonly Aes256Cbc1 _cipher;
-        readonly WrappedInput _wrappedInput;
+        readonly Stream _inputStream;
         readonly bool _isBinary;
 
         internal Encryptor(Aes256Cbc1 cipher, Stream inputStream, bool isBinary)
@@ -220,13 +229,13 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
             cipher.EnsureInitialized();
 
             _cipher = cipher;
-            _wrappedInput = new WrappedInput(inputStream);
+            _inputStream = inputStream;
             _isBinary = isBinary;
         }
 
         internal int GetOutputLength()
         {
-            return _cipher.GetEncryptedLength((int)_wrappedInput.Length);
+            return _cipher.GetEncryptedLength((int)_inputStream.Length);
         }
 
         internal void WriteToEnd(Stream outputStream)
@@ -242,7 +251,7 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
             outputStream.Write(ivData);
 
             using var cryptoStream = new CryptoStream(
-                _wrappedInput,
+                _inputStream,
                 encryptTransform,
                 CryptoStreamMode.Read
             );
@@ -270,48 +279,10 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
 
     internal Encryptor CreateEncryptor(Stream inputStream, bool isBinary)
     {
-        var encryptor = new Encryptor(this, inputStream, isBinary);
+        var encryptorInput = new EncryptorInputStream(inputStream);
+        var encryptor = new Encryptor(this, encryptorInput, isBinary);
 
         return encryptor;
-    }
-
-    void Encrypt(Stream outputStream, Stream inputStream, bool isBinary)
-    {
-        EnsureInitialized();
-
-        outputStream.Write(TAUTENED_DATA);
-        outputStream.Write(RESERVED_DATA);
-
-        Debug.Assert(RANDOM_BYTES + KEY_TAG_BYTES == CIPHER_BLOCK_BYTES);
-
-        var ivData = new byte[CIPHER_BLOCK_BYTES];
-
-        var randomData = new Span<byte>(ivData, 0, RANDOM_BYTES);
-        RandomNumberGenerator.Fill(randomData);
-
-        outputStream.Write(randomData);
-
-        var keyTagData = new Span<byte>(ivData, RANDOM_BYTES, KEY_TAG_BYTES);
-        HKDF.Expand(HashAlgorithmName.SHA256, _keyBase.HashedPass, keyTagData, randomData);
-
-        outputStream.Write(keyTagData);
-
-        _aes.Key = _keyBase.GenerateCipherKey(randomData, CIPHER_KEY_BYTES, KEY_ITERATION_COUNT);
-        _aes.IV = ivData;
-
-        using var cryptoStream = new CryptoStream(
-            inputStream,
-            _aes.CreateEncryptor(),
-            CryptoStreamMode.Read
-        );
-
-        var readBuf = new byte[CIPHER_BLOCK_BYTES];
-        int readLen = 0;
-
-        while ((readLen = cryptoStream.Read(readBuf)) > 0)
-        {
-            outputStream.Write(readBuf, 0, readLen);
-        }
     }
 
     ICryptoTransform PrepareForDecryption(byte[] ivData)
@@ -463,70 +434,5 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         var decryptor = new Decryptor(this, inputStream, isBinary);
 
         return decryptor;
-    }
-
-    void Decrypt(Stream outputStream, Stream inputStream, bool isBinary)
-    {
-        EnsureInitialized();
-
-        var tautenedData = new byte[TAUTENED_BYTES];
-        var tautenedSize = inputStream.Read(tautenedData);
-        if (tautenedSize != TAUTENED_BYTES)
-        {
-            throw new InvalidDataException($"Cannot read {nameof(TAUTENED_BYTES)}");
-        }
-        if (tautenedData.SequenceEqual(TAUTENED_DATA) == false)
-        {
-            throw new InvalidDataException($"Invalid {nameof(TAUTENED_DATA)}");
-        }
-
-        var reservedData = new byte[RESERVED_BYTES];
-        var reservedSize = inputStream.Read(reservedData);
-        if (reservedSize != RESERVED_BYTES)
-        {
-            throw new InvalidDataException($"Cannot read {nameof(RESERVED_BYTES)}");
-        }
-
-        var ivData = new byte[CIPHER_BLOCK_BYTES];
-
-        var randomData = new Span<byte>(ivData, 0, RANDOM_BYTES);
-        var randomSize = inputStream.Read(randomData);
-        if (randomSize != RANDOM_BYTES)
-        {
-            throw new InvalidDataException($"Cannot read {nameof(RANDOM_BYTES)}");
-        }
-
-        var keyTagData = new Span<byte>(ivData, RANDOM_BYTES, KEY_TAG_BYTES);
-        var keyTagSize = inputStream.Read(keyTagData);
-        if (keyTagSize != KEY_TAG_BYTES)
-        {
-            throw new InvalidDataException($"Cannot read {nameof(KEY_TAG_BYTES)}");
-        }
-
-        var expectedKeyTagData = new byte[KEY_TAG_BYTES];
-
-        HKDF.Expand(HashAlgorithmName.SHA256, _keyBase.HashedPass, expectedKeyTagData, randomData);
-
-        if (keyTagData.SequenceEqual(expectedKeyTagData) == false)
-        {
-            throw new InvalidDataException($"Failed to verify key");
-        }
-
-        _aes.Key = _keyBase.GenerateCipherKey(randomData, CIPHER_KEY_BYTES, KEY_ITERATION_COUNT);
-        _aes.IV = ivData;
-
-        using var cryptoStream = new CryptoStream(
-            inputStream,
-            _aes.CreateDecryptor(),
-            CryptoStreamMode.Read
-        );
-
-        var readBuf = new byte[CIPHER_BLOCK_BYTES];
-        int readLen;
-
-        while ((readLen = cryptoStream.Read(readBuf)) > 0)
-        {
-            outputStream.Write(readBuf, 0, readLen);
-        }
     }
 }

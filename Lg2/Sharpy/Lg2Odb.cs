@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
 
@@ -94,6 +95,22 @@ public static unsafe class Lg2OdbStreamExtensions
         return bytesRead;
     }
 
+    public static int Read(this Lg2OdbStream strm, Span<byte> data)
+    {
+        strm.EnsureValid();
+
+        fixed (byte* ptr = &MemoryMarshal.GetReference(data))
+        {
+            var bytesRead = git_odb_stream_read(strm.Ptr, (sbyte*)ptr, (nuint)data.Length);
+            if (bytesRead < 0)
+            {
+                Lg2Exception.ThrowIfNotOk(bytesRead);
+            }
+
+            return bytesRead;
+        }
+    }
+
     public static void Write(this Lg2OdbStream strm, scoped ref readonly Lg2RawData rawData)
     {
         strm.EnsureValid();
@@ -133,6 +150,8 @@ public unsafe class Lg2OdbReadStream : Stream
     readonly Lg2OdbStream _strm;
     readonly long _length;
 
+    long _totalRead;
+
     internal Lg2OdbReadStream(Lg2OdbStream rstrm, long length)
     {
         _strm = rstrm;
@@ -149,7 +168,7 @@ public unsafe class Lg2OdbReadStream : Stream
 
     public override long Position
     {
-        get => throw new NotSupportedException($"Getting {nameof(Position)} is not supported");
+        get => _totalRead;
         set => throw new NotSupportedException($"Setting {nameof(Position)} is not supported");
     }
 
@@ -157,14 +176,11 @@ public unsafe class Lg2OdbReadStream : Stream
 
     public override int Read(byte[] buffer, int offset, int count)
     {
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, buffer.Length - offset);
+        var dataRead = _strm.Read(buffer.AsSpan(offset, count));
 
-        fixed (byte* ptr = &buffer[offset])
-        {
-            Lg2RawData rawData = new() { Ptr = (nint)ptr, Len = count };
+        _totalRead += dataRead;
 
-            return _strm.Read(ref rawData);
-        }
+        return dataRead;
     }
 
     public override long Seek(long offset, SeekOrigin origin)
