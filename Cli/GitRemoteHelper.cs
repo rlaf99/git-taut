@@ -420,7 +420,9 @@ partial class GitRemoteHelper
         _remote = remote;
         _address = address;
 
-        logger.ZLogTrace($"Run {ProgramInfo.CommandName} with '{remote}' and '{address}'");
+        logger.ZLogTrace(
+            $"Start running {ProgramInfo.CommandName} with '{remote}' and '{address}'"
+        );
 
         EnsureTautDir();
 
@@ -432,8 +434,16 @@ partial class GitRemoteHelper
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
-                    logger.ZLogTrace($"{ProgramInfo.CommandName} cancelled");
+                    logger.ZLogWarning($"{nameof(HandleGitCommandsAsync)}: cancellation requested");
                 }
+
+                if (_handleGitCommand is not null)
+                {
+                    logger.ZLogWarning(
+                        $"{nameof(HandleGitCommandsAsync)}: no input when there is pending command"
+                    );
+                }
+
                 break;
             }
 
@@ -447,6 +457,8 @@ partial class GitRemoteHelper
                 _handleGitCommand = null;
             }
         }
+
+        logger.ZLogTrace($"Exiting {nameof(HandleGitCommandsAsync)}");
     }
 
     void EnsureTautDir()

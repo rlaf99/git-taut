@@ -20,6 +20,8 @@ catch (Exception ex)
 
 ConsoleApp.Version = "alpha-0.0.1";
 
+ConsoleApp.Timeout = TimeSpan.FromMicroseconds(800);
+
 var app = ConsoleApp
     .Create()
     .ConfigureEmptyConfiguration(config =>
