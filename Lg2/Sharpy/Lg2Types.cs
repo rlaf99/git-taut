@@ -130,7 +130,7 @@ public sealed unsafe class Lg2StrArray : IDisposable
     }
 }
 
-internal static unsafe partial class Lg2StrArrayNativeExtensions
+internal static unsafe partial class RawStrArrayExtensions
 {
     internal static List<string> ToList(ref readonly this git_strarray strarray)
     {
@@ -146,8 +146,6 @@ internal static unsafe partial class Lg2StrArrayNativeExtensions
     }
 }
 
-public static class Lg2StrArrayExtensions { }
-
 public unsafe ref struct Lg2RawData
 {
     internal nint Ptr;
@@ -156,6 +154,11 @@ public unsafe ref struct Lg2RawData
 
 public static unsafe class Lg2RawDataExtensions
 {
+    public static ReadOnlySpan<byte> AsReadOnlySpan(this Lg2RawData rawData)
+    {
+        return new((void*)rawData.Ptr, (int)rawData.Len);
+    }
+
     public static bool IsInvalid(this Lg2RawData rawData)
     {
         if (rawData.Ptr == default || rawData.Len <= 0)

@@ -1,3 +1,4 @@
+using Lg2.Sharpy;
 using Microsoft.Extensions.Configuration;
 
 namespace Git.Taut;
@@ -16,7 +17,7 @@ static class KnownEnvironVars
     internal const string GitAlternateObjectDirectories = "GIT_ALTERNATE_OBJECT_DIRECTORIES";
 }
 
-static class GitRepoLayout
+static class GitRepoHelper
 {
     internal const string TautRepoDir = "taut";
     internal const string ObjectsDir = "Objects";
@@ -27,6 +28,15 @@ static class GitRepoLayout
     );
 
     internal const string Description = "description";
+
+    internal static string GetObjectInfoDir(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        var result = Path.Join(repo.GetPath(), ObjectsInfoDir);
+
+        return result;
+    }
 }
 
 static class GitConfig

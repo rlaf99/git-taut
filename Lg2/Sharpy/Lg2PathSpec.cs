@@ -48,8 +48,6 @@ public unsafe class Lg2PathSpec
     }
 }
 
-internal static unsafe class Lg2PathSpecNativeExtensions { }
-
 public static unsafe class Lg2PathSpecExtensions
 {
     public static bool MatchPath(this Lg2PathSpec pathSpec, string path, Lg2PathSpecFlags flags)
@@ -79,7 +77,7 @@ public static unsafe class Lg2PathSpecExtensions
     }
 }
 
-unsafe partial class Lg2StrArrayNativeExtensions
+unsafe partial class RawStrArrayExtensions
 {
     internal static git_pathspec* NewPathSpec(this git_strarray strarray)
     {

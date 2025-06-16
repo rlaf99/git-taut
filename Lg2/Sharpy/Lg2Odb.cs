@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
@@ -61,6 +62,11 @@ public static unsafe class Lg2OdbObjectExtensions
         var result = git_odb_object_size(odbObject.Ptr);
 
         return (long)result;
+    }
+
+    public static Lg2OdbObjectReadStream NewReadStream(this Lg2OdbObject odbObject)
+    {
+        return new(odbObject);
     }
 }
 
@@ -149,13 +155,16 @@ public unsafe class Lg2OdbReadStream : Stream
 {
     readonly Lg2OdbStream _strm;
     readonly long _length;
+    readonly Lg2ObjectType _objType;
+    internal Lg2ObjectType ObjectType => _objType;
 
     long _totalRead;
 
-    internal Lg2OdbReadStream(Lg2OdbStream rstrm, long length)
+    internal Lg2OdbReadStream(Lg2OdbStream rstrm, long length, Lg2ObjectType objType)
     {
         _strm = rstrm;
         _length = length;
+        _objType = objType;
     }
 
     public override bool CanRead => true;
@@ -380,45 +389,38 @@ public static unsafe class Lg2OdbExtenions
         return new(pOdbObject);
     }
 
-    public static Lg2OdbObject Read(this Lg2Odb odb, ILg2ObjectInfo objInfo)
+    public static void Write(
+        this Lg2Odb odb,
+        Lg2RawData rawData,
+        Lg2ObjectType objType,
+        scoped ref Lg2Oid oid
+    )
     {
         odb.EnsureValid();
 
-        var oidRef = objInfo.GetOidPlainRef();
-        git_odb_object* pOdbObject = null;
-        var rc = git_odb_read(&pOdbObject, odb.Ptr, oidRef.Ptr);
-        Lg2Exception.ThrowIfNotOk(rc);
-
-        return new(pOdbObject);
-    }
-
-    public static Lg2Oid Write(this Lg2Odb odb, Lg2RawData rawData, Lg2ObjectType objType)
-    {
-        odb.EnsureValid();
-
-        Lg2Oid oid = new();
-        var rc = git_odb_write(
-            &oid.Raw,
-            odb.Ptr,
-            (void*)rawData.Ptr,
-            (nuint)rawData.Len,
-            (git_object_t)objType
-        );
-        Lg2Exception.ThrowIfNotOk(rc);
-
-        return oid;
+        fixed (git_oid* pOid = &oid.Raw)
+        {
+            var rc = git_odb_write(
+                pOid,
+                odb.Ptr,
+                (void*)rawData.Ptr,
+                (nuint)rawData.Len,
+                (git_object_t)objType
+            );
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
     }
 
     public static bool CopyObjectIfNotExists(
         this Lg2Odb odb,
         Lg2Odb another,
         Lg2OidPlainRef oidRef,
-        bool refreshThatOdb = false
+        bool refreshAnotherOdb = false
     )
     {
         bool alreadyExists;
 
-        if (refreshThatOdb)
+        if (refreshAnotherOdb)
         {
             alreadyExists = another.Exists(oidRef);
         }
@@ -433,7 +435,14 @@ public static unsafe class Lg2OdbExtenions
         }
 
         var odbObject = odb.Read(oidRef);
-        another.Write(odbObject.GetRawData(), odbObject.GetObjectType());
+
+        Lg2Oid oid = new();
+        another.Write(odbObject.GetRawData(), odbObject.GetObjectType(), ref oid);
+
+        if (oidRef.Equals(oid.PlainRef) == false)
+        {
+            throw new InvalidDataException($"Copying object results in different oid");
+        }
 
         return true;
     }
@@ -450,7 +459,7 @@ public static unsafe class Lg2OdbExtenions
 
         Lg2OdbStream strm = new(pOdbStream);
 
-        return new(strm, (long)len);
+        return new(strm, (long)len, type.GetLg2());
     }
 
     public static Lg2OdbWriteStream OpenWriteStream(
@@ -473,6 +482,73 @@ public static unsafe class Lg2OdbExtenions
         Lg2OdbStream strm = new(pOdbStream);
 
         return new(strm);
+    }
+}
+
+public unsafe class Lg2OdbObjectReadStream : Stream
+{
+    readonly Lg2OdbObject _odbObject;
+    readonly byte* _pData;
+    readonly long _dataLength;
+    long _position;
+
+    internal Lg2OdbObjectReadStream(Lg2OdbObject odbObject)
+    {
+        odbObject.EnsureValid();
+
+        _odbObject = odbObject;
+
+        var rawData = odbObject.GetRawData();
+        _pData = (byte*)rawData.Ptr;
+        _dataLength = rawData.Len;
+    }
+
+    public override bool CanRead => true;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => false;
+
+    public override long Length => _dataLength;
+
+    public override long Position
+    {
+        get => _position;
+        set => throw new NotSupportedException();
+    }
+
+    public override void Flush()
+    {
+        throw new NotSupportedException();
+    }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        var dataRead = 0;
+
+        var target = buffer.AsSpan(offset, count);
+
+        while (_position < _dataLength && dataRead < target.Length)
+        {
+            target[dataRead++] = _pData[_position++];
+        }
+
+        return dataRead;
+    }
+
+    public override long Seek(long offset, SeekOrigin origin)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override void SetLength(long value)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
     }
 }
 

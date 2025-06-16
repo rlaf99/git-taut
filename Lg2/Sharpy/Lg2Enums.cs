@@ -56,6 +56,14 @@ public static unsafe class Lg2ObjectTypeExtensions
     }
 }
 
+internal static unsafe class RawObjectTypeExtensions
+{
+    internal static Lg2ObjectType GetLg2(this git_object_t objType)
+    {
+        return (Lg2ObjectType)objType;
+    }
+}
+
 [Flags]
 public enum Lg2OdbLookupFlags
 {
@@ -175,16 +183,16 @@ public enum Lg2DeltaType
     LG2_DELTA_CONFLICTED = git_delta_t.GIT_DELTA_CONFLICTED,
 }
 
-internal static class Lg2DeltaTypeNativeExtensions
+internal static class RawDeltaTypeExtensions
 {
     internal static git_delta_t GetRaw(this Lg2DeltaType deltaType)
     {
         return (git_delta_t)deltaType;
     }
 
-    internal static Lg2DeltaType GetLg2(this git_delta_t delta)
+    internal static Lg2DeltaType GetLg2(this git_delta_t deltaType)
     {
-        return (Lg2DeltaType)delta;
+        return (Lg2DeltaType)deltaType;
     }
 }
 

@@ -31,9 +31,15 @@ sealed class KeyValueStore(ILogger<KeyValueStore> logger) : IDisposable
     internal void Init(string location)
     {
         _dbPath = Path.Join(location, DbDirectoryName);
-
         Directory.CreateDirectory(_dbPath);
 
+        Open();
+
+        logger.ZLogTrace($"Initialize '{_dbPath}'");
+    }
+
+    void Open()
+    {
         var envConfig = new EnvironmentConfiguration() { MaxDatabases = 2 };
         _dbEnv = new LightningEnvironment(_dbPath, envConfig);
         _dbEnv.Open();
@@ -47,8 +53,28 @@ sealed class KeyValueStore(ILogger<KeyValueStore> logger) : IDisposable
 
             txn.Commit();
         }
+    }
 
-        logger.ZLogTrace($"Initialize {nameof(KeyValueStore)}");
+    internal void Truncate()
+    {
+        if (_dbPath is null)
+        {
+            throw new InvalidOperationException($"DbPath is null");
+        }
+
+        logger.ZLogTrace($"Truncating '{_dbPath}'");
+
+        _tautenedDb?.Dispose();
+        _tautenedDb = null;
+        _regainedDb?.Dispose();
+        _regainedDb = null;
+        _dbEnv?.Dispose();
+        _dbEnv = null;
+
+        Directory.Delete(_dbPath, recursive: true);
+        Directory.CreateDirectory(_dbPath);
+
+        Open();
     }
 
     internal bool HasTautened(Lg2OidPlainRef oidRef)
@@ -101,18 +127,18 @@ sealed class KeyValueStore(ILogger<KeyValueStore> logger) : IDisposable
         txn.Commit();
     }
 
-    internal void PutTautened(Lg2OidPlainRef hostOidRef, Lg2OidPlainRef tautOidRef)
+    internal void PutSameTautened(Lg2OidPlainRef hostOidRef, Lg2OidPlainRef tautOidRef)
     {
         using var txn = _dbEnv.BeginTransaction();
-        txn.Put(_tautenedDb, hostOidRef, tautOidRef);
+        txn.PutSame(_tautenedDb, hostOidRef, tautOidRef);
         txn.PutSame(_regainedDb, tautOidRef, hostOidRef);
         txn.Commit();
     }
 
-    internal void PutRegained(Lg2OidPlainRef tautOidRef, Lg2OidPlainRef hostOidRef)
+    internal void PutSameRegained(Lg2OidPlainRef tautOidRef, Lg2OidPlainRef hostOidRef)
     {
         using var txn = _dbEnv.BeginTransaction();
-        txn.Put(_regainedDb, tautOidRef, hostOidRef);
+        txn.PutSame(_regainedDb, tautOidRef, hostOidRef);
         txn.PutSame(_tautenedDb, hostOidRef, tautOidRef);
         txn.Commit();
     }
@@ -215,13 +241,14 @@ static class LightningExtensions
         this LightningTransaction txn,
         LightningDatabase db,
         Lg2OidPlainRef sourceOidRef,
-        Lg2OidPlainRef targetOidRef
+        Lg2OidPlainRef targetOidRef,
+        PutOptions options = PutOptions.None
     )
     {
         var key = sourceOidRef.GetReadOnlyBytes();
         var val = targetOidRef.GetReadOnlyBytes();
 
-        var rc = txn.Put(db, key, val, PutOptions.NoOverwrite);
+        var rc = txn.Put(db, key, val, options);
         if (rc != MDBResultCode.Success)
         {
             var mdbError = Marshal.PtrToStringUTF8(Lmdb.mdb_strerror((int)rc));

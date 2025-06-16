@@ -39,6 +39,8 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         }
     }
 
+    internal string KvStoreLocation => TautRepo.GetObjectInfoDir();
+
     const string TautenedRefGlob = "refs/tautened/*";
     const string RegainedRefGlob = "refs/regained/*";
 
@@ -77,8 +79,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         _targetPathSpec = Lg2PathSpec.New(targetPathSpecList);
 
-        var kvStoreLocation = Path.Join(TautRepoPath, GitRepoLayout.ObjectsInfoDir);
-        kvStore.Init(kvStoreLocation);
+        kvStore.Init(KvStoreLocation);
 
         cipher.Init();
 
@@ -94,7 +95,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
     {
         void SetDefaultDescription()
         {
-            var descriptionFile = Path.Join(TautRepoPath, GitRepoLayout.Description);
+            var descriptionFile = Path.Join(TautRepoPath, GitRepoHelper.Description);
 
             File.Delete(descriptionFile);
 
@@ -119,14 +120,14 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         void AddHostObjects()
         {
-            var objectsDir = Path.Join(TautRepoPath, GitRepoLayout.ObjectsDir);
+            var objectsDir = Path.Join(TautRepoPath, GitRepoHelper.ObjectsDir);
 
             var objectsInfoAlternatesFile = Path.Join(
                 TautRepoPath,
-                GitRepoLayout.ObjectsInfoAlternatesFile
+                GitRepoHelper.ObjectsInfoAlternatesFile
             );
 
-            var hostRepoObjectsDir = Path.Join(HostRepoPath, GitRepoLayout.ObjectsDir);
+            var hostRepoObjectsDir = Path.Join(HostRepoPath, GitRepoHelper.ObjectsDir);
 
             var relPathToHostObjects = Path.GetRelativePath(objectsDir, hostRepoObjectsDir);
 
@@ -219,7 +220,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
     {
         var source = objInfo.GetOidPlainRef();
 
-        kvStore.PutTautened(source, target);
+        kvStore.PutSameTautened(source, target);
 
         if (logger.IsEnabled(LogLevel.Trace))
         {
@@ -242,7 +243,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
     {
         var source = objInfo.GetOidPlainRef();
 
-        kvStore.PutRegained(source, target);
+        kvStore.PutSameRegained(source, target);
 
         if (logger.IsEnabled(LogLevel.Trace))
         {
@@ -378,12 +379,10 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var tautRepoOdb = _tautRepo.GetOdb();
         using var hostRepoOdb = _hostRepo.GetOdb();
 
-        var copied = tautRepoOdb.CopyObjectIfNotExists(hostRepoOdb, objInfo.GetOidPlainRef());
+        // XXX use hardlink to improve performance
+        tautRepoOdb.CopyObjectIfNotExists(hostRepoOdb, objInfo.GetOidPlainRef());
 
-        if (copied)
-        {
-            StoreRegained(objInfo, objInfo.GetOidPlainRef());
-        }
+        StoreRegained(objInfo, objInfo.GetOidPlainRef());
     }
 
     async Task RegainTreeAsync(Lg2Tree tautTree)
@@ -479,7 +478,9 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var tautRepoOdb = _tautRepo.GetOdb();
         using var hostRepoOdb = _hostRepo.GetOdb();
 
-        using var readStream = tautRepoOdb.OpenReadStream(blob);
+        using var odbObject = tautRepoOdb.Read(blob);
+        using var readStream = odbObject.NewReadStream();
+
         var isBinary = blob.IsBinary();
 
         var decryptor = cipher.CreateDecryptor(readStream, isBinary);
@@ -704,7 +705,8 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var hostRepoOdb = _hostRepo.GetOdb();
         using var tautRepoOdb = _tautRepo.GetOdb();
 
-        using var readStream = hostRepoOdb.OpenReadStream(blob);
+        using var odbObject = hostRepoOdb.Read(blob);
+        using var readStream = odbObject.NewReadStream();
 
         var isBinary = blob.IsBinary();
 
@@ -718,5 +720,33 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         writeStream.FinalizeWrite(ref resultOid);
 
         StoreTautened(blob, resultOid);
+    }
+
+    internal void RebuildKvStore()
+    {
+        if (_tautRepo is null)
+        {
+            throw new InvalidOperationException($"Taut repo is null");
+        }
+
+        logger.ZLogTrace($"Rebuilding {nameof(kvStore)}");
+
+        kvStore.Truncate();
+
+        foreach (var refName in RegainedTautRefs)
+        {
+            _tautRepo.DeleteRef(refName);
+            logger.ZLogTrace($"Delete {refName}");
+        }
+
+        foreach (var refName in TautenedTautRefs)
+        {
+            _tautRepo.DeleteRef(refName);
+            logger.ZLogTrace($"Delete {refName}");
+        }
+
+        RegainHostRefs();
+
+        TautenHostRefs();
     }
 }

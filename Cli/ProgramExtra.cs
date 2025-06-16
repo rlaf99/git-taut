@@ -21,7 +21,7 @@ internal class ExtraCommands
     [Command("--repo")]
     public void Repo([FromServices] GitCli gitCli, [Argument] params string[] args)
     {
-        var tautRepo = LocateTautRepo();
+        using var tautRepo = LocateTautRepo();
 
         string[] gitArgs = ["--git-dir", tautRepo.GetPath(), .. args];
         try
@@ -35,7 +35,7 @@ internal class ExtraCommands
     }
 
     /// <summary>
-    /// Regain a tautened file, output regained content to stdout.
+    /// Regain a tautened file and dump its content to stdout.
     /// </summary>
     /// <param name="file">The tautened file to regain.</param>
     [Command("--regain")]
@@ -65,6 +65,20 @@ internal class ExtraCommands
         }
     }
 
+    /// <summary>
+    /// Rescan the taut repo and rebuild mapping.
+    /// </summary>
+    [Command("--rescan")]
+    public void Rescan([FromServices] TautManager tautManager)
+    {
+        using (var tautRepo = LocateTautRepo())
+        {
+            tautManager.Open(tautRepo.GetPath());
+        }
+
+        tautManager.RebuildKvStore();
+    }
+
     Lg2Repository LocateTautRepo()
     {
         var currentDir = Directory.GetCurrentDirectory();
@@ -75,7 +89,7 @@ internal class ExtraCommands
             throw new OperationCanceledException();
         }
 
-        var tautRepoFullPath = Path.Join(hostRepo.GetPath(), GitRepoLayout.TautRepoDir);
+        var tautRepoFullPath = Path.Join(hostRepo.GetPath(), GitRepoHelper.TautRepoDir);
         var tautRepoRelPath = Path.GetRelativePath(currentDir, tautRepoFullPath);
 
         Lg2Repository? tautRepo = null;

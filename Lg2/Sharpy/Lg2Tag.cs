@@ -35,7 +35,7 @@ public unsafe class Lg2Tag
 
 unsafe partial class Lg2RepositoryExtensions
 {
-    public static Lg2Tag LookupTag(this Lg2Repository repo, ref Lg2Oid oid)
+    public static Lg2Tag LookupTag(this Lg2Repository repo, scoped ref readonly Lg2Oid oid)
     {
         repo.EnsureValid();
 
@@ -47,6 +47,6 @@ unsafe partial class Lg2RepositoryExtensions
         }
         Lg2Exception.ThrowIfNotOk(rc);
 
-        return new Lg2Tag(pTag);
+        return new(pTag);
     }
 }

@@ -93,7 +93,7 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         Debug.Assert(RANDOM_BYTES + KEY_TAG_BYTES == CIPHER_BLOCK_BYTES);
 
         logger.ZLogTrace(
-            $"initialize {nameof(Aes256Cbc1)} mode '{Enum.GetName(UsedCipherMode)}' padding '{Enum.GetName(UsedPaddingMode)}'"
+            $"Initialize {nameof(Aes256Cbc1)} mode '{Enum.GetName(UsedCipherMode)}' padding '{Enum.GetName(UsedPaddingMode)}'"
         );
     }
 
@@ -309,27 +309,86 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         return _aes.CreateDecryptor();
     }
 
-    internal sealed class Decryptor : IDisposable
+    internal class DecryptorInputStream : Stream
     {
         readonly Aes256Cbc1 _cipher;
-        readonly Stream _inputStream;
-        readonly bool _isBinary;
+
+        readonly Stream _sourceInput;
 
         [AllowNull]
         CryptoStream _cryptoStream;
 
-        [AllowNull]
-        int? _plainTextLength;
+        int _plainTextLength;
 
         bool _headerVerified;
 
-        internal Decryptor(Aes256Cbc1 cipher, Stream inputStream, bool isBinary)
+        internal DecryptorInputStream(Aes256Cbc1 cipher, Stream sourceInput)
         {
             cipher.EnsureInitialized();
 
+            if (sourceInput.Length <= PLAIN_TEXT_LENGTH_BYTES)
+            {
+                throw new ArgumentException($"Invalid input", nameof(sourceInput));
+            }
+
             _cipher = cipher;
-            _inputStream = inputStream;
-            _isBinary = isBinary;
+            _sourceInput = sourceInput;
+        }
+
+        public override bool CanRead => _sourceInput.CanRead;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length
+        {
+            get
+            {
+                VerifyHeader();
+
+                return _plainTextLength;
+            }
+        }
+
+        public override long Position
+        {
+            get
+            {
+                VerifyHeader();
+
+                return _cryptoStream.Position - PLAIN_TEXT_LENGTH_BYTES;
+            }
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+            VerifyHeader();
+
+            _cryptoStream.Flush();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            VerifyHeader();
+
+            return _cryptoStream.Read(buffer, offset, count);
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
         }
 
         void VerifyHeader()
@@ -342,7 +401,7 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
             _headerVerified = true;
 
             var tautenedData = new byte[TAUTENED_BYTES];
-            var tautenedSize = _inputStream.Read(tautenedData);
+            var tautenedSize = _sourceInput.Read(tautenedData);
             if (tautenedSize != TAUTENED_BYTES)
             {
                 throw new InvalidDataException($"Cannot read {nameof(TAUTENED_BYTES)}");
@@ -353,7 +412,7 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
             }
 
             var reservedData = new byte[RESERVED_BYTES];
-            var reservedSize = _inputStream.Read(reservedData);
+            var reservedSize = _sourceInput.Read(reservedData);
             if (reservedSize != RESERVED_BYTES)
             {
                 throw new InvalidDataException($"Cannot read {nameof(RESERVED_BYTES)}");
@@ -362,14 +421,14 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
             var ivData = new byte[CIPHER_BLOCK_BYTES];
 
             var randomData = new Span<byte>(ivData, 0, RANDOM_BYTES);
-            var randomSize = _inputStream.Read(randomData);
+            var randomSize = _sourceInput.Read(randomData);
             if (randomSize != RANDOM_BYTES)
             {
                 throw new InvalidDataException($"Cannot read {nameof(RANDOM_BYTES)}");
             }
 
             var keyTagData = new Span<byte>(ivData, RANDOM_BYTES, KEY_TAG_BYTES);
-            var keyTagSize = _inputStream.Read(keyTagData);
+            var keyTagSize = _sourceInput.Read(keyTagData);
             if (keyTagSize != KEY_TAG_BYTES)
             {
                 throw new InvalidDataException($"Cannot read {nameof(KEY_TAG_BYTES)}");
@@ -377,7 +436,7 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
 
             var decryptTransform = _cipher.PrepareForDecryption(ivData);
 
-            _cryptoStream = new CryptoStream(_inputStream, decryptTransform, CryptoStreamMode.Read);
+            _cryptoStream = new CryptoStream(_sourceInput, decryptTransform, CryptoStreamMode.Read);
 
             var lengthData = new byte[PLAIN_TEXT_LENGTH_BYTES];
 
@@ -394,44 +453,44 @@ class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
 
             _plainTextLength = BitConverter.ToInt32(lengthData);
         }
+    }
+
+    internal class Decryptor
+    {
+        readonly Aes256Cbc1 _cipher;
+        readonly Stream _inputStream;
+        readonly bool _isBinary;
+
+        internal Decryptor(Aes256Cbc1 cipher, Stream inputStream, bool isBinary)
+        {
+            cipher.EnsureInitialized();
+
+            _cipher = cipher;
+            _inputStream = inputStream;
+            _isBinary = isBinary;
+        }
 
         internal int GetOutputLength()
         {
-            VerifyHeader();
-
-            return _plainTextLength!.Value;
+            return (int)_inputStream.Length;
         }
 
         internal void WriteToEnd(Stream outputStream)
         {
-            VerifyHeader();
-
             var readBuf = new byte[CIPHER_BLOCK_BYTES];
             int readLen;
 
-            while ((readLen = _cryptoStream.Read(readBuf)) > 0)
+            while ((readLen = _inputStream.Read(readBuf)) > 0)
             {
                 outputStream.Write(readBuf, 0, readLen);
             }
-        }
-
-        bool _isDisposed;
-
-        public void Dispose()
-        {
-            if (_isDisposed)
-            {
-                return;
-            }
-            _isDisposed = true;
-
-            _cryptoStream?.Dispose();
         }
     }
 
     internal Decryptor CreateDecryptor(Stream inputStream, bool isBinary)
     {
-        var decryptor = new Decryptor(this, inputStream, isBinary);
+        var decryptorInput = new DecryptorInputStream(this, inputStream);
+        var decryptor = new Decryptor(this, decryptorInput, isBinary);
 
         return decryptor;
     }

@@ -130,7 +130,7 @@ partial class GitRemoteHelper
 
 static partial class GitRemoteHelperTraces
 {
-    [ZLoggerMessage(LogLevel.Trace, "Received command '{line}'")]
+    [ZLoggerMessage(LogLevel.Trace, "Handle command '{line}'")]
     internal static partial void TraceReceivedGitCommand(
         this ILogger<GitRemoteHelper> logger,
         string line

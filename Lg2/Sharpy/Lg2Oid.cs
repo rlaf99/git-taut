@@ -135,7 +135,7 @@ public static unsafe class Lg2OidExtensions
     }
 }
 
-internal static unsafe class Lg2OidNativeExtentions
+internal static unsafe class RawOidExtentions
 {
     internal static string Fmt(ref readonly this git_oid oid)
     {
