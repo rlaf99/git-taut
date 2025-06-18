@@ -146,6 +146,96 @@ internal static unsafe partial class RawStrArrayExtensions
     }
 }
 
+public sealed unsafe class Lg2Buf : IDisposable
+{
+    public class ReadStream(Lg2Buf sourceBuf) : Stream
+    {
+        long _totalRead;
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => sourceBuf.Length;
+
+        public override long Position
+        {
+            get => _totalRead;
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush() { } // do nothing
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var dataRead = 0;
+
+            var target = buffer.AsSpan(offset, count);
+
+            while (_totalRead < sourceBuf.Length && dataRead < target.Length)
+            {
+                target[dataRead++] = (byte)sourceBuf.Raw.ptr[_totalRead++];
+            }
+
+            return dataRead;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    internal git_buf Raw;
+
+    internal Lg2Buf(git_buf buf)
+    {
+        Raw = buf;
+    }
+
+    public long Length => (long)Raw.size;
+
+    public ReadStream NewReadStream() => new(this);
+
+    bool _isDiposed;
+
+    void Dispose(bool disposing)
+    {
+        if (_isDiposed)
+        {
+            return;
+        }
+        _isDiposed = true;
+
+        if (disposing) { }
+
+        fixed (git_buf* ptr = &Raw)
+        {
+            git_buf_dispose(ptr);
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    ~Lg2Buf() => Dispose(false);
+}
+
 public unsafe ref struct Lg2RawData
 {
     internal nint Ptr;

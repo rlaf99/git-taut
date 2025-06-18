@@ -137,7 +137,18 @@ public static unsafe class Lg2CommitExtensions
         return result;
     }
 
-    public static List<Lg2Commit> GetParents(this Lg2Commit commit)
+    public static Lg2Commit GetParent(this Lg2Commit commit, uint idx)
+    {
+        commit.EnsureValid();
+
+        git_commit* pParent = null;
+        var rc = git_commit_parent(&pParent, commit.Ptr, idx);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(pParent);
+    }
+
+    public static List<Lg2Commit> GetAllParents(this Lg2Commit commit)
     {
         commit.EnsureValid();
 

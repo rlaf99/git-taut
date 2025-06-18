@@ -1062,6 +1062,54 @@ namespace Lg2.Native
         public static extern int git_odb_backend_loose(git_odb_backend** @out, [NativeTypeName("const char *")] sbyte* objects_dir, int compression_level, int do_fsync, [NativeTypeName("unsigned int")] uint dir_mode, [NativeTypeName("unsigned int")] uint file_mode);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern git_repository* git_patch_owner([NativeTypeName("const git_patch *")] git_patch* patch);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_patch_from_diff(git_patch** @out, git_diff* diff, [NativeTypeName("size_t")] nuint idx);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_patch_from_blobs(git_patch** @out, [NativeTypeName("const git_blob *")] git_blob* old_blob, [NativeTypeName("const char *")] sbyte* old_as_path, [NativeTypeName("const git_blob *")] git_blob* new_blob, [NativeTypeName("const char *")] sbyte* new_as_path, [NativeTypeName("const git_diff_options *")] git_diff_options* opts);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_patch_from_blob_and_buffer(git_patch** @out, [NativeTypeName("const git_blob *")] git_blob* old_blob, [NativeTypeName("const char *")] sbyte* old_as_path, [NativeTypeName("const void *")] void* buffer, [NativeTypeName("size_t")] nuint buffer_len, [NativeTypeName("const char *")] sbyte* buffer_as_path, [NativeTypeName("const git_diff_options *")] git_diff_options* opts);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_patch_from_buffers(git_patch** @out, [NativeTypeName("const void *")] void* old_buffer, [NativeTypeName("size_t")] nuint old_len, [NativeTypeName("const char *")] sbyte* old_as_path, [NativeTypeName("const void *")] void* new_buffer, [NativeTypeName("size_t")] nuint new_len, [NativeTypeName("const char *")] sbyte* new_as_path, [NativeTypeName("const git_diff_options *")] git_diff_options* opts);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_patch_free(git_patch* patch);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const git_diff_delta *")]
+        public static extern git_diff_delta* git_patch_get_delta([NativeTypeName("const git_patch *")] git_patch* patch);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("size_t")]
+        public static extern nuint git_patch_num_hunks([NativeTypeName("const git_patch *")] git_patch* patch);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_patch_line_stats([NativeTypeName("size_t *")] nuint* total_context, [NativeTypeName("size_t *")] nuint* total_additions, [NativeTypeName("size_t *")] nuint* total_deletions, [NativeTypeName("const git_patch *")] git_patch* patch);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_patch_get_hunk([NativeTypeName("const git_diff_hunk **")] git_diff_hunk** @out, [NativeTypeName("size_t *")] nuint* lines_in_hunk, git_patch* patch, [NativeTypeName("size_t")] nuint hunk_idx);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_patch_num_lines_in_hunk([NativeTypeName("const git_patch *")] git_patch* patch, [NativeTypeName("size_t")] nuint hunk_idx);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_patch_get_line_in_hunk([NativeTypeName("const git_diff_line **")] git_diff_line** @out, git_patch* patch, [NativeTypeName("size_t")] nuint hunk_idx, [NativeTypeName("size_t")] nuint line_of_hunk);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("size_t")]
+        public static extern nuint git_patch_size(git_patch* patch, int include_context, int include_hunk_headers, int include_file_headers);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_patch_print(git_patch* patch, [NativeTypeName("git_diff_line_cb")] delegate* unmanaged[Cdecl]<git_diff_delta*, git_diff_hunk*, git_diff_line*, void*, int> print_cb, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_patch_to_buf(git_buf* @out, git_patch* patch);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_pathspec_new(git_pathspec** @out, [NativeTypeName("const git_strarray *")] git_strarray* pathspec);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

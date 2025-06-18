@@ -262,6 +262,8 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         }
     }
 
+    #region Regaining
+
     internal void RegainHostRefs()
     {
         logger.ZLogTrace($"Start regaining host refs");
@@ -357,7 +359,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         var author = tautCommit.GetAuthor();
         var committer = tautCommit.GetCommitter();
         var message = tautCommit.GetMessage();
-        var tautParents = tautCommit.GetParents();
+        var tautParents = tautCommit.GetAllParents();
 
         var hostParents = new List<Lg2Commit>();
 
@@ -392,7 +394,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         var treeBuilder = _hostRepo.NewTreeBuilder();
         var regainedSet = new HashSet<nuint>();
 
-        for (nuint i = 0; i < tautTree.GetEntryCount(); i++)
+        for (nuint i = 0, count = tautTree.GetEntryCount(); i < count; i++)
         {
             var entry = tautTree.GetEntry(i);
             var entryName = entry.GetName();
@@ -445,7 +447,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         if (treeBuilder.GetEntryCount() > 0)
         {
-            for (nuint i = 0; i < tautTree.GetEntryCount(); i++)
+            for (nuint i = 0, count = tautTree.GetEntryCount(); i < count; i++)
             {
                 if (regainedSet.Contains(i) == false)
                 {
@@ -481,20 +483,22 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var odbObject = tautRepoOdb.Read(blob);
         using var readStream = odbObject.NewReadStream();
 
-        var isBinary = blob.IsBinary();
-
-        var decryptor = cipher.CreateDecryptor(readStream, isBinary);
+        var decryptor = cipher.CreateDecryptor(readStream);
 
         var outputLength = decryptor.GetOutputLength();
 
         using var writeStream = hostRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
 
-        decryptor.WriteToEnd(writeStream);
+        decryptor.WriteToOutput(writeStream);
 
         writeStream.FinalizeWrite(ref resultOid);
 
         StoreRegained(blob, resultOid);
     }
+
+    #endregion Regaining
+
+    #region Tautening
 
     internal void TautenHostRefs()
     {
@@ -543,6 +547,11 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
             logger.ZLogTrace($"Start tautening commit {commitOidHex8} '{commitSummary}'");
 
+            // if (hostCommit.GetParentCount() == 1)
+            // {
+            //     TautenFilesInDiff(hostCommit);
+            // }
+
             TautenCommit(hostCommit);
         }
 
@@ -578,6 +587,113 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         _tautRepo.SetHead(tautHeadRefName);
     }
 
+    void TautenFilesInDiff(Lg2Commit hostCommit)
+    {
+        var hostParentCommit = hostCommit.GetParent(0);
+        var hostParentTree = hostParentCommit.GetTree();
+        var hostTree = hostCommit.GetTree();
+
+        Lg2DiffOptions diffOptions = new()
+        {
+            Flags =
+                Lg2DiffOptionFlags.LG2_DIFF_IGNORE_FILEMODE
+                | Lg2DiffOptionFlags.LG2_DIFF_IGNORE_SUBMODULES,
+        };
+
+        var hostDiffToParent = _hostRepo.NewDiff(hostParentTree, hostTree, ref diffOptions);
+
+        Lg2DiffFindOptions diffFindOpts = new()
+        {
+            Flags =
+                Lg2DiffFindFlags.LG2_DIFF_FIND_AND_BREAK_REWRITES
+                | Lg2DiffFindFlags.LG2_DIFF_FIND_RENAMES
+                | Lg2DiffFindFlags.LG2_DIFF_FIND_COPIES,
+        };
+
+        hostDiffToParent.FindSimilar(ref diffFindOpts);
+
+        for (nuint i = 0, count = hostDiffToParent.GetNumDeltas(); i < count; i++)
+        {
+            var delta = hostDiffToParent.GetDelta(i);
+
+            var status = delta.GetStatus();
+
+            if (
+                status != Lg2DeltaType.LG2_DELTA_MODIFIED
+                && status != Lg2DeltaType.LG2_DELTA_RENAMED
+                && status != Lg2DeltaType.LG2_DELTA_COPIED
+            )
+            {
+                continue;
+            }
+
+            if (delta.GetNumOfFiles() != 2)
+            {
+                throw new InvalidDataException($"There should be two files in the delta");
+            }
+
+            var newFile = delta.GetNewFile();
+            var oldFile = delta.GetOldFile();
+
+            if (kvStore.HasTautened(newFile))
+            {
+                continue;
+            }
+
+            var newFilePath = newFile.GetPath();
+            var oldFilePath = oldFile.GetPath();
+
+            if (
+                _targetPathSpec.MatchPath(newFilePath, Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE)
+                    == false
+                || _targetPathSpec.MatchPath(oldFilePath, Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE)
+                    == false
+            )
+            {
+                continue;
+            }
+
+            var newFileSize = newFile.GetSize();
+            var oldFileSize = oldFile.GetSize();
+
+            if (newFileSize < 100)
+            {
+                continue;
+            }
+
+            Lg2Oid oid = new();
+            kvStore.GetTautened(oldFile, ref oid);
+            var oldTautenedBlob = _tautRepo.LookupBlob(oid);
+
+            if (oldTautenedBlob.GetObjectSize() > 2 * (long)oldFileSize)
+            {
+                continue;
+            }
+
+            using var patch = hostDiffToParent.NewPatch(i);
+            var patchSize = patch.GetSize();
+
+            var ratio = (double)patchSize / newFileSize;
+
+            if (ratio > 0.5)
+            {
+                continue;
+            }
+
+            // TODO
+            // - A new encryptor output format
+
+            // using var hostRepoOdb = _hostRepo.GetOdb();
+            // var oldFileOdbObject = hostRepoOdb.Read(oldFile);
+            // var oldFileReadStream = oldFileOdbObject.NewReadStream();
+
+            var patchContent = patch.Dump();
+            var patchContentStream = patchContent.NewReadStream();
+
+            // var encryptor = cipher.CreateEncryptor(patchContentStream, );
+        }
+    }
+
     void TautenCommit(Lg2Commit hostCommit)
     {
         var hostTree = hostCommit.GetTree();
@@ -603,7 +719,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         var author = hostCommit.GetAuthor();
         var committer = hostCommit.GetCommitter();
         var message = hostCommit.GetMessage();
-        var hostParents = hostCommit.GetParents();
+        var hostParents = hostCommit.GetAllParents();
 
         var tautParents = new List<Lg2Commit>();
 
@@ -627,7 +743,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         var treeBuilder = _tautRepo.NewTreeBuilder();
         var tautenedSet = new HashSet<nuint>();
 
-        for (nuint i = 0; i < hostTree.GetEntryCount(); i++)
+        for (nuint i = 0, count = hostTree.GetEntryCount(); i < count; i++)
         {
             var entry = hostTree.GetEntry(i);
             var entryName = entry.GetName();
@@ -676,7 +792,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         if (treeBuilder.GetEntryCount() > 0)
         {
-            for (nuint i = 0; i < hostTree.GetEntryCount(); i++)
+            for (nuint i = 0, count = hostTree.GetEntryCount(); i < count; i++)
             {
                 if (tautenedSet.Contains(i) == false)
                 {
@@ -705,8 +821,8 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var hostRepoOdb = _hostRepo.GetOdb();
         using var tautRepoOdb = _tautRepo.GetOdb();
 
-        using var odbObject = hostRepoOdb.Read(blob);
-        using var readStream = odbObject.NewReadStream();
+        var odbObject = hostRepoOdb.Read(blob);
+        var readStream = odbObject.NewReadStream();
 
         var isBinary = blob.IsBinary();
 
@@ -715,7 +831,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         using var writeStream = tautRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
 
-        encryptor.WriteToEnd(writeStream);
+        encryptor.Output(writeStream);
 
         writeStream.FinalizeWrite(ref resultOid);
 
@@ -749,4 +865,6 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         TautenHostRefs();
     }
+
+    #endregion Tautening
 }

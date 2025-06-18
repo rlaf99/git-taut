@@ -19,6 +19,8 @@ public unsafe class Lg2Blob
         git_blob_free(pNative);
     }
 
+    public static implicit operator Lg2OidPlainRef(Lg2Blob blob) => blob.GetOidPlainRef();
+
     public Lg2OidPlainRef GetOidPlainRef()
     {
         EnsureValid();
@@ -33,7 +35,80 @@ public unsafe class Lg2Blob
         return Lg2ObjectType.LG2_OBJECT_BLOB;
     }
 
-    public static implicit operator Lg2OidPlainRef(Lg2Blob blob) => blob.GetOidPlainRef();
+    public ReadStream NewReadStream()
+    {
+        EnsureValid();
+
+        return new(this);
+    }
+
+    public class ReadStream(Lg2Blob sourceBlob) : Stream
+    {
+        long _totalRead;
+        void* _ptr;
+        byte* Data
+        {
+            get
+            {
+                if (_ptr is null)
+                {
+                    _ptr = git_blob_rawcontent(sourceBlob.Ptr);
+                    if (_ptr is null)
+                    {
+                        throw new InvalidDataException($"blob content is null");
+                    }
+                }
+
+                return (byte*)_ptr;
+            }
+        }
+
+        readonly long _length = sourceBlob.GetObjectSize();
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => _length;
+
+        public override long Position
+        {
+            get => _totalRead;
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush() { } // do nothing
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var target = buffer.AsSpan(offset, count);
+
+            int dataRead = 0;
+            while (_totalRead < _length && dataRead < target.Length)
+            {
+                target[dataRead++] = Data[_totalRead++];
+            }
+
+            return dataRead;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+    }
 }
 
 public static unsafe class Lg2BlobExtensions
@@ -47,20 +122,7 @@ public static unsafe class Lg2BlobExtensions
         return val != 0;
     }
 
-    public static Lg2RawData GetRawData(this Lg2Blob blob)
-    {
-        blob.EnsureValid();
-
-        Lg2RawData rawData = new()
-        {
-            Ptr = (nint)git_blob_rawcontent(blob.Ptr),
-            Len = (long)git_blob_rawsize(blob.Ptr),
-        };
-
-        return rawData;
-    }
-
-    public static long GetRawSize(this Lg2Blob blob)
+    public static long GetObjectSize(this Lg2Blob blob)
     {
         blob.EnsureValid();
 

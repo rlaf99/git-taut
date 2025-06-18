@@ -85,4 +85,14 @@ public abstract unsafe class NativeOwnedRef<TOwner, TNative>
             ThrowHelper.ThrowInvalidNullInstance<TOwner>();
         }
     }
+
+    internal TOwner EnsureOwner()
+    {
+        if (_ownerWeakRef.TryGetTarget(out var owner) == false)
+        {
+            ThrowHelper.ThrowInvalidNullInstance<TOwner>();
+        }
+
+        return owner!;
+    }
 }

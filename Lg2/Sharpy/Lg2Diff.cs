@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
 
@@ -6,16 +7,86 @@ namespace Lg2.Sharpy;
 public unsafe ref struct Lg2DiffOptions
 {
     internal git_diff_options Raw;
+
+    public Lg2DiffOptionFlags Flags
+    {
+        get => (Lg2DiffOptionFlags)Raw.flags;
+        set => Raw.flags = (uint)value;
+    }
 }
 
 public unsafe ref struct Lg2DiffFindOptions
 {
     internal git_diff_find_options Raw;
+
+    public Lg2DiffFindFlags Flags
+    {
+        get => (Lg2DiffFindFlags)Raw.flags;
+        set => Raw.flags = (uint)value;
+    }
+
+    public Lg2DiffFindOptions()
+    {
+        fixed (git_diff_find_options* ptr = &Raw)
+        {
+            var rc = git_diff_find_options_init(ptr, GIT_DIFF_FIND_OPTIONS_VERSION);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+    }
 }
 
-public unsafe ref struct Lg2DiffDelta
+public unsafe class Lg2DiffFileOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_diff_file>
+    where TOwner : class
 {
-    internal git_diff_delta Raw;
+    internal Lg2DiffFileOwnedRef(TOwner owner, git_diff_file* pNative)
+        : base(owner, pNative) { }
+
+    public Lg2OidPlainRef GetOidPlainRef()
+    {
+        EnsureValid();
+
+        return new(&Ptr->id);
+    }
+
+    public int GetOidValidLength()
+    {
+        EnsureValid();
+
+        return Ptr->id_abbrev;
+    }
+
+    public string GetPath()
+    {
+        EnsureValid();
+
+        var result = Marshal.PtrToStringUTF8((nint)Ptr->path);
+
+        return result!;
+    }
+
+    public ulong GetSize()
+    {
+        EnsureValid();
+
+        return Ptr->size;
+    }
+
+    public Lg2DiffFlags GetDiffFlags()
+    {
+        EnsureValid();
+
+        return (Lg2DiffFlags)Ptr->flags;
+    }
+
+    public Lg2FileMode GetFileMode()
+    {
+        EnsureValid();
+
+        return (Lg2FileMode)Ptr->mode;
+    }
+
+    public static implicit operator Lg2OidPlainRef(Lg2DiffFileOwnedRef<TOwner> ownedRef) =>
+        ownedRef.GetOidPlainRef();
 }
 
 public unsafe class Lg2DiffDeltaOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_diff_delta>
@@ -23,6 +94,26 @@ public unsafe class Lg2DiffDeltaOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_di
 {
     internal Lg2DiffDeltaOwnedRef(TOwner owner, git_diff_delta* pNative)
         : base(owner, pNative) { }
+
+    public Lg2DeltaType GetStatus() => Ref.status.GetLg2();
+
+    public Lg2DiffFlags GetFlags() => (Lg2DiffFlags)Ref.flags;
+
+    public ushort GetSimilarity() => Ref.similarity;
+
+    public ushort GetNumOfFiles() => Ref.nfiles;
+
+    public Lg2DiffFileOwnedRef<TOwner> GetOldFile()
+    {
+        var owner = EnsureOwner();
+        return new(owner, &Ptr->old_file);
+    }
+
+    public Lg2DiffFileOwnedRef<TOwner> GetNewFile()
+    {
+        var owner = EnsureOwner();
+        return new(owner, &Ptr->new_file);
+    }
 }
 
 public unsafe class Lg2Diff : NativeSafePointer<Lg2Diff, git_diff>, INativeRelease<git_diff>
@@ -39,7 +130,7 @@ public unsafe class Lg2Diff : NativeSafePointer<Lg2Diff, git_diff>, INativeRelea
     }
 }
 
-public static unsafe class Lg2DiffExtensions
+public static unsafe partial class Lg2DiffExtensions
 {
     public static nuint GetNumDeltas(this Lg2Diff diff)
     {
@@ -163,7 +254,7 @@ public static unsafe class Lg2DiffStatsExtensions
 
 unsafe partial class Lg2RepositoryExtensions
 {
-    public static Lg2Diff New(this Lg2Repository repo, Lg2Tree srcTree, Lg2Tree dstTree)
+    public static Lg2Diff NewDiff(this Lg2Repository repo, Lg2Tree srcTree, Lg2Tree dstTree)
     {
         repo.EnsureValid();
         srcTree.EnsureValid();
@@ -176,7 +267,7 @@ unsafe partial class Lg2RepositoryExtensions
         return new(pDiff);
     }
 
-    public static Lg2Diff New(
+    public static Lg2Diff NewDiff(
         this Lg2Repository repo,
         Lg2Tree srcTree,
         Lg2Tree dstTree,

@@ -365,23 +365,6 @@ public static unsafe class Lg2TreeBuilderExtensions
     }
 }
 
-public class Lg2TreeUpdate
-{
-    git_tree_update _raw;
-
-    public Lg2TreeUpdateAction Action
-    {
-        get { return (Lg2TreeUpdateAction)_raw.action; }
-        set { _raw.action = (git_tree_update_t)value; }
-    }
-
-    public Lg2FileMode FileMode
-    {
-        get { return (Lg2FileMode)_raw.filemode; }
-        set { _raw.filemode = (git_filemode_t)value; }
-    }
-}
-
 unsafe partial class Lg2RepositoryExtensions
 {
     public static Lg2Tree LookupTree(this Lg2Repository repo, Lg2OidPlainRef oidRef)

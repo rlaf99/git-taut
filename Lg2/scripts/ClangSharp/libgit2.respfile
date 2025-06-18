@@ -57,6 +57,7 @@ thirdparty/libgit2/include/git2/net.h
 thirdparty/libgit2/include/git2/pathspec.h
 thirdparty/libgit2/include/git2/diff.h
 thirdparty/libgit2/include/git2/signature.h
+thirdparty/libgit2/include/git2/patch.h
 
 
 --file

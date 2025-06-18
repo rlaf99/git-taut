@@ -35,6 +35,44 @@ internal class ExtraCommands
     }
 
     /// <summary>
+    /// Examine a tautend file.
+    /// </summary>
+    /// <param name="file">The tautened file to examine.</param>
+    [Command("--examine")]
+    public void Examine([FromServices] Aes256Cbc1 cipher, [Argument] string file)
+    {
+        cipher.Init();
+
+        try
+        {
+            using var fileStream = File.OpenRead(file);
+            var decryptor = cipher.CreateDecryptor(fileStream);
+
+            var isBinary = decryptor.IsContentBinary();
+            var outputLength = decryptor.GetOutputLength();
+            var extraInfo = decryptor.GetExtraPayload();
+            var extraInfoText = Convert.ToHexStringLower(extraInfo);
+
+            Console.WriteLine($"Is binary: {isBinary}");
+            Console.WriteLine($"Output length: {outputLength}");
+            if (string.IsNullOrEmpty(extraInfoText))
+            {
+                Console.WriteLine($"Extra payload: <Empty>");
+            }
+            else
+            {
+                Console.WriteLine($"Extra payload: {extraInfoText}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ConsoleApp.LogError($"Failed to examine '{file}': {ex.Message}");
+
+            throw new OperationCanceledException();
+        }
+    }
+
+    /// <summary>
     /// Regain a tautened file and dump its content to stdout.
     /// </summary>
     /// <param name="file">The tautened file to regain.</param>
@@ -46,21 +84,15 @@ internal class ExtraCommands
         try
         {
             using var fileStream = File.OpenRead(file);
-            var decryptor = cipher.CreateDecryptor(fileStream, false);
+            var decryptor = cipher.CreateDecryptor(fileStream);
 
             using var outputStream = Console.OpenStandardOutput();
-            decryptor.WriteToEnd(outputStream);
+            decryptor.WriteToOutput(outputStream);
         }
         catch (Exception ex)
         {
             ConsoleApp.LogError($"Failed to regain '{file}': {ex.Message}");
 
-#if DEBUG
-            if (ex.StackTrace is not null)
-            {
-                ConsoleApp.LogError($"{ex.StackTrace}");
-            }
-#endif
             throw new OperationCanceledException();
         }
     }
