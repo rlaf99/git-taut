@@ -30,6 +30,7 @@ git_diff_format_t=uint
 git_diff_flag_t=uint
 git_diff_stats_format_t=uint
 git_diff_find_t=uint
+git_index_add_option_t=uint
 
 --traverse
 thirdparty/libgit2/include/git2/global.h
@@ -58,6 +59,8 @@ thirdparty/libgit2/include/git2/pathspec.h
 thirdparty/libgit2/include/git2/diff.h
 thirdparty/libgit2/include/git2/signature.h
 thirdparty/libgit2/include/git2/patch.h
+thirdparty/libgit2/include/git2/apply.h
+thirdparty/libgit2/include/git2/index.h
 
 
 --file

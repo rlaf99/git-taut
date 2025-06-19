@@ -68,6 +68,9 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
     [AllowNull]
     Lg2PathSpec _targetPathSpec;
 
+    const int DELTA_COMPRESSION_MIN_FILE_LENGTH = 100;
+    const double DELTA_COMPRESSION_RATIO_LIMIT = 0.5;
+
     internal void Open(string repoPath, bool newSetup = false)
     {
         _tautRepo = Lg2Repository.New(repoPath);
@@ -216,17 +219,15 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         return result;
     }
 
-    void StoreTautened(ILg2ObjectInfo objInfo, Lg2OidPlainRef target)
+    void StoreTautened(Lg2OidPlainRef source, Lg2OidPlainRef target, Lg2ObjectType objType)
     {
-        var source = objInfo.GetOidPlainRef();
-
         kvStore.PutSameTautened(source, target);
 
         if (logger.IsEnabled(LogLevel.Trace))
         {
             var sourceOidText = source.GetOidHexDigits();
             var targetOidText = target.GetOidHexDigits();
-            var objTypeName = objInfo.GetObjectType().GetName();
+            var objTypeName = objType.GetName();
 
             if (sourceOidText == targetOidText)
             {
@@ -545,12 +546,14 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 continue;
             }
 
-            logger.ZLogTrace($"Start tautening commit {commitOidHex8} '{commitSummary}'");
+            if (hostCommit.GetParentCount() == 1)
+            {
+                logger.ZLogTrace($"Start tautening files in diff");
 
-            // if (hostCommit.GetParentCount() == 1)
-            // {
-            //     TautenFilesInDiff(hostCommit);
-            // }
+                TautenFilesInDiff(hostCommit);
+            }
+
+            logger.ZLogTrace($"Start tautening commit {commitOidHex8} '{commitSummary}'");
 
             TautenCommit(hostCommit);
         }
@@ -592,6 +595,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         var hostParentCommit = hostCommit.GetParent(0);
         var hostParentTree = hostParentCommit.GetTree();
         var hostTree = hostCommit.GetTree();
+        var tautRepoOdb = _tautRepo.GetOdb();
 
         Lg2DiffOptions diffOptions = new()
         {
@@ -612,7 +616,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         hostDiffToParent.FindSimilar(ref diffFindOpts);
 
-        for (nuint i = 0, count = hostDiffToParent.GetNumDeltas(); i < count; i++)
+        for (nuint i = 0, count = hostDiffToParent.GetDeltaCount(); i < count; i++)
         {
             var delta = hostDiffToParent.GetDelta(i);
 
@@ -654,43 +658,47 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             }
 
             var newFileSize = newFile.GetSize();
-            var oldFileSize = oldFile.GetSize();
 
-            if (newFileSize < 100)
+            if (newFileSize < DELTA_COMPRESSION_MIN_FILE_LENGTH)
             {
                 continue;
             }
 
-            Lg2Oid oid = new();
-            kvStore.GetTautened(oldFile, ref oid);
-            var oldTautenedBlob = _tautRepo.LookupBlob(oid);
-
-            if (oldTautenedBlob.GetObjectSize() > 2 * (long)oldFileSize)
-            {
-                continue;
-            }
-
-            using var patch = hostDiffToParent.NewPatch(i);
+            var patch = hostDiffToParent.NewPatch(i);
             var patchSize = patch.GetSize();
 
             var ratio = (double)patchSize / newFileSize;
 
-            if (ratio > 0.5)
+            if (ratio > DELTA_COMPRESSION_RATIO_LIMIT)
             {
                 continue;
             }
 
-            // TODO
-            // - A new encryptor output format
-
-            // using var hostRepoOdb = _hostRepo.GetOdb();
-            // var oldFileOdbObject = hostRepoOdb.Read(oldFile);
-            // var oldFileReadStream = oldFileOdbObject.NewReadStream();
-
             var patchContent = patch.Dump();
             var patchContentStream = patchContent.NewReadStream();
+            var newFileOidRef = newFile.GetOidPlainRef();
 
-            // var encryptor = cipher.CreateEncryptor(patchContentStream, );
+            var encryptor = cipher.CreateEncryptor(
+                patchContentStream,
+                isBinary: false,
+                newFileOidRef.GetReadOnlyBytes()
+            );
+
+            var outputLength = encryptor.GetOutputLength();
+
+            var writeStream = tautRepoOdb.OpenWriteStream(
+                outputLength,
+                Lg2ObjectType.LG2_OBJECT_BLOB
+            );
+
+            encryptor.WriteToOutput(writeStream);
+
+            Lg2Oid resultOid = new();
+            writeStream.FinalizeWrite(ref resultOid);
+
+            StoreTautened(newFile, resultOid, Lg2ObjectType.LG2_OBJECT_BLOB);
+
+            logger.ZLogTrace($"Tauten patch {patchSize}/{newFileSize} for '{newFilePath}'");
         }
     }
 
@@ -733,7 +741,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         _tautRepo.NewCommit(author, committer, message, tautTree, tautParents, ref oid);
 
-        StoreTautened(hostCommit, oid);
+        StoreTautened(hostCommit, oid, hostCommit.GetObjectType());
     }
 
     async Task TautenTreeAsync(Lg2Tree hostTree)
@@ -812,7 +820,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             var oid = new Lg2Oid();
             treeBuilder.Write(ref oid);
 
-            StoreTautened(hostTree, oid);
+            StoreTautened(hostTree, oid, hostTree.GetObjectType());
         }
     }
 
@@ -831,11 +839,11 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         using var writeStream = tautRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
 
-        encryptor.Output(writeStream);
+        encryptor.WriteToOutput(writeStream);
 
         writeStream.FinalizeWrite(ref resultOid);
 
-        StoreTautened(blob, resultOid);
+        StoreTautened(blob, resultOid, blob.GetObjectType());
     }
 
     internal void RebuildKvStore()

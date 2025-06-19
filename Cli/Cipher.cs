@@ -1,3 +1,10 @@
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Extensions.Logging;
+using ZLogger;
+
 namespace Git.Taut;
 
 class UserKeyBase
@@ -284,7 +291,7 @@ partial class Aes256Cbc1
 
         internal int GetOutputLength() => _encStream.GetOutputLength();
 
-        internal void Output(Stream outputStream) => _encStream.WriteToEnd(outputStream);
+        internal void WriteToOutput(Stream outputStream) => _encStream.WriteToEnd(outputStream);
     }
 
     internal Encryptor CreateEncryptor(Stream sourceInput, bool isBinary)

@@ -8,6 +8,14 @@ public unsafe ref struct Lg2DiffOptions
 {
     internal git_diff_options Raw;
 
+    public Lg2DiffOptions()
+    {
+        fixed (git_diff_options* ptr = &Raw)
+        {
+            git_diff_options_init(ptr, GIT_DIFF_OPTIONS_VERSION);
+        }
+    }
+
     public Lg2DiffOptionFlags Flags
     {
         get => (Lg2DiffOptionFlags)Raw.flags;
@@ -132,7 +140,7 @@ public unsafe class Lg2Diff : NativeSafePointer<Lg2Diff, git_diff>, INativeRelea
 
 public static unsafe partial class Lg2DiffExtensions
 {
-    public static nuint GetNumDeltas(this Lg2Diff diff)
+    public static nuint GetDeltaCount(this Lg2Diff diff)
     {
         diff.EnsureValid();
 
@@ -141,7 +149,7 @@ public static unsafe partial class Lg2DiffExtensions
         return result;
     }
 
-    public static nuint GetNumDeltas(this Lg2Diff diff, Lg2DeltaType deltaType)
+    public static nuint GetDeltaCount(this Lg2Diff diff, Lg2DeltaType deltaType)
     {
         diff.EnsureValid();
 
@@ -203,6 +211,15 @@ public static unsafe partial class Lg2DiffExtensions
             var rc = git_diff_find_similar(diff.Ptr, pOptions);
             Lg2Exception.ThrowIfNotOk(rc);
         }
+    }
+
+    public static void Merge(this Lg2Diff into, Lg2Diff from)
+    {
+        into.EnsureValid();
+        from.EnsureValid();
+
+        var rc = git_diff_merge(into.Ptr, from.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
     }
 }
 

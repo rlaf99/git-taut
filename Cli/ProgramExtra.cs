@@ -35,7 +35,7 @@ internal class ExtraCommands
     }
 
     /// <summary>
-    /// Examine a tautend file.
+    /// Examine a tautened file.
     /// </summary>
     /// <param name="file">The tautened file to examine.</param>
     [Command("--examine")]
@@ -53,7 +53,7 @@ internal class ExtraCommands
             var extraInfo = decryptor.GetExtraPayload();
             var extraInfoText = Convert.ToHexStringLower(extraInfo);
 
-            Console.WriteLine($"Is binary: {isBinary}");
+            Console.WriteLine($"Binary output: {isBinary}");
             Console.WriteLine($"Output length: {outputLength}");
             if (string.IsNullOrEmpty(extraInfoText))
             {
