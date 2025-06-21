@@ -68,6 +68,13 @@ public static unsafe class Lg2OdbObjectExtensions
     {
         return new(odbObject);
     }
+
+    public static ReadOnlySpan<byte> GetReadOnlyBytes(this Lg2OdbObject odbObject)
+    {
+        var rawData = GetRawData(odbObject);
+
+        return rawData.GetReadOnlyBytes();
+    }
 }
 
 public unsafe class Lg2OdbStream
@@ -387,6 +394,12 @@ public static unsafe class Lg2OdbExtenions
         Lg2Exception.ThrowIfNotOk(rc);
 
         return new(pOdbObject);
+    }
+
+    public static Lg2OdbObjectReadStream ReadToStream(this Lg2Odb odb, Lg2OidPlainRef oidRef)
+    {
+        var odbObject = odb.Read(oidRef);
+        return odbObject.NewReadStream();
     }
 
     public static void Write(

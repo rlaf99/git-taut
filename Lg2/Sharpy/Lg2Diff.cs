@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
@@ -135,6 +136,18 @@ public unsafe class Lg2Diff : NativeSafePointer<Lg2Diff, git_diff>, INativeRelea
     public static unsafe void NativeRelease(git_diff* pNative)
     {
         git_diff_free(pNative);
+    }
+
+    public static Lg2Diff New(ReadOnlySpan<byte> data)
+    {
+        var ptr = (sbyte*)Unsafe.AsPointer(ref data);
+        var len = (nuint)data.Length;
+
+        git_diff* pDiff = null;
+        var rc = git_diff_from_buffer(&pDiff, ptr, len);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(pDiff);
     }
 }
 

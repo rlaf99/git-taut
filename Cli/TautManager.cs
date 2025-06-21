@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
+using Lg2.Native;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Logging;
 using ZLogger;
@@ -219,6 +221,11 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         return result;
     }
 
+    void StoreTautenedBlob(Lg2OidPlainRef source, Lg2OidPlainRef target)
+    {
+        StoreTautened(source, target, Lg2ObjectType.LG2_OBJECT_BLOB);
+    }
+
     void StoreTautened(Lg2OidPlainRef source, Lg2OidPlainRef target, Lg2ObjectType objType)
     {
         kvStore.PutSameTautened(source, target);
@@ -279,8 +286,18 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 | Lg2SortFlags.LG2_SORT_REVERSE
         );
 
-        revWalk.HideGlob(RegainedRefGlob);
-        logger.ZLogTrace($"RevWalk.Hide {RegainedRefGlob}");
+        using (var regainedRefIter = _tautRepo.NewRefIteratorGlob(RegainedRefGlob))
+        {
+            for (string refName; regainedRefIter.NextName(out refName); )
+            {
+                Lg2Oid hostOid = new();
+                _tautRepo.GetRefOid(refName, ref hostOid);
+                Lg2Oid tautOid = new();
+                kvStore.GetTautened(hostOid, ref tautOid);
+                revWalk.Hide(tautOid);
+                logger.ZLogTrace($"Revwwalk.Hide {tautOid.ToHexDigits(8)} ({refName})");
+            }
+        }
 
         foreach (var refName in tautRefList)
         {
@@ -481,20 +498,45 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var tautRepoOdb = _tautRepo.GetOdb();
         using var hostRepoOdb = _hostRepo.GetOdb();
 
-        using var odbObject = tautRepoOdb.Read(blob);
-        using var readStream = odbObject.NewReadStream();
+        using var readStream = tautRepoOdb.ReadToStream(blob);
 
         var decryptor = cipher.CreateDecryptor(readStream);
-
         var outputLength = decryptor.GetOutputLength();
+        var extraPayload = decryptor.GetExtraPayload();
+        if (extraPayload.Length > 0)
+        {
+            var resultStream = new MemoryStream();
+            var regainStream = new PatchRegainStream(resultStream, "dummy");
+            decryptor.WriteToOutput(regainStream);
 
-        using var writeStream = hostRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
+            var resultData = resultStream.GetBuffer().AsSpan(0, (int)resultStream.Length);
+            logger.ZLogDebug($"{Encoding.ASCII.GetString(resultData)}");
+            var diff = Lg2Diff.New(resultData);
+            if (diff.GetDeltaCount() != 1)
+            {
+                throw new InvalidDataException("There should be one delta on the diff");
+            }
+            var patch = diff.NewPatch(0);
 
-        decryptor.WriteToOutput(writeStream);
+            Lg2Oid oid = new();
+            oid.FromRaw(extraPayload);
+            var baseOdbOject = tautRepoOdb.Read(oid);
+            var resultBuf = patch.Apply(baseOdbOject.GetReadOnlyBytes());
 
-        writeStream.FinalizeWrite(ref resultOid);
+            using var writeStream = hostRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
+            resultBuf.DumpToStream(writeStream);
+            writeStream.FinalizeWrite(ref resultOid);
 
-        StoreRegained(blob, resultOid);
+            StoreRegained(blob, resultOid);
+        }
+        else
+        {
+            using var writeStream = hostRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
+            decryptor.WriteToOutput(writeStream);
+            writeStream.FinalizeWrite(ref resultOid);
+
+            StoreRegained(blob, resultOid);
+        }
     }
 
     #endregion Regaining
@@ -515,15 +557,17 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 | Lg2SortFlags.LG2_SORT_REVERSE
         );
 
-        var tautenedRefIter = _tautRepo.NewRefIteratorGlob(TautenedRefGlob);
-        for (string refName; tautenedRefIter.NextName(out refName); )
+        using (var tautenedRefIter = _tautRepo.NewRefIteratorGlob(TautenedRefGlob))
         {
-            Lg2Oid tautOid = new();
-            _tautRepo.GetRefOid(refName, ref tautOid);
-            Lg2Oid hostOid = new();
-            kvStore.GetRegained(tautOid, ref hostOid);
-            revWalk.Hide(hostOid);
-            logger.ZLogTrace($"RevWalk.Hide {hostOid.ToHexDigits(8)} ({refName})");
+            for (string refName; tautenedRefIter.NextName(out refName); )
+            {
+                Lg2Oid tautOid = new();
+                _tautRepo.GetRefOid(refName, ref tautOid);
+                Lg2Oid hostOid = new();
+                kvStore.GetRegained(tautOid, ref hostOid);
+                revWalk.Hide(hostOid);
+                logger.ZLogTrace($"RevWalk.Hide {hostOid.ToHexDigits(8)} ({refName})");
+            }
         }
 
         foreach (var refName in hostRefList)
@@ -674,19 +718,19 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 continue;
             }
 
-            var patchContent = patch.Dump();
-            var patchContentStream = patchContent.NewReadStream();
+            using var tautenStream = new PatchTautenStream(patch.NewReadStream());
+
             var newFileOidRef = newFile.GetOidPlainRef();
 
             var encryptor = cipher.CreateEncryptor(
-                patchContentStream,
+                tautenStream,
                 isBinary: false,
                 newFileOidRef.GetReadOnlyBytes()
             );
 
             var outputLength = encryptor.GetOutputLength();
 
-            var writeStream = tautRepoOdb.OpenWriteStream(
+            using var writeStream = tautRepoOdb.OpenWriteStream(
                 outputLength,
                 Lg2ObjectType.LG2_OBJECT_BLOB
             );
@@ -696,9 +740,11 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             Lg2Oid resultOid = new();
             writeStream.FinalizeWrite(ref resultOid);
 
-            StoreTautened(newFile, resultOid, Lg2ObjectType.LG2_OBJECT_BLOB);
+            StoreTautenedBlob(newFile, resultOid);
 
-            logger.ZLogTrace($"Tauten patch {patchSize}/{newFileSize} for '{newFilePath}'");
+            logger.ZLogTrace(
+                $"Tauten patch ({tautenStream.Length}:{newFileSize}) for '{newFilePath}'"
+            );
         }
     }
 
@@ -875,4 +921,282 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
     }
 
     #endregion Tautening
+
+
+    class PatchRegainStream : Stream
+    {
+        readonly Stream _targetStream;
+        readonly MemoryStream _headerStream;
+
+        readonly string _baseName;
+
+        bool _headerProcessed;
+
+        static readonly byte[] s_tripleMinusLine = Encoding.ASCII.GetBytes("---\n");
+        static readonly byte[] s_triplePlusLine = Encoding.ASCII.GetBytes("+++\n");
+        static readonly byte[] s_doubleAt = Encoding.ASCII.GetBytes("@@");
+
+        internal PatchRegainStream(Stream patchOutput, string baseName)
+        {
+            if (Path.IsPathRooted(baseName))
+            {
+                throw new ArgumentException("Must not be rooted", nameof(baseName));
+            }
+            _baseName = baseName;
+
+            _targetStream = patchOutput;
+
+            _headerStream = new();
+
+            var diffGitLine = Encoding.ASCII.GetBytes($"diff --git a/{baseName} b/{baseName}\n");
+
+            _headerStream.Write(diffGitLine);
+
+            _headerStream.Position = 0;
+        }
+
+        public override bool CanRead => false;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => _targetStream.CanWrite;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+            if (_headerProcessed == false)
+            {
+                throw new InvalidOperationException($"Header processing not finished");
+            }
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            if (_headerProcessed)
+            {
+                _targetStream.Write(buffer, offset, count);
+
+                return;
+            }
+
+            _headerStream.Write(buffer, offset, count);
+
+            var headerData = _headerStream.GetBuffer();
+            for (; ; )
+            {
+                var start = (int)_headerStream.Position;
+                if (start >= _headerStream.Length)
+                {
+                    break;
+                }
+
+                var lineEndPos = Array.IndexOf(headerData, (byte)'\n', start);
+                if (lineEndPos < 0)
+                {
+                    break;
+                }
+
+                if (start == lineEndPos)
+                {
+                    _targetStream.WriteByte((byte)_headerStream.ReadByte());
+
+                    continue;
+                }
+
+                var newStart = lineEndPos + 1;
+                var lineData = headerData.AsSpan(start, newStart - start);
+
+                if (lineData.SequenceEqual(s_tripleMinusLine))
+                {
+                    var newTripleMinusLine = Encoding.ASCII.GetBytes($"--- a/{_baseName}\n");
+                    _targetStream.Write(newTripleMinusLine);
+
+                    _headerStream.Position = newStart;
+
+                    continue;
+                }
+
+                if (lineData.SequenceEqual(s_triplePlusLine))
+                {
+                    var newTriplePlusLine = Encoding.ASCII.GetBytes($"+++ b/{_baseName}\n");
+                    _targetStream.Write(newTriplePlusLine);
+
+                    _headerStream.Position = newStart;
+
+                    continue;
+                }
+
+                if (lineData.StartsWith(s_doubleAt))
+                {
+                    _headerStream.CopyTo(_targetStream);
+                    _headerProcessed = true;
+
+                    break;
+                }
+
+                _targetStream.Write(lineData);
+                _headerStream.Position = newStart;
+            }
+        }
+    }
+
+    class PatchTautenStream : Stream
+    {
+        readonly Stream _sourceStream;
+        readonly MemoryStream _headerStream;
+
+        readonly long _length;
+
+        long _totalRead;
+
+        static readonly byte[] s_diffGit = Encoding.ASCII.GetBytes("diff --git");
+        static readonly byte[] s_tripleMinus = Encoding.ASCII.GetBytes("---");
+        static readonly byte[] s_triplePlus = Encoding.ASCII.GetBytes("+++");
+        static readonly byte[] s_doubleAt = Encoding.ASCII.GetBytes("@@");
+
+        internal PatchTautenStream(Stream patchInput)
+        {
+            _sourceStream = patchInput;
+            _headerStream = new();
+
+            PrepareHeaderStream();
+            _headerStream.Position = 0;
+            _length = _headerStream.Length + _sourceStream.Length - _sourceStream.Position;
+        }
+
+        int ReadLine()
+        {
+            int dataRead = 0;
+
+            for (; ; )
+            {
+                var val = _sourceStream.ReadByte();
+                if (val == -1)
+                {
+                    break;
+                }
+
+                _headerStream.WriteByte((byte)val);
+                dataRead++;
+
+                if (val == '\n')
+                {
+                    break;
+                }
+            }
+
+            return dataRead;
+        }
+
+        void PrepareHeaderStream()
+        {
+            for (int totalRead = 0; ; )
+            {
+                var dataRead = ReadLine();
+                if (dataRead == 0)
+                {
+                    break;
+                }
+
+                var buffer = _headerStream.GetBuffer();
+                var lineData = buffer.AsSpan(totalRead, dataRead);
+                if (lineData.StartsWith(s_diffGit))
+                {
+                    // skip the line
+                    _headerStream.SetLength(totalRead);
+
+                    continue;
+                }
+                if (lineData.StartsWith(s_tripleMinus) || lineData.StartsWith(s_triplePlus))
+                {
+                    // skip the rest
+                    _headerStream.SetLength(totalRead + 3);
+                    _headerStream.WriteByte((byte)'\n');
+                    totalRead = (int)_headerStream.Length;
+
+                    continue;
+                }
+                if (lineData.StartsWith(s_doubleAt))
+                {
+                    break; // we have passed the diff header, time to break
+                }
+
+                totalRead = (int)_headerStream.Length;
+            }
+        }
+
+        public override bool CanRead => _sourceStream.CanRead;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => _length;
+
+        public override long Position
+        {
+            get => _totalRead;
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+            throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int dataRead;
+
+            if (_headerStream.Position != _headerStream.Length)
+            {
+                dataRead = _headerStream.Read(buffer, offset, count);
+            }
+            else
+            {
+                dataRead = _sourceStream.Read(buffer, offset, count);
+            }
+
+            _totalRead += dataRead;
+
+            return dataRead;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+    }
 }

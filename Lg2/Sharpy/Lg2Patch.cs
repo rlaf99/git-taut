@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
 
@@ -51,11 +52,33 @@ public static unsafe class Lg2PatchExtensions
     {
         patch.EnsureValid();
 
-        git_buf raw = new();
-        var rc = git_patch_to_buf(&raw, patch.Ptr);
+        git_buf buf = new();
+        var rc = git_patch_to_buf(&buf, patch.Ptr);
         Lg2Exception.ThrowIfNotOk(rc);
 
-        return new(raw);
+        return new(buf);
+    }
+
+    public static Lg2Buf.Lg2BufReadStream NewReadStream(this Lg2Patch patch)
+    {
+        var buf = Dump(patch);
+        return buf.NewReadStream();
+    }
+
+    public static Lg2Buf Apply(this Lg2Patch patch, ReadOnlySpan<byte> diffBase)
+    {
+        patch.EnsureValid();
+
+        var ptr = (sbyte*)Unsafe.AsPointer(ref diffBase);
+        var len = (nuint)diffBase.Length;
+
+        git_buf buf = new();
+        sbyte* pFileName = null;
+        uint mode;
+        var rc = git_apply_patch(&buf, &pFileName, &mode, ptr, len, patch.Ptr, null);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(buf);
     }
 }
 

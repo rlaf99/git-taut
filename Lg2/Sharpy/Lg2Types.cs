@@ -148,7 +148,44 @@ internal static unsafe partial class RawStrArrayExtensions
 
 public sealed unsafe class Lg2Buf : IDisposable
 {
-    public class ReadStream(Lg2Buf sourceBuf) : Stream
+    internal git_buf Raw;
+
+    internal Lg2Buf(git_buf buf)
+    {
+        Raw = buf;
+    }
+
+    public long Length => (long)Raw.size;
+
+    public Lg2BufReadStream NewReadStream() => new(this);
+
+    bool _isDiposed;
+
+    void Dispose(bool disposing)
+    {
+        if (_isDiposed)
+        {
+            return;
+        }
+        _isDiposed = true;
+
+        if (disposing) { }
+
+        fixed (git_buf* ptr = &Raw)
+        {
+            git_buf_dispose(ptr);
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    ~Lg2Buf() => Dispose(false);
+
+    public class Lg2BufReadStream(Lg2Buf sourceBuf) : Stream
     {
         long _totalRead;
 
@@ -197,43 +234,19 @@ public sealed unsafe class Lg2Buf : IDisposable
             throw new NotSupportedException();
         }
     }
+}
 
-    internal git_buf Raw;
-
-    internal Lg2Buf(git_buf buf)
+public static unsafe class Lg2BufExtensions
+{
+    public static ReadOnlySpan<byte> GetReadOnlyBytes(this Lg2Buf buf)
     {
-        Raw = buf;
+        return new(buf.Raw.ptr, (int)buf.Raw.size);
     }
 
-    public long Length => (long)Raw.size;
-
-    public ReadStream NewReadStream() => new(this);
-
-    bool _isDiposed;
-
-    void Dispose(bool disposing)
+    public static void DumpToStream(this Lg2Buf buf, Stream targetStream)
     {
-        if (_isDiposed)
-        {
-            return;
-        }
-        _isDiposed = true;
-
-        if (disposing) { }
-
-        fixed (git_buf* ptr = &Raw)
-        {
-            git_buf_dispose(ptr);
-        }
+        targetStream.Write(buf.GetReadOnlyBytes());
     }
-
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    ~Lg2Buf() => Dispose(false);
 }
 
 public unsafe ref struct Lg2RawData
@@ -244,7 +257,7 @@ public unsafe ref struct Lg2RawData
 
 public static unsafe class Lg2RawDataExtensions
 {
-    public static ReadOnlySpan<byte> AsReadOnlySpan(this Lg2RawData rawData)
+    public static ReadOnlySpan<byte> GetReadOnlyBytes(this Lg2RawData rawData)
     {
         return new((void*)rawData.Ptr, (int)rawData.Len);
     }
