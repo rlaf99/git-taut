@@ -140,14 +140,14 @@ public unsafe class Lg2Diff : NativeSafePointer<Lg2Diff, git_diff>, INativeRelea
 
     public static Lg2Diff New(ReadOnlySpan<byte> data)
     {
-        var ptr = (sbyte*)Unsafe.AsPointer(ref data);
-        var len = (nuint)data.Length;
+        fixed (byte* ptr = &MemoryMarshal.GetReference(data))
+        {
+            git_diff* pDiff = null;
+            var rc = git_diff_from_buffer(&pDiff, (sbyte*)ptr, (nuint)data.Length);
+            Lg2Exception.ThrowIfNotOk(rc);
 
-        git_diff* pDiff = null;
-        var rc = git_diff_from_buffer(&pDiff, ptr, len);
-        Lg2Exception.ThrowIfNotOk(rc);
-
-        return new(pDiff);
+            return new(pDiff);
+        }
     }
 }
 
@@ -299,19 +299,19 @@ unsafe partial class Lg2RepositoryExtensions
 
     public static Lg2Diff NewDiff(
         this Lg2Repository repo,
-        Lg2Tree srcTree,
-        Lg2Tree dstTree,
+        Lg2Tree oldTree,
+        Lg2Tree newTree,
         scoped ref readonly Lg2DiffOptions options
     )
     {
         repo.EnsureValid();
-        srcTree.EnsureValid();
-        dstTree.EnsureValid();
+        oldTree.EnsureValid();
+        newTree.EnsureValid();
 
         fixed (git_diff_options* pOptions = &options.Raw)
         {
             git_diff* pDiff = null;
-            var rc = git_diff_tree_to_tree(&pDiff, repo.Ptr, srcTree.Ptr, dstTree.Ptr, pOptions);
+            var rc = git_diff_tree_to_tree(&pDiff, repo.Ptr, oldTree.Ptr, newTree.Ptr, pOptions);
             Lg2Exception.ThrowIfNotOk(rc);
             return new(pDiff);
         }

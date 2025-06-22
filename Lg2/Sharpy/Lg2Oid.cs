@@ -99,12 +99,13 @@ public unsafe ref struct Lg2Oid
 
     public void FromRaw(ReadOnlySpan<byte> bytes)
     {
-        var ptr = (byte*)Unsafe.AsPointer(ref bytes);
-
-        fixed (git_oid* pOid = &Raw)
+        fixed (byte* ptr = &MemoryMarshal.GetReference(bytes))
         {
-            var rc = git_oid_fromraw(pOid, ptr);
-            Lg2Exception.ThrowIfNotOk(rc);
+            fixed (git_oid* pOid = &Raw)
+            {
+                var rc = git_oid_fromraw(pOid, ptr);
+                Lg2Exception.ThrowIfNotOk(rc);
+            }
         }
     }
 

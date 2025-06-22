@@ -43,6 +43,15 @@ class UserKeyBase
     }
 }
 
+class InvalidTautenedDataException : Exception
+{
+    internal InvalidTautenedDataException(string? message)
+        : base(message) { }
+
+    internal bool HasTautenedBytes { get; set; }
+    internal bool HasReservedBytes { get; set; }
+}
+
 partial class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
 {
     internal const int PLAIN_TEXT_MAX_BYTES = 100 * 1024 * 1024;
@@ -135,6 +144,8 @@ partial class Aes256Cbc1
     internal class EncryptorStream : Stream
     {
         readonly Aes256Cbc1 _cipher;
+        readonly byte[] _ivData = new byte[CIPHER_BLOCK_BYTES];
+        readonly ICryptoTransform _encryptTransform;
         readonly Stream _sourceStream;
         readonly bool _isBinary;
         readonly MemoryStream _headerStream;
@@ -152,6 +163,7 @@ partial class Aes256Cbc1
             _isBinary = isBinary;
             _sourceStream = sourceInput;
             _headerStream = new();
+            _encryptTransform = _cipher.PrepareForEncryption(_ivData);
 
             PrepareHeader(sourceExtraInfo);
         }
@@ -258,14 +270,36 @@ partial class Aes256Cbc1
 
             Debug.Assert(RANDOM_BYTES + KEY_TAG_BYTES == CIPHER_BLOCK_BYTES);
 
-            var ivData = new byte[CIPHER_BLOCK_BYTES];
-            var encryptTransform = _cipher.PrepareForEncryption(ivData);
-
-            outputStream.Write(ivData);
+            outputStream.Write(_ivData);
 
             using var cryptoStream = new CryptoStream(
                 this,
-                encryptTransform,
+                _encryptTransform,
+                CryptoStreamMode.Read
+            );
+
+            cryptoStream.CopyTo(outputStream);
+        }
+
+        internal void EncryptAdditional(Stream inputStream, Stream outputStream)
+        {
+            if (Position != Length)
+            {
+                throw new InvalidOperationException(
+                    $"Should finish processing {nameof(EncryptorStream)} first"
+                );
+            }
+
+            if (_encryptTransform.CanReuseTransform == false)
+            {
+                throw new InvalidOperationException(
+                    $"{nameof(_encryptTransform)} cannot be reused"
+                );
+            }
+
+            using var cryptoStream = new CryptoStream(
+                inputStream,
+                _encryptTransform,
                 CryptoStreamMode.Read
             );
 
@@ -291,7 +325,26 @@ partial class Aes256Cbc1
 
         internal int GetOutputLength() => _encStream.GetOutputLength();
 
-        internal void WriteToOutput(Stream outputStream) => _encStream.WriteToEnd(outputStream);
+        internal void ProduceOutput(
+            Stream outputStream,
+            Stream? extraInput = null,
+            Stream? extraOutput = null
+        )
+        {
+            if (extraInput is null ^ extraOutput is null)
+            {
+                throw new ArgumentException(
+                    $"{nameof(extraInput)} and {nameof(extraOutput)} must both be null or not null"
+                );
+            }
+
+            _encStream.WriteToEnd(outputStream);
+
+            if (extraInput is not null && extraOutput is not null)
+            {
+                _encStream.EncryptAdditional(extraInput, extraOutput);
+            }
+        }
     }
 
     internal Encryptor CreateEncryptor(Stream sourceInput, bool isBinary)
@@ -340,8 +393,12 @@ partial class Aes256Cbc1
     internal class DecryptorStream : Stream
     {
         readonly Aes256Cbc1 _cipher;
+        readonly byte[] _ivData = new byte[CIPHER_BLOCK_BYTES];
 
         readonly Stream _sourceStream;
+
+        [AllowNull]
+        ICryptoTransform _decryptTransform;
 
         [AllowNull]
         CryptoStream _cryptoStream;
@@ -356,6 +413,7 @@ partial class Aes256Cbc1
         int _outputOffset;
 
         bool _headerExamined;
+        bool _outputProduced;
 
         internal DecryptorStream(Aes256Cbc1 cipher, Stream sourceInput)
         {
@@ -427,6 +485,36 @@ partial class Aes256Cbc1
             ExamineHeader();
 
             _cryptoStream.CopyTo(outputStream);
+
+            _cryptoStream.Dispose();
+            _cryptoStream = null;
+
+            _outputProduced = true;
+        }
+
+        internal void DecryptAdditional(Stream inputStream, Stream outputStream)
+        {
+            if (_outputProduced == false)
+            {
+                throw new InvalidOperationException(
+                    $"Should finish processing {nameof(DecryptorStream)} first"
+                );
+            }
+
+            if (_decryptTransform.CanReuseTransform == false)
+            {
+                throw new InvalidOperationException(
+                    $"{nameof(_decryptTransform)} cannot be reused"
+                );
+            }
+
+            using var cryptoStream = new CryptoStream(
+                inputStream,
+                _decryptTransform,
+                CryptoStreamMode.Read
+            );
+
+            cryptoStream.CopyTo(outputStream);
         }
 
         internal ReadOnlySpan<byte> ExtraPayload
@@ -458,15 +546,21 @@ partial class Aes256Cbc1
 
             _headerExamined = true;
 
+            ExamineOverallHeader();
+            ExamineContentHeader();
+        }
+
+        void ExamineOverallHeader()
+        {
             var tautenedData = new byte[TAUTENED_BYTES];
             var tautenedSize = _sourceStream.Read(tautenedData);
             if (tautenedSize != TAUTENED_BYTES)
             {
-                throw new InvalidDataException($"Cannot read {nameof(TAUTENED_BYTES)}");
+                throw new InvalidTautenedDataException($"Cannot read {nameof(TAUTENED_BYTES)}");
             }
             if (tautenedData.SequenceEqual(TAUTENED_DATA) == false)
             {
-                throw new InvalidDataException($"Invalid {nameof(TAUTENED_DATA)}");
+                throw new InvalidTautenedDataException($"Invalid {nameof(TAUTENED_DATA)}");
             }
 
             var reservedData = new byte[RESERVED_BYTES];
@@ -476,42 +570,37 @@ partial class Aes256Cbc1
                 throw new InvalidDataException($"Cannot read {nameof(RESERVED_BYTES)}");
             }
 
-            var ivData = new byte[CIPHER_BLOCK_BYTES];
-
-            var randomData = new Span<byte>(ivData, 0, RANDOM_BYTES);
+            var randomData = new Span<byte>(_ivData, 0, RANDOM_BYTES);
             var randomSize = _sourceStream.Read(randomData);
             if (randomSize != RANDOM_BYTES)
             {
                 throw new InvalidDataException($"Cannot read {nameof(RANDOM_BYTES)}");
             }
 
-            var keyTagData = new Span<byte>(ivData, RANDOM_BYTES, KEY_TAG_BYTES);
+            var keyTagData = new Span<byte>(_ivData, RANDOM_BYTES, KEY_TAG_BYTES);
             var keyTagSize = _sourceStream.Read(keyTagData);
             if (keyTagSize != KEY_TAG_BYTES)
             {
                 throw new InvalidDataException($"Cannot read {nameof(KEY_TAG_BYTES)}");
             }
-
-            ExamineCipherTextHeader(ivData);
         }
 
-        void ExamineCipherTextHeader(byte[] ivData)
+        void ExamineContentHeader()
         {
-            var decryptTransform = _cipher.PrepareForDecryption(ivData);
+            _decryptTransform = _cipher.PrepareForDecryption(_ivData);
 
             _cryptoStream = new CryptoStream(
                 _sourceStream,
-                decryptTransform,
+                _decryptTransform,
                 CryptoStreamMode.Read
             );
 
-            using var reader = new BinaryReader(_cryptoStream, Encoding.UTF8, leaveOpen: true);
-
-            _isBinary = reader.ReadBoolean();
+            _isBinary = _cryptoStream.ReadByte() != 0;
             _outputOffset += 1;
 
             const int lengthBytes = sizeof(int);
-            var lengthData = reader.ReadBytes(lengthBytes);
+            var lengthData = new byte[lengthBytes];
+            _cryptoStream.ReadExactly(lengthData, 0, lengthBytes);
             if (BitConverter.IsLittleEndian)
             {
                 Array.Reverse(lengthData);
@@ -519,12 +608,13 @@ partial class Aes256Cbc1
             _outputLength = BitConverter.ToInt32(lengthData);
             _outputOffset += lengthBytes;
 
-            var extraInfoLength = reader.ReadByte();
+            var extraInfoLength = _cryptoStream.ReadByte();
             _outputOffset += 1;
 
             if (extraInfoLength > 0)
             {
-                _extraPayload = reader.ReadBytes(extraInfoLength);
+                _extraPayload = new byte[extraInfoLength];
+                _cryptoStream.ReadExactly(_extraPayload, 0, extraInfoLength);
                 _outputOffset += extraInfoLength;
             }
         }
@@ -547,7 +637,26 @@ partial class Aes256Cbc1
 
         internal bool IsContentBinary() => _decStream.IsBinary;
 
-        internal void WriteToOutput(Stream outputStream) => _decStream.WriteToEnd(outputStream);
+        internal void ProduceOutput(
+            Stream outputStream,
+            Stream? extraInput = null,
+            Stream? extraOutput = null
+        )
+        {
+            if (extraInput is null ^ extraOutput is null)
+            {
+                throw new ArgumentException(
+                    $"{nameof(extraInput)} and {nameof(extraOutput)} must both be null or not null"
+                );
+            }
+
+            _decStream.WriteToEnd(outputStream);
+
+            if (extraInput is not null && extraOutput is not null)
+            {
+                _decStream.DecryptAdditional(extraInput, extraOutput);
+            }
+        }
     }
 
     internal Decryptor CreateDecryptor(Stream inputStream)

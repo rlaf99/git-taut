@@ -221,9 +221,9 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         return result;
     }
 
-    void StoreTautenedBlob(Lg2OidPlainRef source, Lg2OidPlainRef target)
+    void StoreTautened(ILg2ObjectInfo objInfo, Lg2OidPlainRef target)
     {
-        StoreTautened(source, target, Lg2ObjectType.LG2_OBJECT_BLOB);
+        StoreTautened(objInfo.GetOidPlainRef(), target, objInfo.GetObjectType());
     }
 
     void StoreTautened(Lg2OidPlainRef source, Lg2OidPlainRef target, Lg2ObjectType objType)
@@ -295,7 +295,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 Lg2Oid tautOid = new();
                 kvStore.GetTautened(hostOid, ref tautOid);
                 revWalk.Hide(tautOid);
-                logger.ZLogTrace($"Revwwalk.Hide {tautOid.ToHexDigits(8)} ({refName})");
+                logger.ZLogTrace($"RevWalk.Hide {tautOid.ToHexDigits(8)} ({refName})");
             }
         }
 
@@ -305,7 +305,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             logger.ZLogTrace($"RevWalk.Push {refName}");
         }
 
-        for (var oid = new Lg2Oid(); revWalk.Next(ref oid); )
+        for (Lg2Oid oid = new(); revWalk.Next(ref oid); )
         {
             var tautCommit = _tautRepo.LookupCommit(oid);
 
@@ -394,7 +394,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         StoreRegained(tautCommit, oid);
     }
 
-    void RegainObjectByCopy(ILg2ObjectInfo objInfo)
+    void RegainSameObject(ILg2ObjectInfo objInfo)
     {
         using var tautRepoOdb = _tautRepo.GetOdb();
         using var hostRepoOdb = _hostRepo.GetOdb();
@@ -403,6 +403,24 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         tautRepoOdb.CopyObjectIfNotExists(hostRepoOdb, objInfo.GetOidPlainRef());
 
         StoreRegained(objInfo, objInfo.GetOidPlainRef());
+    }
+
+    bool IsPossiblyTautened(string entryName)
+    {
+        if (entryName.Length % 32 != 0)
+        {
+            return false;
+        }
+
+        foreach (char ch in entryName)
+        {
+            if (char.IsAsciiHexDigitLower(ch) == false)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     async Task RegainTreeAsync(Lg2Tree tautTree)
@@ -433,28 +451,56 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 var oid = new Lg2Oid();
                 kvStore.GetRegained(entry, ref oid);
 
-                treeBuilder.Insert(entryName, oid, entryFileMode);
-                regainedSet.Add(i);
+                if (oid.PlainRef.Equals(entry.GetOidPlainRef()) == false)
+                {
+                    treeBuilder.Insert(entryName, oid, entryFileMode);
+                    regainedSet.Add(i);
+                }
             }
             else if (entryObjType.IsBlob())
             {
                 logger.ZLogTrace($"Start regaining blob {entryOidHex8} '{entryName}'");
 
-                if (_targetPathSpec.MatchPath(entryName, Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE))
+                bool isReallyTautened = false;
+                if (IsPossiblyTautened(entryName))
                 {
-                    var oid = new Lg2Oid();
-                    if (kvStore.TryGetRegained(entry, ref oid) == false)
+                    try
                     {
-                        var blob = _tautRepo.LookupBlob(entry);
-                        RegainBlob(blob, ref oid);
-                    }
+                        string? regainedFileName = null;
+                        Lg2Oid oid = new();
+                        if (kvStore.TryGetRegained(entry, ref oid) == false)
+                        {
+                            var blob = _tautRepo.LookupBlob(entry);
+                            regainedFileName = RegainBlob(blob, ref oid, entryName);
+                        }
+                        else
+                        {
+                            var blob = _tautRepo.LookupBlob(entry);
+                            regainedFileName = RegainFileName(blob, entryName);
+                        }
 
-                    treeBuilder.Insert(entryName, oid, entryFileMode);
-                    regainedSet.Add(i);
+                        if (oid.PlainRef.Equals(entry.GetOidPlainRef()) == false)
+                        {
+                            treeBuilder.Insert(regainedFileName, oid, entryFileMode);
+                            regainedSet.Add(i);
+                        }
+
+                        isReallyTautened = true;
+                    }
+                    catch (InvalidTautenedDataException exn)
+                    {
+                        if (exn.HasTautenedBytes)
+                        {
+                            // it is marked as tautened, but not processed correctly,
+                            // thus rethrow it
+                            throw;
+                        }
+                    }
                 }
-                else
+
+                if (isReallyTautened == false)
                 {
-                    RegainObjectByCopy(entry);
+                    RegainSameObject(entry);
                 }
             }
             else
@@ -489,25 +535,50 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         }
         else
         {
-            RegainObjectByCopy(tautTree);
+            RegainSameObject(tautTree);
         }
     }
 
-    void RegainBlob(Lg2Blob blob, ref Lg2Oid resultOid)
+    string RegainFileName(Lg2Blob blob, string fileName)
     {
         using var tautRepoOdb = _tautRepo.GetOdb();
         using var hostRepoOdb = _hostRepo.GetOdb();
 
         using var readStream = tautRepoOdb.ReadToStream(blob);
 
+        var fileNameStream = new MemoryStream(Convert.FromHexString(fileName), writable: false);
+        var regainedFileNameStream = new MemoryStream();
+
         var decryptor = cipher.CreateDecryptor(readStream);
-        var outputLength = decryptor.GetOutputLength();
+        decryptor.ProduceOutput(Stream.Null, fileNameStream, regainedFileNameStream);
+
+        var regainedFileNameData = regainedFileNameStream
+            .GetBuffer()
+            .AsSpan(0, (int)regainedFileNameStream.Length);
+
+        var regainedFileName = Encoding.UTF8.GetString(regainedFileNameData);
+
+        logger.ZLogTrace($"Regain file name '{regainedFileName}' from '{fileName}'");
+
+        return regainedFileName;
+    }
+
+    string RegainBlob(Lg2Blob blob, ref Lg2Oid resultOid, string fileName)
+    {
+        using var tautRepoOdb = _tautRepo.GetOdb();
+        using var hostRepoOdb = _hostRepo.GetOdb();
+
+        using var readStream = tautRepoOdb.ReadToStream(blob);
+
+        var fileNameStream = new MemoryStream(Convert.FromHexString(fileName), writable: false);
+        var regainedFileNameStream = new MemoryStream();
+
+        var decryptor = cipher.CreateDecryptor(readStream);
         var extraPayload = decryptor.GetExtraPayload();
         if (extraPayload.Length > 0)
         {
-            var resultStream = new MemoryStream();
-            var regainStream = new PatchRegainStream(resultStream, "dummy");
-            decryptor.WriteToOutput(regainStream);
+            var resultStream = new PatchRegainStream();
+            decryptor.ProduceOutput(resultStream, fileNameStream, regainedFileNameStream);
 
             var resultData = resultStream.GetBuffer().AsSpan(0, (int)resultStream.Length);
             logger.ZLogDebug($"{Encoding.ASCII.GetString(resultData)}");
@@ -520,10 +591,12 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
             Lg2Oid oid = new();
             oid.FromRaw(extraPayload);
-            var baseOdbOject = tautRepoOdb.Read(oid);
+            var baseOdbOject = hostRepoOdb.Read(oid);
             var resultBuf = patch.Apply(baseOdbOject.GetReadOnlyBytes());
-
-            using var writeStream = hostRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
+            using var writeStream = hostRepoOdb.OpenWriteStream(
+                resultBuf.Length,
+                blob.GetObjectType()
+            );
             resultBuf.DumpToStream(writeStream);
             writeStream.FinalizeWrite(ref resultOid);
 
@@ -531,12 +604,23 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         }
         else
         {
+            var outputLength = decryptor.GetOutputLength();
             using var writeStream = hostRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
-            decryptor.WriteToOutput(writeStream);
+            decryptor.ProduceOutput(writeStream, fileNameStream, regainedFileNameStream);
             writeStream.FinalizeWrite(ref resultOid);
 
             StoreRegained(blob, resultOid);
         }
+
+        var regainedFileNameData = regainedFileNameStream
+            .GetBuffer()
+            .AsSpan(0, (int)regainedFileNameStream.Length);
+
+        var regainedFileName = Encoding.UTF8.GetString(regainedFileNameData);
+
+        logger.ZLogTrace($"Regain file name '{regainedFileName}' from '{fileName}'");
+
+        return regainedFileName;
     }
 
     #endregion Regaining
@@ -576,7 +660,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             logger.ZLogTrace($"RevWalk.Push {refName}");
         }
 
-        for (var oid = new Lg2Oid(); revWalk.Next(ref oid); )
+        for (Lg2Oid oid = new(); revWalk.Next(ref oid); )
         {
             var hostCommit = _hostRepo.LookupCommit(oid);
 
@@ -590,16 +674,18 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 continue;
             }
 
+            Dictionary<string, string> tautenedFilePaths = [];
+
             if (hostCommit.GetParentCount() == 1)
             {
                 logger.ZLogTrace($"Start tautening files in diff");
 
-                TautenFilesInDiff(hostCommit);
+                TautenFilesInDiff(hostCommit, tautenedFilePaths);
             }
 
             logger.ZLogTrace($"Start tautening commit {commitOidHex8} '{commitSummary}'");
 
-            TautenCommit(hostCommit);
+            TautenCommit(hostCommit, tautenedFilePaths);
         }
 
         foreach (var refName in hostRefList)
@@ -634,7 +720,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         _tautRepo.SetHead(tautHeadRefName);
     }
 
-    void TautenFilesInDiff(Lg2Commit hostCommit)
+    void TautenFilesInDiff(Lg2Commit hostCommit, Dictionary<string, string> tautenedFilePaths)
     {
         var hostParentCommit = hostCommit.GetParent(0);
         var hostParentTree = hostParentCommit.GetTree();
@@ -689,13 +775,10 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             }
 
             var newFilePath = newFile.GetPath();
-            var oldFilePath = oldFile.GetPath();
 
             if (
                 _targetPathSpec.MatchPath(newFilePath, Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE)
-                    == false
-                || _targetPathSpec.MatchPath(oldFilePath, Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE)
-                    == false
+                == false
             )
             {
                 continue;
@@ -720,35 +803,49 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
             using var tautenStream = new PatchTautenStream(patch.NewReadStream());
 
-            var newFileOidRef = newFile.GetOidPlainRef();
+            var oldFileOidRef = oldFile.GetOidPlainRef();
 
             var encryptor = cipher.CreateEncryptor(
                 tautenStream,
                 isBinary: false,
-                newFileOidRef.GetReadOnlyBytes()
+                oldFileOidRef.GetReadOnlyBytes()
             );
 
-            var outputLength = encryptor.GetOutputLength();
-
             using var writeStream = tautRepoOdb.OpenWriteStream(
-                outputLength,
+                encryptor.GetOutputLength(),
                 Lg2ObjectType.LG2_OBJECT_BLOB
             );
 
-            encryptor.WriteToOutput(writeStream);
+            var fileName = Path.GetFileName(newFilePath);
+            var fileNameStream = new MemoryStream(
+                Encoding.UTF8.GetBytes(fileName),
+                writable: false
+            );
+            var tautenedFilePathstream = new MemoryStream();
+            encryptor.ProduceOutput(writeStream, fileNameStream, tautenedFilePathstream);
 
             Lg2Oid resultOid = new();
             writeStream.FinalizeWrite(ref resultOid);
 
-            StoreTautenedBlob(newFile, resultOid);
+            StoreTautened(newFile, resultOid, Lg2ObjectType.LG2_OBJECT_BLOB);
 
             logger.ZLogTrace(
                 $"Tauten patch ({tautenStream.Length}:{newFileSize}) for '{newFilePath}'"
             );
+
+            var tautenedFilenameData = tautenedFilePathstream
+                .GetBuffer()
+                .AsSpan(0, (int)tautenedFilePathstream.Length);
+
+            var tautenedFilename = Convert.ToHexStringLower(tautenedFilenameData);
+
+            tautenedFilePaths.Add(newFilePath, tautenedFilename);
+
+            logger.ZLogTrace($"Tauten name '{fileName}' to '{tautenedFilename}'");
         }
     }
 
-    void TautenCommit(Lg2Commit hostCommit)
+    void TautenCommit(Lg2Commit hostCommit, Dictionary<string, string> tautenedFilePaths)
     {
         var hostTree = hostCommit.GetTree();
         var hostTreeOidHex8 = hostTree.GetOidHexDigits(8);
@@ -761,7 +858,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         {
             logger.ZLogTrace($"Start tautening tree {hostTreeOidHex8} '{hostTreePath}'");
 
-            var task = TautenTreeAsync(hostTree);
+            var task = TautenTreeAsync(hostTree, hostTreePath, tautenedFilePaths);
             task.GetAwaiter().GetResult();
         }
 
@@ -787,10 +884,14 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         _tautRepo.NewCommit(author, committer, message, tautTree, tautParents, ref oid);
 
-        StoreTautened(hostCommit, oid, hostCommit.GetObjectType());
+        StoreTautened(hostCommit, oid);
     }
 
-    async Task TautenTreeAsync(Lg2Tree hostTree)
+    async Task TautenTreeAsync(
+        Lg2Tree hostTree,
+        string hostTreePath,
+        Dictionary<string, string> tautenedFilePaths
+    )
     {
         await Task.Yield(); // prevent it from running synchronously
 
@@ -801,6 +902,9 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         {
             var entry = hostTree.GetEntry(i);
             var entryName = entry.GetName();
+            var entryPath = string.IsNullOrEmpty(hostTreePath)
+                ? entryName
+                : string.Join('/', hostTreePath, entryName);
             var entryObjType = entry.GetObjectType();
             var entryFileMode = entry.GetFileModeRaw();
             var entryOidHex8 = entry.GetOidHexDigits(8);
@@ -812,14 +916,17 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 if (kvStore.HasTautened(entry) == false)
                 {
                     var tree = _hostRepo.LookupTree(entry);
-                    await TautenTreeAsync(tree);
+                    await TautenTreeAsync(tree, entryPath, tautenedFilePaths);
                 }
 
-                var oid = new Lg2Oid();
+                Lg2Oid oid = new();
                 kvStore.GetTautened(entry, ref oid);
 
-                treeBuilder.Insert(entryName, oid, entryFileMode);
-                tautenedSet.Add(i);
+                if (oid.PlainRef.Equals(entry.GetOidPlainRef()) == false)
+                {
+                    treeBuilder.Insert(entryName, oid, entryFileMode);
+                    tautenedSet.Add(i);
+                }
             }
             else if (entryObjType.IsBlob())
             {
@@ -827,15 +934,19 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
                 if (_targetPathSpec.MatchPath(entryName, Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE))
                 {
-                    var oid = new Lg2Oid();
+                    Lg2Oid oid = new();
                     if (kvStore.TryGetTautened(entry, ref oid) == false)
                     {
                         var blob = _hostRepo.LookupBlob(entry);
-                        TautenBlob(blob, ref oid);
+                        TautenBlob(blob, ref oid, entryPath, tautenedFilePaths);
                     }
 
-                    treeBuilder.Insert(entryName, oid, entryFileMode);
-                    tautenedSet.Add(i);
+                    if (oid.PlainRef.Equals(entry.GetOidPlainRef()) == false)
+                    {
+                        var tautenedFileName = tautenedFilePaths[entryPath];
+                        treeBuilder.Insert(tautenedFileName, oid, entryFileMode);
+                        tautenedSet.Add(i);
+                    }
                 }
             }
             else
@@ -863,33 +974,52 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 }
             }
 
-            var oid = new Lg2Oid();
+            Lg2Oid oid = new();
             treeBuilder.Write(ref oid);
 
-            StoreTautened(hostTree, oid, hostTree.GetObjectType());
+            StoreTautened(hostTree, oid);
         }
     }
 
-    void TautenBlob(Lg2Blob blob, scoped ref Lg2Oid resultOid)
+    void TautenBlob(
+        Lg2Blob blob,
+        scoped ref Lg2Oid resultOid,
+        string filePath,
+        Dictionary<string, string> tautenedFilePaths
+    )
     {
         using var hostRepoOdb = _hostRepo.GetOdb();
         using var tautRepoOdb = _tautRepo.GetOdb();
 
-        var odbObject = hostRepoOdb.Read(blob);
-        var readStream = odbObject.NewReadStream();
+        var readStream = hostRepoOdb.ReadToStream(blob);
 
         var isBinary = blob.IsBinary();
 
         var encryptor = cipher.CreateEncryptor(readStream, isBinary);
-        var outputLength = encryptor.GetOutputLength();
 
-        using var writeStream = tautRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
+        using var writeStream = tautRepoOdb.OpenWriteStream(
+            encryptor.GetOutputLength(),
+            blob.GetObjectType()
+        );
 
-        encryptor.WriteToOutput(writeStream);
+        var fileName = Path.GetFileName(filePath);
+        var fileNameStream = new MemoryStream(Encoding.UTF8.GetBytes(filePath), writable: false);
+        var tautenedFilePathstream = new MemoryStream();
+        encryptor.ProduceOutput(writeStream, fileNameStream, tautenedFilePathstream);
 
         writeStream.FinalizeWrite(ref resultOid);
 
-        StoreTautened(blob, resultOid, blob.GetObjectType());
+        StoreTautened(blob, resultOid);
+
+        var tautenedFileNameData = tautenedFilePathstream
+            .GetBuffer()
+            .AsSpan(0, (int)tautenedFilePathstream.Length);
+
+        var tautenedFilename = Convert.ToHexStringLower(tautenedFileNameData);
+
+        tautenedFilePaths.Add(filePath, tautenedFilename);
+
+        logger.ZLogTrace($"Tauten file name '{tautenedFilename}' from '{fileName}'");
     }
 
     internal void RebuildKvStore()
@@ -925,56 +1055,36 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
     class PatchRegainStream : Stream
     {
-        readonly Stream _targetStream;
-        readonly MemoryStream _headerStream;
+        readonly MemoryStream _targetStream;
 
-        readonly string _baseName;
+        static readonly byte[] s_diffGitDummyLine = Encoding.ASCII.GetBytes(
+            $"diff --git a/dummy b/dummy\n"
+        );
 
-        bool _headerProcessed;
-
-        static readonly byte[] s_tripleMinusLine = Encoding.ASCII.GetBytes("---\n");
-        static readonly byte[] s_triplePlusLine = Encoding.ASCII.GetBytes("+++\n");
-        static readonly byte[] s_doubleAt = Encoding.ASCII.GetBytes("@@");
-
-        internal PatchRegainStream(Stream patchOutput, string baseName)
+        internal PatchRegainStream()
         {
-            if (Path.IsPathRooted(baseName))
-            {
-                throw new ArgumentException("Must not be rooted", nameof(baseName));
-            }
-            _baseName = baseName;
+            _targetStream = new();
 
-            _targetStream = patchOutput;
-
-            _headerStream = new();
-
-            var diffGitLine = Encoding.ASCII.GetBytes($"diff --git a/{baseName} b/{baseName}\n");
-
-            _headerStream.Write(diffGitLine);
-
-            _headerStream.Position = 0;
+            _targetStream.Write(s_diffGitDummyLine);
         }
 
         public override bool CanRead => false;
 
         public override bool CanSeek => false;
 
-        public override bool CanWrite => _targetStream.CanWrite;
+        public override bool CanWrite => true;
 
-        public override long Length => throw new NotSupportedException();
+        public override long Length => _targetStream.Length;
 
         public override long Position
         {
-            get => throw new NotSupportedException();
+            get => _targetStream.Position;
             set => throw new NotSupportedException();
         }
 
         public override void Flush()
         {
-            if (_headerProcessed == false)
-            {
-                throw new InvalidOperationException($"Header processing not finished");
-            }
+            throw new NotSupportedException();
         }
 
         public override int Read(byte[] buffer, int offset, int count)
@@ -994,71 +1104,12 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         public override void Write(byte[] buffer, int offset, int count)
         {
-            if (_headerProcessed)
-            {
-                _targetStream.Write(buffer, offset, count);
+            _targetStream.Write(buffer, offset, count);
+        }
 
-                return;
-            }
-
-            _headerStream.Write(buffer, offset, count);
-
-            var headerData = _headerStream.GetBuffer();
-            for (; ; )
-            {
-                var start = (int)_headerStream.Position;
-                if (start >= _headerStream.Length)
-                {
-                    break;
-                }
-
-                var lineEndPos = Array.IndexOf(headerData, (byte)'\n', start);
-                if (lineEndPos < 0)
-                {
-                    break;
-                }
-
-                if (start == lineEndPos)
-                {
-                    _targetStream.WriteByte((byte)_headerStream.ReadByte());
-
-                    continue;
-                }
-
-                var newStart = lineEndPos + 1;
-                var lineData = headerData.AsSpan(start, newStart - start);
-
-                if (lineData.SequenceEqual(s_tripleMinusLine))
-                {
-                    var newTripleMinusLine = Encoding.ASCII.GetBytes($"--- a/{_baseName}\n");
-                    _targetStream.Write(newTripleMinusLine);
-
-                    _headerStream.Position = newStart;
-
-                    continue;
-                }
-
-                if (lineData.SequenceEqual(s_triplePlusLine))
-                {
-                    var newTriplePlusLine = Encoding.ASCII.GetBytes($"+++ b/{_baseName}\n");
-                    _targetStream.Write(newTriplePlusLine);
-
-                    _headerStream.Position = newStart;
-
-                    continue;
-                }
-
-                if (lineData.StartsWith(s_doubleAt))
-                {
-                    _headerStream.CopyTo(_targetStream);
-                    _headerProcessed = true;
-
-                    break;
-                }
-
-                _targetStream.Write(lineData);
-                _headerStream.Position = newStart;
-            }
+        internal byte[] GetBuffer()
+        {
+            return _targetStream.GetBuffer();
         }
     }
 
@@ -1073,7 +1124,9 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         static readonly byte[] s_diffGit = Encoding.ASCII.GetBytes("diff --git");
         static readonly byte[] s_tripleMinus = Encoding.ASCII.GetBytes("---");
+        static readonly byte[] s_tripleMinusDummyLine = Encoding.ASCII.GetBytes($"--- a/dummy\n");
         static readonly byte[] s_triplePlus = Encoding.ASCII.GetBytes("+++");
+        static readonly byte[] s_triplePlusDummyLine = Encoding.ASCII.GetBytes($"+++ b/dummy\n");
         static readonly byte[] s_doubleAt = Encoding.ASCII.GetBytes("@@");
 
         internal PatchTautenStream(Stream patchInput)
@@ -1124,16 +1177,22 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 var lineData = buffer.AsSpan(totalRead, dataRead);
                 if (lineData.StartsWith(s_diffGit))
                 {
-                    // skip the line
-                    _headerStream.SetLength(totalRead);
+                    _headerStream.SetLength(totalRead); // rewind
 
                     continue;
                 }
-                if (lineData.StartsWith(s_tripleMinus) || lineData.StartsWith(s_triplePlus))
+                if (lineData.StartsWith(s_tripleMinus))
                 {
-                    // skip the rest
-                    _headerStream.SetLength(totalRead + 3);
-                    _headerStream.WriteByte((byte)'\n');
+                    _headerStream.SetLength(totalRead); // rewind
+                    _headerStream.Write(s_tripleMinusDummyLine);
+                    totalRead = (int)_headerStream.Length;
+
+                    continue;
+                }
+                if (lineData.StartsWith(s_triplePlus))
+                {
+                    _headerStream.SetLength(totalRead); // rewind
+                    _headerStream.Write(s_triplePlusDummyLine);
                     totalRead = (int)_headerStream.Length;
 
                     continue;

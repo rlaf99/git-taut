@@ -1,3 +1,4 @@
+using System.Text;
 using ConsoleAppFramework;
 using Git.Taut;
 using Lg2.Sharpy;
@@ -35,24 +36,36 @@ internal class ExtraCommands
     }
 
     /// <summary>
-    /// Examine a tautened file.
+    /// Reveal a tautened file.
     /// </summary>
-    /// <param name="file">The tautened file to examine.</param>
-    [Command("--examine")]
-    public void Examine([FromServices] Aes256Cbc1 cipher, [Argument] string file)
+    /// <param name="filePath">The tautened file to reveal.</param>
+    [Command("--reveal")]
+    public void Reveal([FromServices] Aes256Cbc1 cipher, [Argument] string filePath)
     {
         cipher.Init();
 
         try
         {
-            using var fileStream = File.OpenRead(file);
+            using var fileStream = File.OpenRead(filePath);
             var decryptor = cipher.CreateDecryptor(fileStream);
+
+            var fileName = Path.GetFileName(filePath);
+            var fileNameStream = new MemoryStream(Convert.FromHexString(fileName), writable: false);
+            var regainedFileNameStream = new MemoryStream();
+
+            decryptor.ProduceOutput(Stream.Null, fileNameStream, regainedFileNameStream);
+
+            var regainedFileNameData = regainedFileNameStream
+                .GetBuffer()
+                .AsSpan(0, (int)regainedFileNameStream.Length);
+            var regainedFileName = Encoding.UTF8.GetString(regainedFileNameData);
 
             var isBinary = decryptor.IsContentBinary();
             var outputLength = decryptor.GetOutputLength();
             var extraInfo = decryptor.GetExtraPayload();
             var extraInfoText = Convert.ToHexStringLower(extraInfo);
 
+            Console.WriteLine($"File name: {regainedFileName}");
             Console.WriteLine($"Binary output: {isBinary}");
             Console.WriteLine($"Output length: {outputLength}");
             if (string.IsNullOrEmpty(extraInfoText))
@@ -66,7 +79,13 @@ internal class ExtraCommands
         }
         catch (Exception ex)
         {
-            ConsoleApp.LogError($"Failed to examine '{file}': {ex.Message}");
+            ConsoleApp.LogError($"Failed to reveal '{filePath}': {ex.Message}");
+#if DEBUG
+            if (ex.StackTrace is not null)
+            {
+                ConsoleApp.LogError($"{ex.StackTrace}");
+            }
+#endif
 
             throw new OperationCanceledException();
         }
@@ -75,23 +94,29 @@ internal class ExtraCommands
     /// <summary>
     /// Regain a tautened file and dump its content to stdout.
     /// </summary>
-    /// <param name="file">The tautened file to regain.</param>
+    /// <param name="filePath">The tautened file to regain.</param>
     [Command("--regain")]
-    public void Regain([FromServices] Aes256Cbc1 cipher, [Argument] string file)
+    public void Regain([FromServices] Aes256Cbc1 cipher, [Argument] string filePath)
     {
         cipher.Init();
 
         try
         {
-            using var fileStream = File.OpenRead(file);
+            using var fileStream = File.OpenRead(filePath);
             var decryptor = cipher.CreateDecryptor(fileStream);
 
             using var outputStream = Console.OpenStandardOutput();
-            decryptor.WriteToOutput(outputStream);
+            decryptor.ProduceOutput(outputStream);
         }
         catch (Exception ex)
         {
-            ConsoleApp.LogError($"Failed to regain '{file}': {ex.Message}");
+            ConsoleApp.LogError($"Failed to regain '{filePath}': {ex.Message}");
+#if DEBUG
+            if (ex.StackTrace is not null)
+            {
+                ConsoleApp.LogError($"{ex.StackTrace}");
+            }
+#endif
 
             throw new OperationCanceledException();
         }
