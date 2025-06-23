@@ -44,7 +44,7 @@ public static unsafe class Lg2OidPlainRefExtensions
         return plainRef.Ref.NFmt(size);
     }
 
-    public static ReadOnlySpan<byte> GetReadOnlyBytes(this Lg2OidPlainRef plainRef)
+    public static ReadOnlySpan<byte> GetRawData(this Lg2OidPlainRef plainRef)
     {
         return MemoryMarshal.CreateReadOnlySpan(ref plainRef.Ref.id[0], GIT_OID_MAX_SIZE);
     }
@@ -125,12 +125,7 @@ public static unsafe class Lg2OidExtensions
         return oid.Raw.NFmt(size);
     }
 
-    public static ReadOnlySpan<byte> GetReadOnlySpan(this ref Lg2Oid oid)
-    {
-        return MemoryMarshal.CreateReadOnlySpan(ref oid.Raw.id[0], GIT_OID_MAX_SIZE);
-    }
-
-    public static Span<byte> GetSpan(this ref Lg2Oid oid)
+    public static Span<byte> GetRawData(this ref Lg2Oid oid)
     {
         return MemoryMarshal.CreateSpan(ref oid.Raw.id[0], GIT_OID_MAX_SIZE);
     }

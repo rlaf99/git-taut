@@ -175,7 +175,7 @@ static class LightningExtensions
         Lg2OidPlainRef oidRef
     )
     {
-        var key = oidRef.GetReadOnlyBytes();
+        var key = oidRef.GetRawData();
         return txn.ContainsKey(db, key);
     }
 
@@ -186,7 +186,7 @@ static class LightningExtensions
         ref Lg2Oid oid
     )
     {
-        var key = oidRef.GetReadOnlyBytes();
+        var key = oidRef.GetRawData();
         var (rc, _, value) = txn.Get(db, key);
 
         if (rc != MDBResultCode.Success)
@@ -195,7 +195,7 @@ static class LightningExtensions
         }
 
         var source = value.AsSpan();
-        var target = oid.GetSpan();
+        var target = oid.GetRawData();
 
         if (source.Length != target.Length)
         {
@@ -216,7 +216,7 @@ static class LightningExtensions
         ref Lg2Oid oid
     )
     {
-        var key = oidRef.GetReadOnlyBytes();
+        var key = oidRef.GetRawData();
         var (rc, _, value) = txn.Get(db, key);
         if (rc != MDBResultCode.Success)
         {
@@ -225,7 +225,7 @@ static class LightningExtensions
         }
 
         var source = value.AsSpan();
-        var target = oid.GetSpan();
+        var target = oid.GetRawData();
 
         if (source.Length != target.Length)
         {
@@ -245,8 +245,8 @@ static class LightningExtensions
         PutOptions options = PutOptions.None
     )
     {
-        var key = sourceOidRef.GetReadOnlyBytes();
-        var val = targetOidRef.GetReadOnlyBytes();
+        var key = sourceOidRef.GetRawData();
+        var val = targetOidRef.GetRawData();
 
         var rc = txn.Put(db, key, val, options);
         if (rc != MDBResultCode.Success)
@@ -263,8 +263,8 @@ static class LightningExtensions
         Lg2OidPlainRef targetOidRef
     )
     {
-        var key = sourceOidRef.GetReadOnlyBytes();
-        var val = targetOidRef.GetReadOnlyBytes();
+        var key = sourceOidRef.GetRawData();
+        var val = targetOidRef.GetRawData();
 
         var (rc, _, value) = txn.Get(db, key);
         if (rc == MDBResultCode.Success)

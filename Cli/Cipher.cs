@@ -141,13 +141,21 @@ partial class Aes256Cbc1
         return _aes.CreateEncryptor();
     }
 
+    [Flags]
+    internal enum ContentHeaderPrimaryFlags : byte
+    {
+        None = 0,
+        ContentIsCompressed = 1 << 0,
+        ExtraPayloadPresent = 1 << 1,
+    }
+
     internal class EncryptorStream : Stream
     {
         readonly Aes256Cbc1 _cipher;
         readonly byte[] _ivData = new byte[CIPHER_BLOCK_BYTES];
         readonly ICryptoTransform _encryptTransform;
         readonly Stream _sourceStream;
-        readonly bool _isBinary;
+        readonly bool _isCompressed;
         readonly MemoryStream _headerStream;
 
         long _totalRead;
@@ -155,24 +163,35 @@ partial class Aes256Cbc1
         internal EncryptorStream(
             Aes256Cbc1 cihper,
             Stream sourceInput,
-            bool isBinary,
-            ReadOnlySpan<byte> sourceExtraInfo
+            bool isCompressed,
+            ReadOnlySpan<byte> extraPayload
         )
         {
             _cipher = cihper;
-            _isBinary = isBinary;
+            _isCompressed = isCompressed;
             _sourceStream = sourceInput;
             _headerStream = new();
             _encryptTransform = _cipher.PrepareForEncryption(_ivData);
 
-            PrepareHeader(sourceExtraInfo);
+            PrepareHeaderStream(extraPayload);
+            _headerStream.Position = 0;
         }
 
-        void PrepareHeader(ReadOnlySpan<byte> sourceExtraInfo)
+        void PrepareHeaderStream(ReadOnlySpan<byte> extraPayload)
         {
-            using var writer = new BinaryWriter(_headerStream, Encoding.UTF8, leaveOpen: true);
+            var primaryFlags = ContentHeaderPrimaryFlags.None;
 
-            writer.Write(_isBinary);
+            if (_isCompressed)
+            {
+                primaryFlags |= ContentHeaderPrimaryFlags.ContentIsCompressed;
+            }
+
+            if (extraPayload.Length > 0)
+            {
+                primaryFlags |= ContentHeaderPrimaryFlags.ExtraPayloadPresent;
+            }
+
+            _headerStream.WriteByte((byte)primaryFlags);
 
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(_sourceStream.Length, 0);
             ArgumentOutOfRangeException.ThrowIfGreaterThan(
@@ -187,17 +206,13 @@ partial class Aes256Cbc1
                 Array.Reverse(sourceLengthData);
             }
 
-            writer.Write(sourceLengthData);
+            _headerStream.Write(sourceLengthData);
 
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(sourceExtraInfo.Length, byte.MaxValue);
-            var extraInfoLength = (byte)sourceExtraInfo.Length;
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(extraPayload.Length, byte.MaxValue);
+            var extraPayloadLength = (byte)extraPayload.Length;
 
-            writer.Write(extraInfoLength);
-            writer.Write(sourceExtraInfo);
-
-            writer.Flush();
-
-            _headerStream.Position = 0;
+            _headerStream.WriteByte(extraPayloadLength);
+            _headerStream.Write(extraPayload);
         }
 
         public override bool CanRead => _sourceStream.CanRead;
@@ -314,13 +329,13 @@ partial class Aes256Cbc1
         internal Encryptor(
             Aes256Cbc1 cipher,
             Stream sourceInput,
-            bool isBinary,
+            bool isCompressed,
             ReadOnlySpan<byte> deltaBashHash
         )
         {
             cipher.EnsureInitialized();
 
-            _encStream = new EncryptorStream(cipher, sourceInput, isBinary, deltaBashHash);
+            _encStream = new EncryptorStream(cipher, sourceInput, isCompressed, deltaBashHash);
         }
 
         internal int GetOutputLength() => _encStream.GetOutputLength();
@@ -354,11 +369,11 @@ partial class Aes256Cbc1
 
     internal Encryptor CreateEncryptor(
         Stream sourceInput,
-        bool isBinary,
+        bool isCompressed,
         ReadOnlySpan<byte> soruceExtraInfo
     )
     {
-        var encryptor = new Encryptor(this, sourceInput, isBinary, soruceExtraInfo);
+        var encryptor = new Encryptor(this, sourceInput, isCompressed, soruceExtraInfo);
 
         return encryptor;
     }
@@ -406,7 +421,7 @@ partial class Aes256Cbc1
         [AllowNull]
         byte[] _extraPayload;
 
-        bool _isBinary;
+        bool _isCompressed;
 
         int _outputLength;
 
@@ -527,13 +542,13 @@ partial class Aes256Cbc1
             }
         }
 
-        internal bool IsBinary
+        internal bool IsCompressed
         {
             get
             {
                 ExamineHeader();
 
-                return _isBinary;
+                return _isCompressed;
             }
         }
 
@@ -595,8 +610,13 @@ partial class Aes256Cbc1
                 CryptoStreamMode.Read
             );
 
-            _isBinary = _cryptoStream.ReadByte() != 0;
+            var primaryFlags = (ContentHeaderPrimaryFlags)_cryptoStream.ReadByte();
             _outputOffset += 1;
+
+            if (primaryFlags.HasFlag(ContentHeaderPrimaryFlags.ContentIsCompressed))
+            {
+                _isCompressed = true;
+            }
 
             const int lengthBytes = sizeof(int);
             var lengthData = new byte[lengthBytes];
@@ -608,14 +628,17 @@ partial class Aes256Cbc1
             _outputLength = BitConverter.ToInt32(lengthData);
             _outputOffset += lengthBytes;
 
-            var extraInfoLength = _cryptoStream.ReadByte();
-            _outputOffset += 1;
-
-            if (extraInfoLength > 0)
+            if (primaryFlags.HasFlag(ContentHeaderPrimaryFlags.ExtraPayloadPresent))
             {
-                _extraPayload = new byte[extraInfoLength];
-                _cryptoStream.ReadExactly(_extraPayload, 0, extraInfoLength);
-                _outputOffset += extraInfoLength;
+                var extraInfoLength = _cryptoStream.ReadByte();
+                _outputOffset += 1;
+
+                if (extraInfoLength > 0)
+                {
+                    _extraPayload = new byte[extraInfoLength];
+                    _cryptoStream.ReadExactly(_extraPayload, 0, extraInfoLength);
+                    _outputOffset += extraInfoLength;
+                }
             }
         }
     }
@@ -635,7 +658,7 @@ partial class Aes256Cbc1
 
         internal ReadOnlySpan<byte> GetExtraPayload() => _decStream.ExtraPayload;
 
-        internal bool IsContentBinary() => _decStream.IsBinary;
+        internal bool IsCompressed() => _decStream.IsCompressed;
 
         internal void ProduceOutput(
             Stream outputStream,

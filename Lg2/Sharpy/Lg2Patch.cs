@@ -71,14 +71,22 @@ public static unsafe class Lg2PatchExtensions
     {
         patch.EnsureValid();
 
-        fixed (byte* ptr = &MemoryMarshal.GetReference(diffBase))
+        fixed (byte* pDiffBase = diffBase)
         {
             var len = (nuint)diffBase.Length;
 
             git_buf buf = new();
             sbyte* pFileName = null;
             uint mode;
-            var rc = git_apply_patch(&buf, &pFileName, &mode, (sbyte*)ptr, len, patch.Ptr, null);
+            var rc = git_apply_patch(
+                &buf,
+                &pFileName,
+                &mode,
+                (sbyte*)pDiffBase,
+                len,
+                patch.Ptr,
+                null
+            );
             Lg2Exception.ThrowIfNotOk(rc);
 
             return new(buf);

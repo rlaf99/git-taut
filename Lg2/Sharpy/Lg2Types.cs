@@ -238,50 +238,14 @@ public sealed unsafe class Lg2Buf : IDisposable
 
 public static unsafe class Lg2BufExtensions
 {
-    public static ReadOnlySpan<byte> GetReadOnlyBytes(this Lg2Buf buf)
+    public static ReadOnlySpan<byte> GetRawData(this Lg2Buf buf)
     {
         return new(buf.Raw.ptr, (int)buf.Raw.size);
     }
 
     public static void DumpToStream(this Lg2Buf buf, Stream targetStream)
     {
-        targetStream.Write(buf.GetReadOnlyBytes());
-    }
-}
-
-public unsafe ref struct Lg2RawData
-{
-    internal nint Ptr;
-    internal long Len;
-}
-
-public static unsafe class Lg2RawDataExtensions
-{
-    public static ReadOnlySpan<byte> GetReadOnlyBytes(this Lg2RawData rawData)
-    {
-        return new((void*)rawData.Ptr, (int)rawData.Len);
-    }
-
-    public static bool IsInvalid(this Lg2RawData rawData)
-    {
-        if (rawData.Ptr == default || rawData.Len <= 0)
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    public static bool IsBinary(this Lg2RawData rawData)
-    {
-        if (rawData.IsInvalid())
-        {
-            throw new InvalidOperationException($"Invalid {nameof(rawData)}");
-        }
-
-        var result = git_blob_data_is_binary((sbyte*)rawData.Ptr, (nuint)rawData.Len);
-
-        return result != 0;
+        targetStream.Write(buf.GetRawData());
     }
 }
 

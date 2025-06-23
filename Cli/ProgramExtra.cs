@@ -5,6 +5,7 @@ using Lg2.Sharpy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ZLogger;
+using ZstdSharp;
 
 internal class ExtraCommands
 {
@@ -50,23 +51,34 @@ internal class ExtraCommands
             var decryptor = cipher.CreateDecryptor(fileStream);
 
             var fileName = Path.GetFileName(filePath);
-            var fileNameStream = new MemoryStream(Convert.FromHexString(fileName), writable: false);
-            var regainedFileNameStream = new MemoryStream();
+            var encryptedFileNameStream = new MemoryStream(
+                Convert.FromHexString(fileName),
+                writable: false
+            );
+            var compressedFileNameStream = new MemoryStream();
 
-            decryptor.ProduceOutput(Stream.Null, fileNameStream, regainedFileNameStream);
+            decryptor.ProduceOutput(Stream.Null, encryptedFileNameStream, compressedFileNameStream);
+
+            compressedFileNameStream.Position = 0;
+            using var decompressedFileNameStream = new DecompressionStream(
+                compressedFileNameStream
+            );
+            var regainedFileNameStream = new MemoryStream();
+            decompressedFileNameStream.CopyTo(regainedFileNameStream);
 
             var regainedFileNameData = regainedFileNameStream
                 .GetBuffer()
-                .AsSpan(0, (int)regainedFileNameStream.Length);
+                .AsSpan(0, (int)compressedFileNameStream.Length);
+
             var regainedFileName = Encoding.UTF8.GetString(regainedFileNameData);
 
-            var isBinary = decryptor.IsContentBinary();
+            var isCompressed = decryptor.IsCompressed();
             var outputLength = decryptor.GetOutputLength();
             var extraInfo = decryptor.GetExtraPayload();
             var extraInfoText = Convert.ToHexStringLower(extraInfo);
 
             Console.WriteLine($"File name: {regainedFileName}");
-            Console.WriteLine($"Binary output: {isBinary}");
+            Console.WriteLine($"Compressed: {isCompressed}");
             Console.WriteLine($"Output length: {outputLength}");
             if (string.IsNullOrEmpty(extraInfoText))
             {

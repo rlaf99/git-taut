@@ -42,20 +42,19 @@ public unsafe class Lg2OdbObject
 
 public static unsafe class Lg2OdbObjectExtensions
 {
-    public static Lg2RawData GetRawData(this Lg2OdbObject odbObject)
+    public static ReadOnlySpan<byte> GetObjectData(this Lg2OdbObject odbObject)
     {
         odbObject.EnsureValid();
 
-        Lg2RawData rawData = new()
-        {
-            Ptr = (nint)git_odb_object_data(odbObject.Ptr),
-            Len = (long)git_odb_object_size(odbObject.Ptr),
-        };
+        var ptr = git_odb_object_data(odbObject.Ptr);
+        var len = git_odb_object_size(odbObject.Ptr);
 
-        return rawData;
+        var result = new ReadOnlySpan<byte>(ptr, (int)len);
+
+        return result;
     }
 
-    public static long GetRawSize(this Lg2OdbObject odbObject)
+    public static long GetObjectSize(this Lg2OdbObject odbObject)
     {
         odbObject.EnsureValid();
 
@@ -67,13 +66,6 @@ public static unsafe class Lg2OdbObjectExtensions
     public static Lg2OdbObjectReadStream NewReadStream(this Lg2OdbObject odbObject)
     {
         return new(odbObject);
-    }
-
-    public static ReadOnlySpan<byte> GetReadOnlyBytes(this Lg2OdbObject odbObject)
-    {
-        var rawData = GetRawData(odbObject);
-
-        return rawData.GetReadOnlyBytes();
     }
 }
 
@@ -95,19 +87,6 @@ public unsafe class Lg2OdbStream
 
 public static unsafe class Lg2OdbStreamExtensions
 {
-    public static int Read(this Lg2OdbStream strm, scoped ref readonly Lg2RawData rawData)
-    {
-        strm.EnsureValid();
-
-        var bytesRead = git_odb_stream_read(strm.Ptr, (sbyte*)rawData.Ptr, (nuint)rawData.Len);
-        if (bytesRead < 0)
-        {
-            Lg2Exception.ThrowIfNotOk(bytesRead);
-        }
-
-        return bytesRead;
-    }
-
     public static int Read(this Lg2OdbStream strm, Span<byte> data)
     {
         strm.EnsureValid();
@@ -124,12 +103,15 @@ public static unsafe class Lg2OdbStreamExtensions
         }
     }
 
-    public static void Write(this Lg2OdbStream strm, scoped ref readonly Lg2RawData rawData)
+    public static void Write(this Lg2OdbStream strm, ReadOnlySpan<byte> data)
     {
         strm.EnsureValid();
 
-        var rc = git_odb_stream_write(strm.Ptr, (sbyte*)rawData.Ptr, (nuint)rawData.Len);
-        Lg2Exception.ThrowIfNotOk(rc);
+        fixed (byte* ptr = data)
+        {
+            var rc = git_odb_stream_write(strm.Ptr, (sbyte*)ptr, (nuint)data.Length);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
     }
 
     public static void FinalizeWrite(this Lg2OdbStream strm, scoped ref Lg2Oid oid)
@@ -274,14 +256,8 @@ public unsafe class Lg2OdbWriteStream : Stream
 
     public override void Write(byte[] buffer, int offset, int count)
     {
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, buffer.Length - offset);
-
-        fixed (byte* ptr = &buffer[offset])
-        {
-            Lg2RawData rawData = new() { Ptr = (nint)ptr, Len = count };
-
-            _wstrm.Write(ref rawData);
-        }
+        var data = buffer.AsSpan(offset, count);
+        _wstrm.Write(data);
     }
 
     bool _disposed;
@@ -341,16 +317,12 @@ public unsafe class Lg2Odb : NativeSafePointer<Lg2Odb, git_odb>, INativeRelease<
         return new(pOdb);
     }
 
-    public static void Hash(Lg2RawData rawData, Lg2ObjectType objType, ref Lg2Oid oid)
+    public static void Hash(ReadOnlySpan<byte> data, Lg2ObjectType objType, scoped ref Lg2Oid oid)
     {
-        fixed (git_oid* pOid = &oid.Raw)
+        var oidPtr = (git_oid*)Unsafe.AsPointer(ref oid.Raw);
+        fixed (byte* dataPtr = data)
         {
-            var rc = git_odb_hash(
-                pOid,
-                (void*)rawData.Ptr,
-                (nuint)rawData.Len,
-                (git_object_t)objType
-            );
+            var rc = git_odb_hash(oidPtr, dataPtr, (nuint)data.Length, (git_object_t)objType);
             Lg2Exception.ThrowIfNotOk(rc);
         }
     }
@@ -404,23 +376,26 @@ public static unsafe class Lg2OdbExtenions
 
     public static void Write(
         this Lg2Odb odb,
-        Lg2RawData rawData,
+        ReadOnlySpan<byte> objData,
         Lg2ObjectType objType,
         scoped ref Lg2Oid oid
     )
     {
         odb.EnsureValid();
 
-        fixed (git_oid* pOid = &oid.Raw)
+        fixed (byte* dataPtr = objData)
         {
-            var rc = git_odb_write(
-                pOid,
-                odb.Ptr,
-                (void*)rawData.Ptr,
-                (nuint)rawData.Len,
-                (git_object_t)objType
-            );
-            Lg2Exception.ThrowIfNotOk(rc);
+            fixed (git_oid* pOid = &oid.Raw)
+            {
+                var rc = git_odb_write(
+                    pOid,
+                    odb.Ptr,
+                    dataPtr,
+                    (nuint)objData.Length,
+                    (git_object_t)objType
+                );
+                Lg2Exception.ThrowIfNotOk(rc);
+            }
         }
     }
 
@@ -450,7 +425,7 @@ public static unsafe class Lg2OdbExtenions
         var odbObject = odb.Read(oidRef);
 
         Lg2Oid oid = new();
-        another.Write(odbObject.GetRawData(), odbObject.GetObjectType(), ref oid);
+        another.Write(odbObject.GetObjectData(), odbObject.GetObjectType(), ref oid);
 
         if (oidRef.Equals(oid.PlainRef) == false)
         {
@@ -501,8 +476,8 @@ public static unsafe class Lg2OdbExtenions
 public unsafe class Lg2OdbObjectReadStream : Stream
 {
     readonly Lg2OdbObject _odbObject;
-    readonly byte* _pData;
-    readonly long _dataLength;
+    readonly byte* _ptr;
+    readonly long _len;
     long _position;
 
     internal Lg2OdbObjectReadStream(Lg2OdbObject odbObject)
@@ -511,9 +486,8 @@ public unsafe class Lg2OdbObjectReadStream : Stream
 
         _odbObject = odbObject;
 
-        var rawData = odbObject.GetRawData();
-        _pData = (byte*)rawData.Ptr;
-        _dataLength = rawData.Len;
+        _ptr = (byte*)git_odb_object_data(odbObject.Ptr);
+        _len = (long)git_odb_object_size(odbObject.Ptr);
     }
 
     public override bool CanRead => true;
@@ -522,7 +496,7 @@ public unsafe class Lg2OdbObjectReadStream : Stream
 
     public override bool CanWrite => false;
 
-    public override long Length => _dataLength;
+    public override long Length => _len;
 
     public override long Position
     {
@@ -541,9 +515,9 @@ public unsafe class Lg2OdbObjectReadStream : Stream
 
         var target = buffer.AsSpan(offset, count);
 
-        while (_position < _dataLength && dataRead < target.Length)
+        while (_position < _len && dataRead < target.Length)
         {
-            target[dataRead++] = _pData[_position++];
+            target[dataRead++] = _ptr[_position++];
         }
 
         return dataRead;

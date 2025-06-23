@@ -1,9 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
-using Lg2.Native;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Logging;
 using ZLogger;
+using ZstdSharp;
 
 namespace Git.Taut;
 
@@ -70,8 +70,11 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
     [AllowNull]
     Lg2PathSpec _targetPathSpec;
 
-    const int DELTA_COMPRESSION_MIN_FILE_LENGTH = 100;
-    const double DELTA_COMPRESSION_RATIO_LIMIT = 0.5;
+    readonly Compressor _compressor = new();
+
+    const int DELTA_ENCODING_MIN_BYTES = 100;
+    const double DELTA_ENCODING_MAX_RATIO = 0.6;
+    const double DATA_COMPRESSION_MAX_RATIO = 0.8;
 
     internal void Open(string repoPath, bool newSetup = false)
     {
@@ -466,16 +469,15 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 {
                     try
                     {
-                        string? regainedFileName = null;
+                        var blob = _tautRepo.LookupBlob(entry);
+                        string regainedFileName;
                         Lg2Oid oid = new();
                         if (kvStore.TryGetRegained(entry, ref oid) == false)
                         {
-                            var blob = _tautRepo.LookupBlob(entry);
                             regainedFileName = RegainBlob(blob, ref oid, entryName);
                         }
                         else
                         {
-                            var blob = _tautRepo.LookupBlob(entry);
                             regainedFileName = RegainFileName(blob, entryName);
                         }
 
@@ -546,11 +548,19 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         using var readStream = tautRepoOdb.ReadToStream(blob);
 
-        var fileNameStream = new MemoryStream(Convert.FromHexString(fileName), writable: false);
-        var regainedFileNameStream = new MemoryStream();
+        var encryptedFileNameStream = new MemoryStream(
+            Convert.FromHexString(fileName),
+            writable: false
+        );
+        var compressedFileNameStream = new MemoryStream();
 
         var decryptor = cipher.CreateDecryptor(readStream);
-        decryptor.ProduceOutput(Stream.Null, fileNameStream, regainedFileNameStream);
+        decryptor.ProduceOutput(Stream.Null, encryptedFileNameStream, compressedFileNameStream);
+
+        compressedFileNameStream.Position = 0;
+        using var decompressedFileNameStream = new DecompressionStream(compressedFileNameStream);
+        var regainedFileNameStream = new MemoryStream();
+        decompressedFileNameStream.CopyTo(regainedFileNameStream);
 
         var regainedFileNameData = regainedFileNameStream
             .GetBuffer()
@@ -570,15 +580,22 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         using var readStream = tautRepoOdb.ReadToStream(blob);
 
-        var fileNameStream = new MemoryStream(Convert.FromHexString(fileName), writable: false);
-        var regainedFileNameStream = new MemoryStream();
+        var encryptedFileNameStream = new MemoryStream(
+            Convert.FromHexString(fileName),
+            writable: false
+        );
+        var compressedFileNameStream = new MemoryStream();
 
         var decryptor = cipher.CreateDecryptor(readStream);
         var extraPayload = decryptor.GetExtraPayload();
         if (extraPayload.Length > 0)
         {
             var resultStream = new PatchRegainStream();
-            decryptor.ProduceOutput(resultStream, fileNameStream, regainedFileNameStream);
+            decryptor.ProduceOutput(
+                resultStream,
+                encryptedFileNameStream,
+                compressedFileNameStream
+            );
 
             var resultData = resultStream.GetBuffer().AsSpan(0, (int)resultStream.Length);
             logger.ZLogDebug($"{Encoding.ASCII.GetString(resultData)}");
@@ -592,7 +609,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             Lg2Oid oid = new();
             oid.FromRaw(extraPayload);
             var baseOdbOject = hostRepoOdb.Read(oid);
-            var resultBuf = patch.Apply(baseOdbOject.GetReadOnlyBytes());
+            var resultBuf = patch.Apply(baseOdbOject.GetObjectData());
             using var writeStream = hostRepoOdb.OpenWriteStream(
                 resultBuf.Length,
                 blob.GetObjectType()
@@ -606,15 +623,20 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         {
             var outputLength = decryptor.GetOutputLength();
             using var writeStream = hostRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
-            decryptor.ProduceOutput(writeStream, fileNameStream, regainedFileNameStream);
+            decryptor.ProduceOutput(writeStream, encryptedFileNameStream, compressedFileNameStream);
             writeStream.FinalizeWrite(ref resultOid);
 
             StoreRegained(blob, resultOid);
         }
 
+        compressedFileNameStream.Position = 0;
+        using var decompressedFileNameStream = new DecompressionStream(compressedFileNameStream);
+        var regainedFileNameStream = new MemoryStream();
+        decompressedFileNameStream.CopyTo(regainedFileNameStream);
+
         var regainedFileNameData = regainedFileNameStream
             .GetBuffer()
-            .AsSpan(0, (int)regainedFileNameStream.Length);
+            .AsSpan(0, (int)compressedFileNameStream.Length);
 
         var regainedFileName = Encoding.UTF8.GetString(regainedFileNameData);
 
@@ -786,7 +808,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
             var newFileSize = newFile.GetSize();
 
-            if (newFileSize < DELTA_COMPRESSION_MIN_FILE_LENGTH)
+            if (newFileSize < DELTA_ENCODING_MIN_BYTES)
             {
                 continue;
             }
@@ -796,19 +818,37 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
             var ratio = (double)patchSize / newFileSize;
 
-            if (ratio > DELTA_COMPRESSION_RATIO_LIMIT)
+            if (ratio > DELTA_ENCODING_MAX_RATIO)
             {
                 continue;
             }
 
             using var tautenStream = new PatchTautenStream(patch.NewReadStream());
 
+            var compressedBufferSize = (int)(tautenStream.Length * DATA_COMPRESSION_MAX_RATIO);
+            var compressedBuffer = new byte[compressedBufferSize];
+            var compressedStream = new MemoryStream(compressedBuffer);
+            using var compressionStream = new CompressionStream(compressedStream);
+
+            bool canCompress = true;
+            try
+            {
+                compressedStream.CopyTo(compressedStream);
+                compressedStream.Position = 0;
+            }
+            catch (NotSupportedException)
+            {
+                canCompress = false;
+            }
+
+            Stream readStream = canCompress ? compressedStream : tautenStream;
+
             var oldFileOidRef = oldFile.GetOidPlainRef();
 
             var encryptor = cipher.CreateEncryptor(
-                tautenStream,
-                isBinary: false,
-                oldFileOidRef.GetReadOnlyBytes()
+                readStream,
+                isCompressed: false,
+                oldFileOidRef.GetRawData()
             );
 
             using var writeStream = tautRepoOdb.OpenWriteStream(
@@ -821,8 +861,9 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 Encoding.UTF8.GetBytes(fileName),
                 writable: false
             );
-            var tautenedFilePathstream = new MemoryStream();
-            encryptor.ProduceOutput(writeStream, fileNameStream, tautenedFilePathstream);
+            var compressedFileNameStream = new CompressionStream(fileNameStream);
+            var tautenedFileNameStream = new MemoryStream();
+            encryptor.ProduceOutput(writeStream, compressedFileNameStream, tautenedFileNameStream);
 
             Lg2Oid resultOid = new();
             writeStream.FinalizeWrite(ref resultOid);
@@ -833,9 +874,9 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
                 $"Tauten patch ({tautenStream.Length}:{newFileSize}) for '{newFilePath}'"
             );
 
-            var tautenedFilenameData = tautenedFilePathstream
+            var tautenedFilenameData = tautenedFileNameStream
                 .GetBuffer()
-                .AsSpan(0, (int)tautenedFilePathstream.Length);
+                .AsSpan(0, (int)tautenedFileNameStream.Length);
 
             var tautenedFilename = Convert.ToHexStringLower(tautenedFilenameData);
 
@@ -911,7 +952,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
             if (entryObjType.IsTree())
             {
-                logger.ZLogTrace($"Start tautening tree {entryOidHex8} '{entryName}'");
+                logger.ZLogTrace($"Start tautening tree {entryOidHex8} '{entryPath}'");
 
                 if (kvStore.HasTautened(entry) == false)
                 {
@@ -930,15 +971,22 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             }
             else if (entryObjType.IsBlob())
             {
-                logger.ZLogTrace($"Start tautening blob {entryOidHex8} '{entryName}'");
+                logger.ZLogTrace($"Start tautening blob {entryOidHex8} '{entryPath}'");
 
                 if (_targetPathSpec.MatchPath(entryName, Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE))
                 {
+                    var blob = _hostRepo.LookupBlob(entry);
                     Lg2Oid oid = new();
                     if (kvStore.TryGetTautened(entry, ref oid) == false)
                     {
-                        var blob = _hostRepo.LookupBlob(entry);
                         TautenBlob(blob, ref oid, entryPath, tautenedFilePaths);
+                    }
+                    else
+                    {
+                        if (tautenedFilePaths.ContainsKey(entryPath) == false)
+                        {
+                            TautenFileName(blob, entryPath, tautenedFilePaths);
+                        }
                     }
 
                     if (oid.PlainRef.Equals(entry.GetOidPlainRef()) == false)
@@ -981,6 +1029,44 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         }
     }
 
+    void TautenFileName(Lg2Blob blob, string filePath, Dictionary<string, string> tautenedFilePaths)
+    {
+        using var hostRepoOdb = _hostRepo.GetOdb();
+        using var tautRepoOdb = _tautRepo.GetOdb();
+
+        var odbObject = hostRepoOdb.Read(blob);
+        var readStream = odbObject.NewReadStream();
+
+        var encryptor = cipher.CreateEncryptor(readStream, true);
+
+        var fileName = Path.GetFileName(filePath);
+        var fileNameStream = new MemoryStream(Encoding.UTF8.GetBytes(filePath), writable: false);
+        var compressedFileNameStream = new MemoryStream();
+        using (
+            var compressionStream = new CompressionStream(compressedFileNameStream, leaveOpen: true)
+        )
+        {
+            fileNameStream.CopyTo(compressionStream);
+        }
+        var compressedSize = (int)compressedFileNameStream.Length;
+
+        compressedFileNameStream.Position = 0;
+        var tautenedFileNameStream = new MemoryStream();
+        encryptor.ProduceOutput(Stream.Null, compressedFileNameStream, tautenedFileNameStream);
+
+        var tautenedFileNameData = tautenedFileNameStream
+            .GetBuffer()
+            .AsSpan(0, (int)tautenedFileNameStream.Length);
+
+        var tautenedFilename = Convert.ToHexStringLower(tautenedFileNameData);
+
+        tautenedFilePaths.Add(filePath, tautenedFilename);
+
+        logger.ZLogTrace(
+            $"Tauten file name '{tautenedFilename}' from '{filePath}' compression ({compressedSize}/{fileNameStream.Length})"
+        );
+    }
+
     void TautenBlob(
         Lg2Blob blob,
         scoped ref Lg2Oid resultOid,
@@ -991,11 +1077,33 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var hostRepoOdb = _hostRepo.GetOdb();
         using var tautRepoOdb = _tautRepo.GetOdb();
 
-        var readStream = hostRepoOdb.ReadToStream(blob);
+        var odbObject = hostRepoOdb.Read(blob);
+        var odbObjectData = odbObject.GetObjectData();
+        var compressedBufferSize = (int)(odbObjectData.Length * DATA_COMPRESSION_MAX_RATIO);
+        var compressedBuffer = new byte[compressedBufferSize];
 
-        var isBinary = blob.IsBinary();
+        bool canCompress = _compressor.TryWrap(
+            odbObjectData,
+            compressedBuffer,
+            out var compressWritten
+        );
 
-        var encryptor = cipher.CreateEncryptor(readStream, isBinary);
+        Stream readStream;
+
+        if (canCompress)
+        {
+            logger.ZLogTrace(
+                $"Tauten compressed content ({compressWritten}/{odbObjectData.Length}"
+            );
+
+            readStream = new MemoryStream(compressedBuffer, 0, compressWritten, writable: false);
+        }
+        else
+        {
+            readStream = odbObject.NewReadStream();
+        }
+
+        var encryptor = cipher.CreateEncryptor(readStream, true);
 
         using var writeStream = tautRepoOdb.OpenWriteStream(
             encryptor.GetOutputLength(),
@@ -1004,8 +1112,18 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         var fileName = Path.GetFileName(filePath);
         var fileNameStream = new MemoryStream(Encoding.UTF8.GetBytes(filePath), writable: false);
+        var compressedFileNameStream = new MemoryStream();
+        using (
+            var compressionStream = new CompressionStream(compressedFileNameStream, leaveOpen: true)
+        )
+        {
+            fileNameStream.CopyTo(compressionStream);
+        }
+        var compressedSize = (int)compressedFileNameStream.Length;
+
+        compressedFileNameStream.Position = 0;
         var tautenedFilePathstream = new MemoryStream();
-        encryptor.ProduceOutput(writeStream, fileNameStream, tautenedFilePathstream);
+        encryptor.ProduceOutput(writeStream, compressedFileNameStream, tautenedFilePathstream);
 
         writeStream.FinalizeWrite(ref resultOid);
 
@@ -1019,7 +1137,9 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         tautenedFilePaths.Add(filePath, tautenedFilename);
 
-        logger.ZLogTrace($"Tauten file name '{tautenedFilename}' from '{fileName}'");
+        logger.ZLogTrace(
+            $"Tauten file name '{tautenedFilename}' from '{filePath}' compression ({compressedSize}/{fileNameStream.Length})"
+        );
     }
 
     internal void RebuildKvStore()
