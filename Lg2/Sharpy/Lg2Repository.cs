@@ -102,4 +102,13 @@ public static unsafe partial class Lg2RepositoryExtensions
         var rc = git_repository_set_head(repo.Ptr, u8Refname.Ptr);
         Lg2Exception.ThrowIfNotOk(rc);
     }
+
+    public static Lg2OidType GetOidType(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        var result = git_repository_oid_type(repo.Ptr);
+
+        return (Lg2OidType)result;
+    }
 }

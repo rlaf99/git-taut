@@ -501,7 +501,11 @@ public unsafe class Lg2OdbObjectReadStream : Stream
     public override long Position
     {
         get => _position;
-        set => throw new NotSupportedException();
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(value, _len);
+            _position = value;
+        }
     }
 
     public override void Flush()

@@ -27,4 +27,7 @@
     <ProjectReference Include="..\Lg2\Lg2.csproj" />
   </ItemGroup>
 
+    <ItemGroup>
+    <InternalsVisibleTo Include="$(MSBuildProjectName).Tests" />
+  </ItemGroup>
 </Project>

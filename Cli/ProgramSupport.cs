@@ -5,7 +5,6 @@ using Lg2.Sharpy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ZLogger;
-using ZstdSharp;
 
 internal class ExtraCommands
 {
@@ -14,7 +13,11 @@ internal class ExtraCommands
     public void InternalInfo()
     {
         var lg2Version = Lg2Global.Version;
-        ConsoleApp.Log($"LibGit2 Version: {lg2Version}");
+        ConsoleApp.Log($"Libgit2 version: {lg2Version}");
+        ConsoleApp.Log($"Cipher schema: {nameof(Aes256Cbc1)}");
+        ConsoleApp.Log(
+            $"  Maximum plain text length: {Aes256Cbc1.PLAIN_TEXT_MAX_BYTES} Bytes ({Aes256Cbc1.PLAIN_TEXT_MAX_BYTES / 1024 / 1024} MB)"
+        );
     }
 
     /// <summary>
@@ -55,24 +58,17 @@ internal class ExtraCommands
                 Convert.FromHexString(fileName),
                 writable: false
             );
-            var compressedFileNameStream = new MemoryStream();
-
-            decryptor.ProduceOutput(Stream.Null, encryptedFileNameStream, compressedFileNameStream);
-
-            compressedFileNameStream.Position = 0;
-            using var decompressedFileNameStream = new DecompressionStream(
-                compressedFileNameStream
-            );
             var regainedFileNameStream = new MemoryStream();
-            decompressedFileNameStream.CopyTo(regainedFileNameStream);
+
+            decryptor.ProduceOutput(Stream.Null, encryptedFileNameStream, regainedFileNameStream);
 
             var regainedFileNameData = regainedFileNameStream
                 .GetBuffer()
-                .AsSpan(0, (int)compressedFileNameStream.Length);
+                .AsSpan(0, (int)regainedFileNameStream.Length);
 
             var regainedFileName = Encoding.UTF8.GetString(regainedFileNameData);
 
-            var isCompressed = decryptor.IsCompressed();
+            var isCompressed = decryptor.IsCompressed;
             var outputLength = decryptor.GetOutputLength();
             var extraInfo = decryptor.GetExtraPayload();
             var extraInfoText = Convert.ToHexStringLower(extraInfo);

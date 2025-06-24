@@ -157,7 +157,7 @@ public sealed unsafe class Lg2Buf : IDisposable
 
     public long Length => (long)Raw.size;
 
-    public Lg2BufReadStream NewReadStream() => new(this);
+    public ReadStream NewReadStream() => new(this);
 
     bool _isDiposed;
 
@@ -185,7 +185,7 @@ public sealed unsafe class Lg2Buf : IDisposable
 
     ~Lg2Buf() => Dispose(false);
 
-    public class Lg2BufReadStream(Lg2Buf sourceBuf) : Stream
+    public class ReadStream(Lg2Buf sourceBuf) : Stream
     {
         long _totalRead;
 
@@ -200,10 +200,17 @@ public sealed unsafe class Lg2Buf : IDisposable
         public override long Position
         {
             get => _totalRead;
-            set => throw new NotSupportedException();
+            set
+            {
+                ArgumentOutOfRangeException.ThrowIfGreaterThan(value, sourceBuf.Length);
+                _totalRead = value;
+            }
         }
 
-        public override void Flush() { } // do nothing
+        public override void Flush()
+        {
+            throw new NotSupportedException();
+        }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
@@ -243,7 +250,7 @@ public static unsafe class Lg2BufExtensions
         return new(buf.Raw.ptr, (int)buf.Raw.size);
     }
 
-    public static void DumpToStream(this Lg2Buf buf, Stream targetStream)
+    public static void DumpTo(this Lg2Buf buf, Stream targetStream)
     {
         targetStream.Write(buf.GetRawData());
     }

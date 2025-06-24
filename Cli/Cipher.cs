@@ -4,6 +4,8 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using ZLogger;
+using ZstdSharp;
+using ZstdSharp.Unsafe;
 
 namespace Git.Taut;
 
@@ -52,10 +54,11 @@ class InvalidTautenedDataException : Exception
     internal bool HasReservedBytes { get; set; }
 }
 
-partial class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
+partial class Aes256Cbc1(ILogger<Aes256Cbc1> logger) { }
+
+partial class Aes256Cbc1
 {
     internal const int PLAIN_TEXT_MAX_BYTES = 100 * 1024 * 1024;
-    internal const int PLAIN_TEXT_LENGTH_BYTES = 4;
 
     internal const int TAUTENED_BYTES = 4;
     internal const int RESERVED_BYTES = 4;
@@ -108,7 +111,7 @@ partial class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         );
     }
 
-    void EnsureInitialized()
+    internal void EnsureInitialized()
     {
         if (_initialized == false)
         {
@@ -116,8 +119,14 @@ partial class Aes256Cbc1(ILogger<Aes256Cbc1> logger)
         }
     }
 
-    internal int GetCipherTextLength(int intputSize) =>
-        _aes.GetCiphertextLengthCbc(intputSize, _aes.Padding);
+    internal int GetCipherTextLength(int intputSize)
+    {
+        EnsureInitialized();
+
+        var result = _aes.GetCiphertextLengthCbc(intputSize, _aes.Padding);
+
+        return result;
+    }
 }
 
 partial class Aes256Cbc1
@@ -156,7 +165,9 @@ partial class Aes256Cbc1
         readonly ICryptoTransform _encryptTransform;
         readonly Stream _sourceStream;
         readonly bool _isCompressed;
+        readonly int _sourceLength;
         readonly MemoryStream _headerStream;
+        readonly long _length;
 
         long _totalRead;
 
@@ -164,17 +175,21 @@ partial class Aes256Cbc1
             Aes256Cbc1 cihper,
             Stream sourceInput,
             bool isCompressed,
+            int sourceLength,
             ReadOnlySpan<byte> extraPayload
         )
         {
             _cipher = cihper;
-            _isCompressed = isCompressed;
             _sourceStream = sourceInput;
+            _sourceLength = sourceLength;
+            _isCompressed = isCompressed;
+
             _headerStream = new();
             _encryptTransform = _cipher.PrepareForEncryption(_ivData);
 
             PrepareHeaderStream(extraPayload);
             _headerStream.Position = 0;
+            _length = _headerStream.Length + _sourceStream.Length - _sourceStream.Position;
         }
 
         void PrepareHeaderStream(ReadOnlySpan<byte> extraPayload)
@@ -193,14 +208,10 @@ partial class Aes256Cbc1
 
             _headerStream.WriteByte((byte)primaryFlags);
 
-            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(_sourceStream.Length, 0);
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(
-                _sourceStream.Length,
-                PLAIN_TEXT_MAX_BYTES
-            );
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(_sourceLength, 0);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(_sourceLength, PLAIN_TEXT_MAX_BYTES);
 
-            var sourceLength = (int)_sourceStream.Length;
-            var sourceLengthData = BitConverter.GetBytes(sourceLength);
+            var sourceLengthData = BitConverter.GetBytes(_sourceLength);
             if (BitConverter.IsLittleEndian)
             {
                 Array.Reverse(sourceLengthData);
@@ -211,8 +222,11 @@ partial class Aes256Cbc1
             ArgumentOutOfRangeException.ThrowIfGreaterThan(extraPayload.Length, byte.MaxValue);
             var extraPayloadLength = (byte)extraPayload.Length;
 
-            _headerStream.WriteByte(extraPayloadLength);
-            _headerStream.Write(extraPayload);
+            if (extraPayload.Length > 0)
+            {
+                _headerStream.WriteByte(extraPayloadLength);
+                _headerStream.Write(extraPayload);
+            }
         }
 
         public override bool CanRead => _sourceStream.CanRead;
@@ -221,7 +235,7 @@ partial class Aes256Cbc1
 
         public override bool CanWrite => false;
 
-        public override long Length => _headerStream.Length + _sourceStream.Length;
+        public override long Length => _length;
 
         public override long Position
         {
@@ -270,9 +284,11 @@ partial class Aes256Cbc1
             throw new NotSupportedException();
         }
 
+        internal bool IsCompressed => _isCompressed;
+
         internal int GetOutputLength()
         {
-            var cipherTextLength = _cipher.GetCipherTextLength((int)Length);
+            var cipherTextLength = _cipher.GetCipherTextLength((int)_length);
             var result = CIPHER_TEXT_OFFSET + cipherTextLength;
 
             return result;
@@ -326,19 +342,34 @@ partial class Aes256Cbc1
     {
         readonly EncryptorStream _encStream;
 
+        readonly long _contentLength;
+
         internal Encryptor(
             Aes256Cbc1 cipher,
             Stream sourceInput,
             bool isCompressed,
-            ReadOnlySpan<byte> deltaBashHash
+            int sourceLength,
+            ReadOnlySpan<byte> extraPayload
         )
         {
             cipher.EnsureInitialized();
 
-            _encStream = new EncryptorStream(cipher, sourceInput, isCompressed, deltaBashHash);
+            _encStream = new EncryptorStream(
+                cipher,
+                sourceInput,
+                isCompressed,
+                sourceLength,
+                extraPayload
+            );
+
+            _contentLength = sourceInput.Length - sourceInput.Position;
         }
 
+        internal bool IsCompressed => _encStream.IsCompressed;
+
         internal int GetOutputLength() => _encStream.GetOutputLength();
+
+        internal int GetContentLength() => (int)_contentLength;
 
         internal void ProduceOutput(
             Stream outputStream,
@@ -362,18 +393,70 @@ partial class Aes256Cbc1
         }
     }
 
-    internal Encryptor CreateEncryptor(Stream sourceInput, bool isBinary)
+    internal Encryptor CreateEncryptor(Stream sourceInput, double compressionMaxRatio = 0.0)
     {
-        return CreateEncryptor(sourceInput, isBinary, []);
+        return CreateEncryptor(sourceInput, compressionMaxRatio, []);
     }
 
     internal Encryptor CreateEncryptor(
         Stream sourceInput,
-        bool isCompressed,
-        ReadOnlySpan<byte> soruceExtraInfo
+        double compressionMaxRatio,
+        ReadOnlySpan<byte> extraPayload
     )
     {
-        var encryptor = new Encryptor(this, sourceInput, isCompressed, soruceExtraInfo);
+        var sourceLength = sourceInput.Length - sourceInput.Position;
+
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(sourceLength, PLAIN_TEXT_MAX_BYTES);
+
+        var isCompressed = false;
+        var inputStream = sourceInput;
+
+        if (compressionMaxRatio > 0.0)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(compressionMaxRatio, 0.1);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(compressionMaxRatio, 0.9);
+
+            var compressedBufferSize = (int)(sourceInput.Length * compressionMaxRatio);
+            var compressedBuffer = new byte[compressedBufferSize];
+            var compressedStream = new MemoryStream(compressedBuffer);
+
+            using (
+                var encompressionStream = new CompressionStream(compressedStream, leaveOpen: true)
+            )
+            {
+                try
+                {
+                    sourceInput.CopyTo(encompressionStream);
+                    isCompressed = true;
+                }
+                catch (NotSupportedException)
+                {
+                    isCompressed = false;
+                }
+            }
+
+            if (isCompressed)
+            {
+                var compressedLength = compressedStream.Position;
+
+                compressedStream.Position = 0;
+                compressedStream.SetLength(compressedLength);
+
+                inputStream = compressedStream;
+
+                logger.ZLogTrace(
+                    $"Compress encryptor input from {sourceInput.Length} to {compressedLength}"
+                );
+            }
+        }
+
+        var encryptor = new Encryptor(
+            this,
+            inputStream,
+            isCompressed,
+            (int)sourceLength,
+            extraPayload
+        );
 
         return encryptor;
     }
@@ -428,6 +511,7 @@ partial class Aes256Cbc1
         int _outputOffset;
 
         bool _headerExamined;
+
         bool _outputProduced;
 
         internal DecryptorStream(Aes256Cbc1 cipher, Stream sourceInput)
@@ -497,14 +581,30 @@ partial class Aes256Cbc1
 
         internal void WriteToEnd(Stream outputStream)
         {
+            if (_outputProduced)
+            {
+                throw new InvalidOperationException($"The output has already been produced");
+            }
+            _outputProduced = true;
+
             ExamineHeader();
 
-            _cryptoStream.CopyTo(outputStream);
+            if (_isCompressed)
+            {
+                using var decompressionStream = new DecompressionStream(
+                    _cryptoStream,
+                    leaveOpen: true
+                );
+
+                decompressionStream.CopyTo(outputStream);
+            }
+            else
+            {
+                _cryptoStream.CopyTo(outputStream);
+            }
 
             _cryptoStream.Dispose();
             _cryptoStream = null;
-
-            _outputProduced = true;
         }
 
         internal void DecryptAdditional(Stream inputStream, Stream outputStream)
@@ -598,12 +698,12 @@ partial class Aes256Cbc1
             {
                 throw new InvalidDataException($"Cannot read {nameof(KEY_TAG_BYTES)}");
             }
+
+            _decryptTransform = _cipher.PrepareForDecryption(_ivData);
         }
 
         void ExamineContentHeader()
         {
-            _decryptTransform = _cipher.PrepareForDecryption(_ivData);
-
             _cryptoStream = new CryptoStream(
                 _sourceStream,
                 _decryptTransform,
@@ -658,7 +758,7 @@ partial class Aes256Cbc1
 
         internal ReadOnlySpan<byte> GetExtraPayload() => _decStream.ExtraPayload;
 
-        internal bool IsCompressed() => _decStream.IsCompressed;
+        internal bool IsCompressed => _decStream.IsCompressed;
 
         internal void ProduceOutput(
             Stream outputStream,

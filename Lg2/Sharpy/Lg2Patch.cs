@@ -61,7 +61,7 @@ public static unsafe class Lg2PatchExtensions
         return new(buf);
     }
 
-    public static Lg2Buf.Lg2BufReadStream NewReadStream(this Lg2Patch patch)
+    public static Lg2Buf.ReadStream NewReadStream(this Lg2Patch patch)
     {
         var buf = Dump(patch);
         return buf.NewReadStream();

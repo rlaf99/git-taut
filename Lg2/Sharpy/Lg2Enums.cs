@@ -1,9 +1,13 @@
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
+
+public enum Lg2OidType
+{
+    LG2_OID_SHA1 = git_oid_t.GIT_OID_SHA1,
+}
 
 public enum Lg2ObjectType
 {
