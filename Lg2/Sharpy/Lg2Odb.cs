@@ -167,13 +167,18 @@ public unsafe class Lg2OdbReadStream : Stream
     public override long Position
     {
         get => _totalRead;
-        set => throw new NotSupportedException($"Setting {nameof(Position)} is not supported");
+        set => throw new NotSupportedException();
     }
 
-    public override void Flush() { } // do nothing
+    public override void Flush()
+    {
+        throw new NotSupportedException();
+    }
 
     public override int Read(byte[] buffer, int offset, int count)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         var dataRead = _strm.Read(buffer.AsSpan(offset, count));
 
         _totalRead += dataRead;
@@ -183,31 +188,32 @@ public unsafe class Lg2OdbReadStream : Stream
 
     public override long Seek(long offset, SeekOrigin origin)
     {
-        throw new NotSupportedException($"'{nameof(Seek)}' not supported");
+        throw new NotSupportedException();
     }
 
     public override void SetLength(long value)
     {
-        throw new NotSupportedException($"'{nameof(SetLength)}' not supported");
+        throw new NotSupportedException();
     }
 
     public override void Write(byte[] buffer, int offset, int count)
     {
-        throw new NotSupportedException($"'{nameof(Write)}' not supported");
+        throw new NotSupportedException();
     }
 
     bool _disposed;
 
     protected override void Dispose(bool disposing)
     {
-        if (_disposed == false)
+        if (_disposed)
         {
-            _disposed = true;
+            return;
+        }
+        _disposed = true;
 
-            if (disposing)
-            {
-                _strm.Dispose();
-            }
+        if (disposing)
+        {
+            _strm.Dispose();
         }
 
         base.Dispose(disposing);
@@ -234,29 +240,32 @@ public unsafe class Lg2OdbWriteStream : Stream
     public override long Position
     {
         get => _wstrm.GetReceivedBytes();
-        set => throw new NotSupportedException($"Setting {nameof(Position)} is not supported");
+        set => throw new NotSupportedException();
     }
 
     public override void Flush() { } // do nonthing
 
     public override int Read(byte[] buffer, int offset, int count)
     {
-        throw new NotSupportedException($"'{nameof(Read)}' not supported");
+        throw new NotSupportedException();
     }
 
     public override long Seek(long offset, SeekOrigin origin)
     {
-        throw new NotSupportedException($"'{nameof(Seek)}' not supported");
+        throw new NotSupportedException();
     }
 
     public override void SetLength(long value)
     {
-        throw new NotSupportedException($"'{nameof(SetLength)}' not supported");
+        throw new NotSupportedException();
     }
 
     public override void Write(byte[] buffer, int offset, int count)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         var data = buffer.AsSpan(offset, count);
+
         _wstrm.Write(data);
     }
 
@@ -264,14 +273,15 @@ public unsafe class Lg2OdbWriteStream : Stream
 
     protected override void Dispose(bool disposing)
     {
-        if (_disposed == false)
+        if (_disposed)
         {
-            _disposed = true;
+            return;
+        }
+        _disposed = true;
 
-            if (disposing)
-            {
-                _wstrm.Dispose();
-            }
+        if (disposing)
+        {
+            _wstrm.Dispose();
         }
 
         base.Dispose(disposing);
@@ -478,7 +488,7 @@ public unsafe class Lg2OdbObjectReadStream : Stream
     readonly Lg2OdbObject _odbObject;
     readonly byte* _ptr;
     readonly long _len;
-    long _position;
+    long _totalRead;
 
     internal Lg2OdbObjectReadStream(Lg2OdbObject odbObject)
     {
@@ -500,11 +510,11 @@ public unsafe class Lg2OdbObjectReadStream : Stream
 
     public override long Position
     {
-        get => _position;
+        get => _totalRead;
         set
         {
             ArgumentOutOfRangeException.ThrowIfGreaterThan(value, _len);
-            _position = value;
+            _totalRead = value;
         }
     }
 
@@ -515,13 +525,15 @@ public unsafe class Lg2OdbObjectReadStream : Stream
 
     public override int Read(byte[] buffer, int offset, int count)
     {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+
         var dataRead = 0;
 
         var target = buffer.AsSpan(offset, count);
 
-        while (_position < _len && dataRead < target.Length)
+        while (_totalRead < _len && dataRead < target.Length)
         {
-            target[dataRead++] = _ptr[_position++];
+            target[dataRead++] = _ptr[_totalRead++];
         }
 
         return dataRead;
@@ -540,6 +552,24 @@ public unsafe class Lg2OdbObjectReadStream : Stream
     public override void Write(byte[] buffer, int offset, int count)
     {
         throw new NotSupportedException();
+    }
+
+    bool _isDisposed;
+
+    protected override void Dispose(bool disposing)
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+        _isDisposed = true;
+
+        if (disposing)
+        {
+            _odbObject.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 }
 
