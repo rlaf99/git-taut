@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using ConsoleAppFramework;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Logging;
@@ -28,8 +29,6 @@ partial class GitRemoteHelper(
     const string cmdPush = "push";
     const string cmdFetch = "fetch";
     const string cmdOption = "option";
-
-    const string tautDirName = "taut";
 }
 
 partial class GitRemoteHelper
@@ -400,16 +399,23 @@ partial class GitRemoteHelper
 
 partial class GitRemoteHelper
 {
-    string _remote = default!;
-    string _address = default!;
-    string _hostRepoDir = default!;
-    string _tautRepoDir = default!;
+    [AllowNull]
+    string _remote;
+
+    [AllowNull]
+    string _address;
+
+    [AllowNull]
+    string _hostRepoDir;
+
+    [AllowNull]
+    string _tautRepoDir;
 
     /// <summary>
     /// Act as a Git remote helper.
     /// </summary>
-    /// <param name="remote">Remote name.</param>
-    /// <param name="address">Remote address.</param>
+    /// <param name="remote">Remote name passed from Git.</param>
+    /// <param name="address">Remote address passed from Git.</param>
     [Command("--remote-helper")]
     public async Task HandleGitCommandsAsync(
         [Argument] string remote,
@@ -471,10 +477,13 @@ partial class GitRemoteHelper
 
         _hostRepoDir = gitDir;
 
-        var tautDir = Path.Join(_hostRepoDir, tautDirName);
+        var tautDir = Path.Join(_hostRepoDir, GitRepoHelper.TautDir);
+        var tautDirUri = new Uri(tautDir, UriKind.Absolute);
+        tautDir = tautDirUri.AbsolutePath;
+
         Directory.CreateDirectory(tautDir);
 
-        logger.ZLogTrace($"Taut dir locates at '{tautDir}'");
+        logger.ZLogTrace($"Taut directory locates at '{tautDir}'");
 
         _tautRepoDir = tautDir;
     }
@@ -483,9 +492,10 @@ partial class GitRemoteHelper
     {
         gitCli.Execute("clone", "--bare", _address, _tautRepoDir);
 
-        logger.ZLogTrace($"Clone '{_remote}' to '{_tautRepoDir}'");
+        logger.ZLogTrace($"Clone '{_remote}' from '{_address}' to '{_tautRepoDir}'");
 
-        tautManager.Open(_tautRepoDir, newSetup: true);
+        tautManager.Open(_tautRepoDir);
+        tautManager.SetupTautAndHost(_remote);
     }
 
     void GitFetchTaut()

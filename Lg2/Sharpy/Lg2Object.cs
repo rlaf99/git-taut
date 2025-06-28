@@ -3,10 +3,14 @@ using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
 
-public interface ILg2ObjectInfo
+public interface ILg2ObjectType
+{
+    Lg2ObjectType GetObjectType();
+}
+
+public interface ILg2ObjectInfo : ILg2ObjectType
 {
     Lg2OidPlainRef GetOidPlainRef();
-    Lg2ObjectType GetObjectType();
 }
 
 public static unsafe class Lg2objInfoExtensions

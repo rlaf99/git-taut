@@ -7,10 +7,13 @@ using ZstdSharp;
 
 namespace Git.Taut;
 
-class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1 cipher)
+class TautManager(
+    ILogger<TautManager> logger,
+    KeyValueStore kvStore,
+    Aes256Cbc1 cipher,
+    ILoggerFactory loggerFactory
+)
 {
-    const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
-
     [AllowNull]
     Lg2Repository _tautRepo;
 
@@ -50,18 +53,15 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
     const string RegainedRefSpecText = "refs/*:refs/regained/*";
     const string RemoteRefSpecText = "refs/*:refs/remotes/*";
 
-    [AllowNull]
-    Lg2RefSpec _tautenedRefSpec;
+    readonly Lg2RefSpec _tautenedRefSpec = Lg2RefSpec.NewForPush(TautenedRefSpecText);
 
     internal Lg2RefSpec TautenedRefSpec => _tautenedRefSpec!;
 
-    [AllowNull]
-    Lg2RefSpec _regainedRefSpec;
+    readonly Lg2RefSpec _regainedRefSpec = Lg2RefSpec.NewForFetch(RegainedRefSpecText);
 
     internal Lg2RefSpec RegainedRefSpec => _regainedRefSpec!;
 
-    [AllowNull]
-    Lg2RefSpec _remoteRefSpec;
+    readonly Lg2RefSpec _remoteRefSpec = Lg2RefSpec.NewForPush(RemoteRefSpecText);
 
     internal Lg2RefSpec RemoteRefSpec => _remoteRefSpec!;
 
@@ -70,13 +70,11 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
     [AllowNull]
     Lg2PathSpec _targetPathSpec;
 
-    readonly Compressor _compressor = new();
-
     const int DELTA_ENCODING_MIN_BYTES = 100;
     const double DELTA_ENCODING_MAX_RATIO = 0.6;
     const double DATA_COMPRESSION_MAX_RATIO = 0.8;
 
-    internal void Open(string repoPath, bool newSetup = false)
+    internal void Open(string repoPath)
     {
         _tautRepo = Lg2Repository.New(repoPath);
         _hostRepo = Lg2Repository.New(Path.Join(repoPath, ".."));
@@ -87,74 +85,24 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
             throw new InvalidOperationException($"Only oid type {name} is supported");
         }
 
-        _tautenedRefSpec = Lg2RefSpec.NewForPush(TautenedRefSpecText);
-        _regainedRefSpec = Lg2RefSpec.NewForFetch(RegainedRefSpecText);
-        _remoteRefSpec = Lg2RefSpec.NewForPush(RemoteRefSpecText);
-
         _targetPathSpec = Lg2PathSpec.New(targetPathSpecList);
 
         kvStore.Init(KvStoreLocation);
 
         cipher.Init();
 
-        if (newSetup)
-        {
-            SetupNewTautRepo();
-        }
-
         logger.ZLogTrace($"{nameof(TautManager)}: {nameof(Open)} '{repoPath}'");
     }
 
-    void SetupNewTautRepo()
+    internal void SetupTautAndHost(string remoteName)
     {
-        void SetDefaultDescription()
-        {
-            var descriptionFile = Path.Join(TautRepoPath, GitRepoHelper.Description);
-
-            File.Delete(descriptionFile);
-
-            using (var writer = File.AppendText(descriptionFile))
-            {
-                writer.NewLine = "\n";
-                writer.WriteLine(defaultDescription);
-            }
-
-            logger.ZLogTrace($"Write '{defaultDescription}' to '{descriptionFile}'");
-        }
-
-        SetDefaultDescription();
-
-        void SetDefaultConfig()
-        {
-            using var config = _tautRepo.GetConfig();
-            config.SetString(GitConfig.Fetch_Prune, "true");
-        }
-
-        SetDefaultConfig();
-
-        void AddHostObjects()
-        {
-            var objectsDir = Path.Join(TautRepoPath, GitRepoHelper.ObjectsDir);
-
-            var objectsInfoAlternatesFile = Path.Join(
-                TautRepoPath,
-                GitRepoHelper.ObjectsInfoAlternatesFile
-            );
-
-            var hostRepoObjectsDir = Path.Join(HostRepoPath, GitRepoHelper.ObjectsDir);
-
-            var relPathToHostObjects = Path.GetRelativePath(objectsDir, hostRepoObjectsDir);
-
-            using (var writer = File.AppendText(objectsInfoAlternatesFile))
-            {
-                writer.NewLine = "\n";
-                writer.WriteLine(relPathToHostObjects);
-            }
-
-            logger.ZLogTrace($"Write '{relPathToHostObjects}' to '{objectsInfoAlternatesFile}'");
-        }
-
-        AddHostObjects();
+        var setupHelper = new TautSetupHelper(
+            loggerFactory.CreateLogger<TautSetupHelper>(),
+            remoteName,
+            _tautRepo,
+            _hostRepo
+        );
+        setupHelper.SetupTautAndHost();
     }
 
     internal List<string> RegainedTautRefs
@@ -551,7 +499,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var tautRepoOdb = _tautRepo.GetOdb();
         using var hostRepoOdb = _hostRepo.GetOdb();
 
-        using var readStream = tautRepoOdb.ReadToStream(blob);
+        using var readStream = tautRepoOdb.ReadAsStream(blob);
 
         var fileNameStream = new MemoryStream(Convert.FromHexString(fileName), writable: false);
         var regainedFileNameStream = new MemoryStream();
@@ -565,7 +513,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         var regainedFileName = Encoding.UTF8.GetString(regainedFileNameData);
 
-        logger.ZLogTrace($"Regain file name '{regainedFileName}' from '{fileName}'");
+        logger.ZLogTrace($"Regain '{regainedFileName}' from file name '{fileName}'");
 
         return regainedFileName;
     }
@@ -575,7 +523,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var tautRepoOdb = _tautRepo.GetOdb();
         using var hostRepoOdb = _hostRepo.GetOdb();
 
-        using var readStream = tautRepoOdb.ReadToStream(blob);
+        using var readStream = tautRepoOdb.ReadAsStream(blob);
 
         var fileNameStream = new MemoryStream(Convert.FromHexString(fileName), writable: false);
         var regainedFileNameStream = new MemoryStream();
@@ -627,7 +575,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         var regainedFileName = Encoding.UTF8.GetString(regainedFileNameData);
 
-        logger.ZLogTrace($"Regain file name '{regainedFileName}' from '{fileName}'");
+        logger.ZLogTrace($"Regain '{regainedFileName}' from file name '{fileName}'");
 
         return regainedFileName;
     }
@@ -1005,10 +953,9 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         Dictionary<string, string> tautenedFilePaths
     )
     {
-        using var hostRepoOdb = _hostRepo.GetOdb();
         using var tautRepoOdb = _tautRepo.GetOdb();
 
-        var readStream = hostRepoOdb.ReadToStream(tautenedBlob);
+        var readStream = tautRepoOdb.ReadAsStream(tautenedBlob);
         var recryptor = cipher.CreateRecryptor(readStream);
 
         var fileName = Path.GetFileName(filePath);
@@ -1024,7 +971,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         tautenedFilePaths.Add(filePath, tautenedFilename);
 
-        logger.ZLogTrace($"Tauten file name '{tautenedFilename}' from '{filePath}'");
+        logger.ZLogTrace($"Tauten '{tautenedFilename}' from file name '{filePath}'");
     }
 
     void TautenBlob(
@@ -1037,7 +984,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
         using var hostRepoOdb = _hostRepo.GetOdb();
         using var tautRepoOdb = _tautRepo.GetOdb();
 
-        var readStream = hostRepoOdb.ReadToStream(blob);
+        var readStream = hostRepoOdb.ReadAsStream(blob);
 
         var encryptor = cipher.CreateEncryptor(readStream, DATA_COMPRESSION_MAX_RATIO);
 
@@ -1064,7 +1011,7 @@ class TautManager(ILogger<TautManager> logger, KeyValueStore kvStore, Aes256Cbc1
 
         tautenedFileNames.Add(filePath, tautenedFilename);
 
-        logger.ZLogTrace($"Tauten file name '{tautenedFilename}' from '{filePath}'");
+        logger.ZLogTrace($"Tauten '{tautenedFilename}' from file name '{filePath}'");
     }
 
     internal void RebuildKvStore()

@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Lg2.Native;
+using static Lg2.Native.git_error_code;
 using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
@@ -140,7 +141,7 @@ public static unsafe class Lg2OdbStreamExtensions
     }
 }
 
-public unsafe class Lg2OdbReadStream : Stream
+public unsafe class Lg2OdbReadStream : Stream, ILg2ObjectType
 {
     readonly Lg2OdbStream _strm;
     readonly long _length;
@@ -217,6 +218,11 @@ public unsafe class Lg2OdbReadStream : Stream
         }
 
         base.Dispose(disposing);
+    }
+
+    public Lg2ObjectType GetObjectType()
+    {
+        return _objType;
     }
 }
 
@@ -378,9 +384,32 @@ public static unsafe class Lg2OdbExtenions
         return new(pOdbObject);
     }
 
-    public static Lg2OdbObjectReadStream ReadToStream(this Lg2Odb odb, Lg2OidPlainRef oidRef)
+    public static Stream ReadAsStream(this Lg2Odb odb, Lg2OidPlainRef oidRef)
     {
+        int rc;
+
+        {
+            git_odb_stream* pOdbStream = null;
+            nuint len;
+            git_object_t type;
+
+            rc = git_odb_open_rstream(&pOdbStream, &len, &type, odb.Ptr, oidRef.Ptr);
+
+            if (rc == 0)
+            {
+                Lg2OdbStream strm = new(pOdbStream);
+
+                return new Lg2OdbReadStream(strm, (long)len, type.GetLg2());
+            }
+        }
+
+        if (rc != (int)GIT_ENOTFOUND)
+        {
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+
         var odbObject = odb.Read(oidRef);
+
         return odbObject.NewReadStream();
     }
 
@@ -411,20 +440,20 @@ public static unsafe class Lg2OdbExtenions
 
     public static bool CopyObjectIfNotExists(
         this Lg2Odb odb,
-        Lg2Odb another,
+        Lg2Odb otherOdb,
         Lg2OidPlainRef oidRef,
-        bool refreshAnotherOdb = false
+        bool refreshOtherOdb = false
     )
     {
         bool alreadyExists;
 
-        if (refreshAnotherOdb)
+        if (refreshOtherOdb)
         {
-            alreadyExists = another.Exists(oidRef);
+            alreadyExists = otherOdb.Exists(oidRef);
         }
         else
         {
-            alreadyExists = another.ExistsExt(oidRef, Lg2OdbLookupFlags.LG2_ODB_LOOKUP_NO_REFRESH);
+            alreadyExists = otherOdb.ExistsExt(oidRef, Lg2OdbLookupFlags.LG2_ODB_LOOKUP_NO_REFRESH);
         }
 
         if (alreadyExists)
@@ -432,14 +461,22 @@ public static unsafe class Lg2OdbExtenions
             return false;
         }
 
-        var odbObject = odb.Read(oidRef);
+        var readStream = odb.ReadAsStream(oidRef);
+        if (readStream is not ILg2ObjectType objType)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(readStream)} does not implement {nameof(ILg2ObjectType)}"
+            );
+        }
 
+        var writeStream = otherOdb.OpenWriteStream(readStream.Length, objType.GetObjectType());
+        readStream.CopyTo(writeStream);
         Lg2Oid oid = new();
-        another.Write(odbObject.GetObjectData(), odbObject.GetObjectType(), ref oid);
+        writeStream.FinalizeWrite(ref oid);
 
         if (oidRef.Equals(oid.PlainRef) == false)
         {
-            throw new InvalidDataException($"Copying object results in different oid");
+            throw new InvalidDataException($"Copying object results in different oids");
         }
 
         return true;
@@ -483,11 +520,12 @@ public static unsafe class Lg2OdbExtenions
     }
 }
 
-public unsafe class Lg2OdbObjectReadStream : Stream
+public unsafe class Lg2OdbObjectReadStream : Stream, ILg2ObjectType
 {
     readonly Lg2OdbObject _odbObject;
     readonly byte* _ptr;
     readonly long _len;
+    readonly Lg2ObjectType _type;
     long _totalRead;
 
     internal Lg2OdbObjectReadStream(Lg2OdbObject odbObject)
@@ -498,6 +536,8 @@ public unsafe class Lg2OdbObjectReadStream : Stream
 
         _ptr = (byte*)git_odb_object_data(odbObject.Ptr);
         _len = (long)git_odb_object_size(odbObject.Ptr);
+        _type = git_odb_object_type(odbObject.Ptr).GetLg2();
+        ;
     }
 
     public override bool CanRead => true;
@@ -570,6 +610,11 @@ public unsafe class Lg2OdbObjectReadStream : Stream
         }
 
         base.Dispose(disposing);
+    }
+
+    public Lg2ObjectType GetObjectType()
+    {
+        return _type;
     }
 }
 

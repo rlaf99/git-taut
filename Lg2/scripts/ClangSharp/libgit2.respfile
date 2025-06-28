@@ -31,6 +31,7 @@ git_diff_flag_t=uint
 git_diff_stats_format_t=uint
 git_diff_find_t=uint
 git_index_add_option_t=uint
+git_credential_t=uint
 
 --traverse
 thirdparty/libgit2/include/git2/global.h
@@ -61,6 +62,12 @@ thirdparty/libgit2/include/git2/signature.h
 thirdparty/libgit2/include/git2/patch.h
 thirdparty/libgit2/include/git2/apply.h
 thirdparty/libgit2/include/git2/index.h
+thirdparty/libgit2/include/git2/remote.h
+thirdparty/libgit2/include/git2/proxy.h
+thirdparty/libgit2/include/git2/cert.h
+thirdparty/libgit2/include/git2/indexer.h
+thirdparty/libgit2/include/git2/credential.h
+thirdparty/libgit2/include/git2/sys/credential.h
 
 
 --file

@@ -775,6 +775,29 @@ namespace Lg2.Native
         public static extern int git_blob_dup(git_blob** @out, git_blob* source);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_indexer_options_init(git_indexer_options* opts, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_indexer_new(git_indexer** @out, [NativeTypeName("const char *")] sbyte* path, [NativeTypeName("unsigned int")] uint mode, git_odb* odb, git_indexer_options* opts);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_indexer_append(git_indexer* idx, [NativeTypeName("const void *")] void* data, [NativeTypeName("size_t")] nuint size, git_indexer_progress* stats);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_indexer_commit(git_indexer* idx, git_indexer_progress* stats);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const git_oid *")]
+        public static extern git_oid* git_indexer_hash([NativeTypeName("const git_indexer *")] git_indexer* idx);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const char *")]
+        public static extern sbyte* git_indexer_name([NativeTypeName("const git_indexer *")] git_indexer* idx);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_indexer_free(git_indexer* idx);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_index_open(git_index** @out, [NativeTypeName("const char *")] sbyte* index_path);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -944,6 +967,193 @@ namespace Lg2.Native
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_refspec_rtransform(git_buf* @out, [NativeTypeName("const git_refspec *")] git_refspec* spec, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_credential_free(git_credential* cred);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_credential_has_username(git_credential* cred);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const char *")]
+        public static extern sbyte* git_credential_get_username(git_credential* cred);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_credential_userpass_plaintext_new(git_credential** @out, [NativeTypeName("const char *")] sbyte* username, [NativeTypeName("const char *")] sbyte* password);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_credential_default_new(git_credential** @out);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_credential_username_new(git_credential** @out, [NativeTypeName("const char *")] sbyte* username);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_credential_ssh_key_new(git_credential** @out, [NativeTypeName("const char *")] sbyte* username, [NativeTypeName("const char *")] sbyte* publickey, [NativeTypeName("const char *")] sbyte* privatekey, [NativeTypeName("const char *")] sbyte* passphrase);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_credential_ssh_key_memory_new(git_credential** @out, [NativeTypeName("const char *")] sbyte* username, [NativeTypeName("const char *")] sbyte* publickey, [NativeTypeName("const char *")] sbyte* privatekey, [NativeTypeName("const char *")] sbyte* passphrase);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_credential_ssh_interactive_new(git_credential** @out, [NativeTypeName("const char *")] sbyte* username, [NativeTypeName("git_credential_ssh_interactive_cb")] delegate* unmanaged[Cdecl]<sbyte*, int, sbyte*, int, int, _LIBSSH2_USERAUTH_KBDINT_PROMPT*, _LIBSSH2_USERAUTH_KBDINT_RESPONSE*, void**, void> prompt_callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_credential_ssh_key_from_agent(git_credential** @out, [NativeTypeName("const char *")] sbyte* username);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_credential_ssh_custom_new(git_credential** @out, [NativeTypeName("const char *")] sbyte* username, [NativeTypeName("const char *")] sbyte* publickey, [NativeTypeName("size_t")] nuint publickey_len, [NativeTypeName("git_credential_sign_cb")] delegate* unmanaged[Cdecl]<_LIBSSH2_SESSION*, byte**, nuint*, byte*, nuint, void**, int> sign_callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_proxy_options_init(git_proxy_options* opts, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_create(git_remote** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* url);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_create_options_init(git_remote_create_options* opts, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_create_with_opts(git_remote** @out, [NativeTypeName("const char *")] sbyte* url, [NativeTypeName("const git_remote_create_options *")] git_remote_create_options* opts);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_create_with_fetchspec(git_remote** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* url, [NativeTypeName("const char *")] sbyte* fetch);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_create_anonymous(git_remote** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* url);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_create_detached(git_remote** @out, [NativeTypeName("const char *")] sbyte* url);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_lookup(git_remote** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_dup(git_remote** dest, git_remote* source);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern git_repository* git_remote_owner([NativeTypeName("const git_remote *")] git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const char *")]
+        public static extern sbyte* git_remote_name([NativeTypeName("const git_remote *")] git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const char *")]
+        public static extern sbyte* git_remote_url([NativeTypeName("const git_remote *")] git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const char *")]
+        public static extern sbyte* git_remote_pushurl([NativeTypeName("const git_remote *")] git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_set_url(git_repository* repo, [NativeTypeName("const char *")] sbyte* remote, [NativeTypeName("const char *")] sbyte* url);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_set_pushurl(git_repository* repo, [NativeTypeName("const char *")] sbyte* remote, [NativeTypeName("const char *")] sbyte* url);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_set_instance_url(git_remote* remote, [NativeTypeName("const char *")] sbyte* url);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_set_instance_pushurl(git_remote* remote, [NativeTypeName("const char *")] sbyte* url);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_add_fetch(git_repository* repo, [NativeTypeName("const char *")] sbyte* remote, [NativeTypeName("const char *")] sbyte* refspec);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_get_fetch_refspecs(git_strarray* array, [NativeTypeName("const git_remote *")] git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_add_push(git_repository* repo, [NativeTypeName("const char *")] sbyte* remote, [NativeTypeName("const char *")] sbyte* refspec);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_get_push_refspecs(git_strarray* array, [NativeTypeName("const git_remote *")] git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("size_t")]
+        public static extern nuint git_remote_refspec_count([NativeTypeName("const git_remote *")] git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const git_refspec *")]
+        public static extern git_refspec* git_remote_get_refspec([NativeTypeName("const git_remote *")] git_remote* remote, [NativeTypeName("size_t")] nuint n);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_ls([NativeTypeName("const git_remote_head ***")] git_remote_head*** @out, [NativeTypeName("size_t *")] nuint* size, git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_connected([NativeTypeName("const git_remote *")] git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_stop(git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_disconnect(git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_remote_free(git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_list(git_strarray* @out, git_repository* repo);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_init_callbacks(git_remote_callbacks* opts, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_fetch_options_init(git_fetch_options* opts, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_push_options_init(git_push_options* opts, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_connect_options_init(git_remote_connect_options* opts, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_connect(git_remote* remote, git_direction direction, [NativeTypeName("const git_remote_callbacks *")] git_remote_callbacks* callbacks, [NativeTypeName("const git_proxy_options *")] git_proxy_options* proxy_opts, [NativeTypeName("const git_strarray *")] git_strarray* custom_headers);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_connect_ext(git_remote* remote, git_direction direction, [NativeTypeName("const git_remote_connect_options *")] git_remote_connect_options* opts);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_download(git_remote* remote, [NativeTypeName("const git_strarray *")] git_strarray* refspecs, [NativeTypeName("const git_fetch_options *")] git_fetch_options* opts);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_upload(git_remote* remote, [NativeTypeName("const git_strarray *")] git_strarray* refspecs, [NativeTypeName("const git_push_options *")] git_push_options* opts);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_update_tips(git_remote* remote, [NativeTypeName("const git_remote_callbacks *")] git_remote_callbacks* callbacks, [NativeTypeName("unsigned int")] uint update_flags, git_remote_autotag_option_t download_tags, [NativeTypeName("const char *")] sbyte* reflog_message);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_fetch(git_remote* remote, [NativeTypeName("const git_strarray *")] git_strarray* refspecs, [NativeTypeName("const git_fetch_options *")] git_fetch_options* opts, [NativeTypeName("const char *")] sbyte* reflog_message);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_prune(git_remote* remote, [NativeTypeName("const git_remote_callbacks *")] git_remote_callbacks* callbacks);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_push(git_remote* remote, [NativeTypeName("const git_strarray *")] git_strarray* refspecs, [NativeTypeName("const git_push_options *")] git_push_options* opts);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const git_indexer_progress *")]
+        public static extern git_indexer_progress* git_remote_stats(git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern git_remote_autotag_option_t git_remote_autotag([NativeTypeName("const git_remote *")] git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_set_autotag(git_repository* repo, [NativeTypeName("const char *")] sbyte* remote, git_remote_autotag_option_t value);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_prune_refs([NativeTypeName("const git_remote *")] git_remote* remote);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_rename(git_strarray* problems, git_repository* repo, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* new_name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_name_is_valid(int* valid, [NativeTypeName("const char *")] sbyte* remote_name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_delete(git_repository* repo, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_remote_default_branch(git_buf* @out, git_remote* remote);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void git_config_entry_free(git_config_entry* entry);
@@ -1494,6 +1704,9 @@ namespace Lg2.Native
         [NativeTypeName("#define GIT_BLOB_FILTER_OPTIONS_VERSION 1")]
         public const int GIT_BLOB_FILTER_OPTIONS_VERSION = 1;
 
+        [NativeTypeName("#define GIT_INDEXER_OPTIONS_VERSION 1")]
+        public const int GIT_INDEXER_OPTIONS_VERSION = 1;
+
         [NativeTypeName("#define GIT_INDEX_ENTRY_NAMEMASK (0x0fff)")]
         public const int GIT_INDEX_ENTRY_NAMEMASK = (0x0fff);
 
@@ -1505,6 +1718,24 @@ namespace Lg2.Native
 
         [NativeTypeName("#define GIT_DEFAULT_PORT \"9418\"")]
         public static ReadOnlySpan<byte> GIT_DEFAULT_PORT => "9418"u8;
+
+        [NativeTypeName("#define GIT_PROXY_OPTIONS_VERSION 1")]
+        public const int GIT_PROXY_OPTIONS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_REMOTE_CREATE_OPTIONS_VERSION 1")]
+        public const int GIT_REMOTE_CREATE_OPTIONS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_REMOTE_CALLBACKS_VERSION 1")]
+        public const int GIT_REMOTE_CALLBACKS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_FETCH_OPTIONS_VERSION 1")]
+        public const int GIT_FETCH_OPTIONS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_PUSH_OPTIONS_VERSION 1")]
+        public const int GIT_PUSH_OPTIONS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_REMOTE_CONNECT_OPTIONS_VERSION 1")]
+        public const int GIT_REMOTE_CONNECT_OPTIONS_VERSION = 1;
 
         [NativeTypeName("#define GIT_ODB_OPTIONS_VERSION 1")]
         public const int GIT_ODB_OPTIONS_VERSION = 1;

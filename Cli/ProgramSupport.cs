@@ -154,7 +154,7 @@ internal class ExtraCommands
             throw new OperationCanceledException();
         }
 
-        var tautRepoFullPath = Path.Join(hostRepo.GetPath(), GitRepoHelper.TautRepoDir);
+        var tautRepoFullPath = Path.Join(hostRepo.GetPath(), GitRepoHelper.TautDir);
         var tautRepoRelPath = Path.GetRelativePath(currentDir, tautRepoFullPath);
 
         Lg2Repository? tautRepo = null;
