@@ -71,7 +71,7 @@ partial class Aes256Cbc1
 
     internal const int KEY_ITERATION_COUNT = 64007;
 
-    internal const int PLAIN_TEXT_PREAMBLE_BYTES = 4;
+    internal const int PLAIN_TEXT_SCRAMBLE_BYTES = 4;
 
 #pragma warning disable IDE0300 // Simplify collection initialization
     internal static readonly byte[] TAUTENED_DATA = new byte[TAUTENED_BYTES] { 0, 9, 9, 0xa1 };
@@ -218,11 +218,11 @@ partial class Aes256Cbc1
                 primaryFlags |= ContentHeaderPrimaryFlags.ExtraPayloadPresent;
             }
 
-            var preambleData = new byte[PLAIN_TEXT_PREAMBLE_BYTES];
-            RandomNumberGenerator.Fill(preambleData);
-            preambleData[0] = (byte)primaryFlags;
+            var scrambleData = new byte[PLAIN_TEXT_SCRAMBLE_BYTES];
+            RandomNumberGenerator.Fill(scrambleData);
+            scrambleData[0] = (byte)primaryFlags;
 
-            _headerStream.Write(preambleData);
+            _headerStream.Write(scrambleData);
 
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(_sourceLength, 0);
             ArgumentOutOfRangeException.ThrowIfGreaterThan(_sourceLength, PLAIN_TEXT_MAX_BYTES);
@@ -809,10 +809,10 @@ partial class Aes256Cbc1
                 CryptoStreamMode.Read
             );
 
-            var preambleData = new byte[PLAIN_TEXT_PREAMBLE_BYTES];
-            _cryptoStream.ReadExactly(preambleData);
-            _outputOffset += PLAIN_TEXT_PREAMBLE_BYTES;
-            var primaryFlags = (ContentHeaderPrimaryFlags)preambleData[0];
+            var scrambleData = new byte[PLAIN_TEXT_SCRAMBLE_BYTES];
+            _cryptoStream.ReadExactly(scrambleData);
+            _outputOffset += PLAIN_TEXT_SCRAMBLE_BYTES;
+            var primaryFlags = (ContentHeaderPrimaryFlags)scrambleData[0];
 
             if (primaryFlags.HasFlag(ContentHeaderPrimaryFlags.ContentIsCompressed))
             {

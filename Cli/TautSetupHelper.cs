@@ -12,12 +12,14 @@ class TautSetupHelper(
 )
 {
     const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
+    const string tautPrefix = "taut::";
 
     internal void SetupTautAndHost()
     {
         TautSetDescription();
-        TautSetConfig();
         TautAddHostObjects();
+        TautSetConfig();
+        TautSetRemote();
     }
 
     void TautSetDescription()
@@ -41,7 +43,33 @@ class TautSetupHelper(
         config.SetString(GitConfigHelper.Fetch_Prune, "true");
     }
 
-    void HostSetConfig() { }
+    void TautSetRemote()
+    {
+        using (var remote = tautRepo.LookupRemote(remoteName))
+        {
+            var remoteUrl = remote.GetUrl();
+            var remoteUri = new Uri(remoteUrl);
+
+            if (remoteUri.IsFile)
+            {
+                // normalize the remote's file path
+                tautRepo.SetRemoteUrl(remoteName, remoteUri.AbsolutePath);
+
+                HostSetRemote(remoteUri);
+            }
+        }
+    }
+
+    void HostSetRemote(Uri tautRemoteUri)
+    {
+        if (tautRemoteUri.IsFile)
+        {
+            var builder = new UriBuilder(tautRemoteUri) { Host = "localhost" };
+            var hostRemoteUrl = tautPrefix + builder.Uri.AbsoluteUri;
+
+            hostRepo.SetRemoteUrl(remoteName, hostRemoteUrl);
+        }
+    }
 
     void TautAddHostObjects()
     {
