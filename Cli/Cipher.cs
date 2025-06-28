@@ -1,8 +1,10 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Microsoft.IO;
 using ZLogger;
 using ZstdSharp;
 
@@ -53,7 +55,7 @@ class InvalidTautenedDataException : Exception
     internal bool HasReservedBytes { get; set; }
 }
 
-partial class Aes256Cbc1(ILogger<Aes256Cbc1> logger);
+partial class Aes256Cbc1(ILogger<Aes256Cbc1> logger, RecyclableMemoryStreamManager streamManager);
 
 partial class Aes256Cbc1
 {
@@ -480,23 +482,55 @@ partial class Aes256Cbc1
             ArgumentOutOfRangeException.ThrowIfGreaterThan(compressionMaxRatio, 0.9);
 
             var compressedBufferSize = (int)(sourceInput.Length * compressionMaxRatio);
-            var compressedBuffer = new byte[compressedBufferSize];
-            var compressedStream = new MemoryStream(compressedBuffer);
+            var compressedStream = streamManager.GetStream(
+                null,
+                requiredSize: compressedBufferSize
+            );
 
-            try
+            bool SizedCompress()
             {
                 using var encompressionStream = new CompressionStream(
                     compressedStream,
+                    bufferSize: 512,
                     leaveOpen: true
                 );
 
-                sourceInput.CopyTo(encompressionStream);
-                isCompressed = true;
+                var buffer = ArrayPool<byte>.Shared.Rent(1024);
+                try
+                {
+                    var startPosition = compressedStream.Position;
+                    for (; ; )
+                    {
+                        var dataRead = sourceInput.Read(buffer, 0, buffer.Length);
+                        if (dataRead == 0)
+                        {
+                            break;
+                        }
+
+                        encompressionStream.Write(buffer, 0, dataRead);
+
+                        if (compressedStream.Position - startPosition > compressedBufferSize)
+                        {
+                            return false;
+                        }
+                    }
+
+                    encompressionStream.Flush();
+
+                    if (compressedStream.Position - startPosition > compressedBufferSize)
+                    {
+                        return false;
+                    }
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(buffer);
+                }
+
+                return true;
             }
-            catch (NotSupportedException)
-            {
-                isCompressed = false;
-            }
+
+            isCompressed = SizedCompress();
 
             if (isCompressed)
             {
@@ -843,32 +877,32 @@ partial class Aes256Cbc1
             }
         }
 
-        // bool _isDisposed;
+        bool _isDisposed;
 
-        // protected override void Dispose(bool disposing)
-        // {
-        //     if (_isDisposed)
-        //     {
-        //         return;
-        //     }
-        //     _isDisposed = true;
+        protected override void Dispose(bool disposing)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+            _isDisposed = true;
 
-        //     if (disposing)
-        //     {
-        //         if (_decKey is not null)
-        //         {
-        //             Array.Fill<byte>(_decKey, 0);
-        //         }
-        //         if (_leaveOpen == false)
-        //         {
-        //             _sourceStream.Dispose();
-        //         }
-        //         _cryptoStream?.Dispose();
-        //         _cryptoStream = null;
-        //     }
+            if (disposing)
+            {
+                if (_decKey is not null)
+                {
+                    Array.Fill<byte>(_decKey, 0);
+                }
+                if (_leaveOpen == false)
+                {
+                    _sourceStream.Dispose();
+                }
+                _cryptoStream?.Dispose();
+                _cryptoStream = null;
+            }
 
-        //     base.Dispose(disposing);
-        // }
+            base.Dispose(disposing);
+        }
     }
 
     internal sealed class Decryptor : IDisposable

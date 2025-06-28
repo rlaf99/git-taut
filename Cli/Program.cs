@@ -4,6 +4,7 @@ using Lg2.Sharpy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.IO;
 using ZLogger;
 
 using var lg2Global = new Lg2Global();
@@ -34,6 +35,7 @@ var app = ConsoleApp
         services.AddSingleton<TautManager>();
         services.AddSingleton<KeyValueStore>();
         services.AddSingleton<Aes256Cbc1>();
+        services.AddSingleton<RecyclableMemoryStreamManager>();
     })
     .ConfigureLogging(
         (config, logging) =>

@@ -7,6 +7,7 @@ namespace Cli.Tests;
 public sealed partial class Aes256Cbc1Tests : IDisposable
 {
     LoggerFactoryFixture _loggerFactory;
+    StreamManagerFixture _streamManager;
 
     [AllowNull]
     Aes256Cbc1 _cihper;
@@ -18,10 +19,12 @@ Why lovest thou that which thou receivest not gladly,
 Or else receivest with pleasure thine annoy?
 """;
 
-    public Aes256Cbc1Tests(LoggerFactoryFixture loggerFactory)
+    public Aes256Cbc1Tests(LoggerFactoryFixture loggerFactory, StreamManagerFixture streamManager)
     {
         _loggerFactory = loggerFactory;
-        _cihper = new Aes256Cbc1(_loggerFactory.CreateLogger<Aes256Cbc1>());
+        _streamManager = streamManager;
+
+        _cihper = new Aes256Cbc1(_loggerFactory.CreateLogger<Aes256Cbc1>(), _streamManager.Get());
         _cihper.Init();
     }
 
@@ -33,7 +36,10 @@ Or else receivest with pleasure thine annoy?
     [Fact]
     public void NotInitialized()
     {
-        var cipher = new Aes256Cbc1(_loggerFactory.CreateLogger<Aes256Cbc1>());
+        var cipher = new Aes256Cbc1(
+            _loggerFactory.CreateLogger<Aes256Cbc1>(),
+            _streamManager.Get()
+        );
 
         Assert.Throws<InvalidOperationException>(() => cipher.EnsureInitialized());
         Assert.Throws<InvalidOperationException>(() => cipher.GetCipherTextLength(100));
@@ -42,14 +48,23 @@ Or else receivest with pleasure thine annoy?
     public class TestEncryptDecrypt : IDisposable
     {
         LoggerFactoryFixture _loggerFactory;
+        StreamManagerFixture _streamManager;
 
         [AllowNull]
         Aes256Cbc1 _cihper;
 
-        public TestEncryptDecrypt(LoggerFactoryFixture loggerFactory)
+        public TestEncryptDecrypt(
+            LoggerFactoryFixture loggerFactory,
+            StreamManagerFixture streamManager
+        )
         {
             _loggerFactory = loggerFactory;
-            _cihper = new Aes256Cbc1(_loggerFactory.CreateLogger<Aes256Cbc1>());
+            _streamManager = streamManager;
+
+            _cihper = new Aes256Cbc1(
+                _loggerFactory.CreateLogger<Aes256Cbc1>(),
+                _streamManager.Get()
+            );
             _cihper.Init();
         }
 

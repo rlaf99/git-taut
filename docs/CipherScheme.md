@@ -24,7 +24,7 @@ An overall header is added to the encryption output, and consists of the followi
   - Used to identify the content, fixed to `[0x0, 0x9, 0x9, 0xa1]`.
 - Reserved data (4 bytes)
   - Filled with zeroes by default.
-- Initalization Vector (16 bytes)
+- Initialization Vector (16 bytes)
   - This is the IV used for encryption/decryption.
   - First 12 bytes are randomly generated.
   - Remaining 4 bytes are derived from the keybase using HKDF using the preceding 12 bytes as salt.
