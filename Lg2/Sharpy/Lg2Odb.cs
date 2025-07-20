@@ -537,7 +537,6 @@ public unsafe class Lg2OdbObjectReadStream : Stream, ILg2ObjectType
         _ptr = (byte*)git_odb_object_data(odbObject.Ptr);
         _len = (long)git_odb_object_size(odbObject.Ptr);
         _type = git_odb_object_type(odbObject.Ptr).GetLg2();
-        ;
     }
 
     public override bool CanRead => true;

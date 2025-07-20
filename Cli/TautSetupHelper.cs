@@ -12,7 +12,6 @@ class TautSetupHelper(
 )
 {
     const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
-    const string tautPrefix = "taut::";
 
     internal void SetupTautAndHost()
     {
@@ -64,8 +63,8 @@ class TautSetupHelper(
     {
         if (tautRemoteUri.IsFile)
         {
-            var builder = new UriBuilder(tautRemoteUri) { Host = "localhost" };
-            var hostRemoteUrl = tautPrefix + builder.Uri.AbsoluteUri;
+            // var uriBuilder = new UriBuilder(tautRemoteUri) { Host = "localhost" };
+            var hostRemoteUrl = GitRepoHelper.AddTautRemoteHelperPrefix(tautRemoteUri.AbsoluteUri);
 
             hostRepo.SetRemoteUrl(remoteName, hostRemoteUrl);
         }

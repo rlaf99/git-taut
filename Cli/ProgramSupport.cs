@@ -44,9 +44,13 @@ internal class ExtraCommands
     /// </summary>
     /// <param name="filePath">The tautened file to reveal.</param>
     [Command("--reveal")]
-    public void Reveal([FromServices] Aes256Cbc1 cipher, [Argument] string filePath)
+    public void Reveal(
+        [FromServices] Aes256Cbc1 cipher,
+        [Argument] string filePath,
+        [FromServices] TautManager tautManager
+    )
     {
-        cipher.Init();
+        cipher.Init(tautManager.GetUserPasswordInBytes);
 
         try
         {
@@ -104,9 +108,13 @@ internal class ExtraCommands
     /// </summary>
     /// <param name="filePath">The tautened file to regain.</param>
     [Command("--regain")]
-    public void Regain([FromServices] Aes256Cbc1 cipher, [Argument] string filePath)
+    public void Regain(
+        [FromServices] Aes256Cbc1 cipher,
+        [Argument] string filePath,
+        [FromServices] TautManager tautManager
+    )
     {
-        cipher.Init();
+        cipher.Init(tautManager.GetUserPasswordInBytes);
 
         try
         {
@@ -138,7 +146,7 @@ internal class ExtraCommands
     {
         using (var tautRepo = LocateTautRepo())
         {
-            tautManager.Open(tautRepo.GetPath());
+            tautManager.Open(tautRepo.GetPath(), null);
         }
 
         tautManager.RebuildKvStore();

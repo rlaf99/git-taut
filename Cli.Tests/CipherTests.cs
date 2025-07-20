@@ -19,13 +19,18 @@ Why lovest thou that which thou receivest not gladly,
 Or else receivest with pleasure thine annoy?
 """;
 
+    byte[] GetUserPasswordInBytes()
+    {
+        return Encoding.ASCII.GetBytes("Hello!");
+    }
+
     public Aes256Cbc1Tests(LoggerFactoryFixture loggerFactory, StreamManagerFixture streamManager)
     {
         _loggerFactory = loggerFactory;
         _streamManager = streamManager;
 
         _cihper = new Aes256Cbc1(_loggerFactory.CreateLogger<Aes256Cbc1>(), _streamManager.Get());
-        _cihper.Init();
+        _cihper.Init(userPasswordFetcher: () => Encoding.ASCII.GetBytes("Hello!"));
     }
 
     public void Dispose()
@@ -65,7 +70,7 @@ Or else receivest with pleasure thine annoy?
                 _loggerFactory.CreateLogger<Aes256Cbc1>(),
                 _streamManager.Get()
             );
-            _cihper.Init();
+            _cihper.Init(() => Encoding.ASCII.GetBytes("Hello!"));
         }
 
         public void Dispose()
@@ -165,7 +170,7 @@ Or else receivest with pleasure thine annoy?
             var encOutputLength = enc.GetOutputLength();
             var encOutputStream = new MemoryStream();
 
-            MemoryStream? encExtraOutput = null;
+            MemoryStream encExtraOutput = new();
             if (extraInfo is null)
             {
                 enc.ProduceOutput(encOutputStream);
@@ -174,7 +179,6 @@ Or else receivest with pleasure thine annoy?
             {
                 var extraBytes = Encoding.UTF8.GetBytes(extraInfo);
                 var extraInput = new MemoryStream(extraBytes, writable: false);
-                encExtraOutput = new MemoryStream();
                 enc.ProduceOutput(encOutputStream, extraInput, encExtraOutput);
             }
 
@@ -202,7 +206,7 @@ Or else receivest with pleasure thine annoy?
             }
             else
             {
-                encExtraOutput!.Position = 0;
+                encExtraOutput.Position = 0;
                 var decExtraOutput = new MemoryStream();
                 dec.ProduceOutput(decOutputStream, encExtraOutput, decExtraOutput);
 
@@ -236,7 +240,7 @@ Or else receivest with pleasure thine annoy?
         }
 
         [Fact]
-        public void TryCompressionButNotApplied()
+        public void TryCompressionButMaxRatioTooSmall()
         {
             var input = Encoding.ASCII.GetBytes(Sonnet_VIII_Part1);
             var inputStream = new MemoryStream(input, writable: false);
@@ -245,6 +249,37 @@ Or else receivest with pleasure thine annoy?
             var enc = _cihper.CreateEncryptor(inputStream, compressionMaxRatio);
 
             Assert.False(enc.IsCompressed);
+
+            Assert.Equal(input.Length, enc.GetInputLength());
+
+            var outputLength = enc.GetOutputLength();
+
+            var output = new MemoryStream();
+            enc.ProduceOutput(output);
+
+            Assert.Equal(outputLength, output.Length);
+        }
+
+        [Fact]
+        public void TryCompressionButSourceTooSmall()
+        {
+            var input = Encoding.ASCII.GetBytes("abcde");
+            var inputStream = new MemoryStream(input, writable: false);
+
+            const double compressionMaxRatio = 0.9;
+            var enc = _cihper.CreateEncryptor(inputStream, compressionMaxRatio);
+
+            Assert.False(enc.IsCompressed);
+
+            var inputLength = enc.GetInputLength();
+            Assert.Equal(input.Length, inputLength);
+
+            var outputLength = enc.GetOutputLength();
+
+            var output = new MemoryStream();
+            enc.ProduceOutput(output);
+
+            Assert.Equal(outputLength, output.Length);
         }
 
         [Fact]

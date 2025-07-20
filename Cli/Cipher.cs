@@ -21,7 +21,12 @@ class UserKeyBase
         {
             if (_hashedPass is null)
             {
-                var userPassBytes = GetUserPasswordInBytes();
+                if (GetUserPassword is null)
+                {
+                    throw new InvalidOperationException($"{nameof(GetUserPassword)} is null");
+                }
+
+                var userPassBytes = GetUserPassword();
                 _hashedPass = SHA256.HashData(userPassBytes);
             }
 
@@ -29,17 +34,14 @@ class UserKeyBase
         }
     }
 
-    byte[] GetUserPasswordInBytes()
-    {
-        return Encoding.UTF8.GetBytes("Hello!");
-    }
+    internal Func<byte[]>? GetUserPassword { get; set; }
 
-    internal byte[] GenerateCipherKey(ReadOnlySpan<byte> salt, int keyLength, int iteration)
+    internal byte[] GenerateCipherKey(ReadOnlySpan<byte> salt, int keyLength, int iterationCount)
     {
         return Rfc2898DeriveBytes.Pbkdf2(
-            _hashedPass,
+            HashedPass,
             salt,
-            iteration,
+            iterationCount,
             HashAlgorithmName.SHA256,
             keyLength
         );
@@ -91,7 +93,7 @@ partial class Aes256Cbc1
 
     bool _initialized = false;
 
-    public void Init()
+    public void Init(Func<byte[]> userPasswordFetcher)
     {
         if (_initialized)
         {
@@ -105,7 +107,7 @@ partial class Aes256Cbc1
         _aes.Mode = UsedCipherMode;
         _aes.Padding = UsedPaddingMode;
 
-        _keyBase = new();
+        _keyBase = new() { GetUserPassword = userPasswordFetcher };
 
         Debug.Assert(RANDOM_BYTES + KEY_TAG_BYTES == CIPHER_BLOCK_BYTES);
 
@@ -185,7 +187,7 @@ partial class Aes256Cbc1
 
         internal EncryptorStream(
             Aes256Cbc1 cihper,
-            Stream sourceInput,
+            Stream inputStream,
             bool isCompressed,
             int sourceLength,
             ReadOnlySpan<byte> extraPayload,
@@ -195,7 +197,7 @@ partial class Aes256Cbc1
             _cipher = cihper;
             _encKey = _cipher.PrepareEncryptionKey(_ivData);
 
-            _sourceStream = sourceInput;
+            _sourceStream = inputStream;
             _sourceLength = sourceLength;
             _isCompressed = isCompressed;
 
@@ -203,6 +205,7 @@ partial class Aes256Cbc1
 
             PrepareHeaderStream(extraPayload);
             _headerStream.Position = 0;
+
             _length = _headerStream.Length + _sourceStream.Length - _sourceStream.Position;
         }
 
@@ -275,10 +278,7 @@ partial class Aes256Cbc1
 
         public override void Flush()
         {
-            if (_totalRead > _headerStream.Length)
-            {
-                _sourceStream.Flush();
-            }
+            throw new NotSupportedException();
         }
 
         public override int Read(byte[] buffer, int offset, int count)
@@ -341,6 +341,11 @@ partial class Aes256Cbc1
             );
 
             cryptoStream.CopyTo(outputStream);
+
+            if (_leaveOpen == false)
+            {
+                _sourceStream.Dispose();
+            }
         }
 
         internal void EncryptExternal(Stream input, Stream output)
@@ -391,7 +396,7 @@ partial class Aes256Cbc1
 
         internal Encryptor(
             Aes256Cbc1 cipher,
-            Stream sourceInput,
+            Stream inputStream,
             bool isCompressed,
             int sourceLength,
             ReadOnlySpan<byte> extraPayload,
@@ -400,16 +405,16 @@ partial class Aes256Cbc1
         {
             cipher.EnsureInitialized();
 
+            _inputLength = inputStream.Length - inputStream.Position;
+
             _encStream = new EncryptorStream(
                 cipher,
-                sourceInput,
+                inputStream,
                 isCompressed,
                 sourceLength,
                 extraPayload,
                 leaveOpen
             );
-
-            _inputLength = sourceInput.Length - sourceInput.Position;
         }
 
         internal bool IsCompressed => _encStream.IsCompressed;
@@ -481,75 +486,51 @@ partial class Aes256Cbc1
             ArgumentOutOfRangeException.ThrowIfLessThan(compressionMaxRatio, 0.1);
             ArgumentOutOfRangeException.ThrowIfGreaterThan(compressionMaxRatio, 0.9);
 
-            var compressedBufferSize = (int)(sourceInput.Length * compressionMaxRatio);
+            var compressedLengthLimit = (int)(sourceInput.Length * compressionMaxRatio);
             var compressedStream = streamManager.GetStream(
                 null,
-                requiredSize: compressedBufferSize
+                requiredSize: compressedLengthLimit
             );
 
-            bool SizedCompress()
-            {
-                using var encompressionStream = new CompressionStream(
+            using (
+                var encompressionStream = new CompressionStream(
                     compressedStream,
-                    bufferSize: 512,
+                    bufferSize: 1024,
                     leaveOpen: true
-                );
-
-                var buffer = ArrayPool<byte>.Shared.Rent(1024);
-                try
-                {
-                    var startPosition = compressedStream.Position;
-                    for (; ; )
-                    {
-                        var dataRead = sourceInput.Read(buffer, 0, buffer.Length);
-                        if (dataRead == 0)
-                        {
-                            break;
-                        }
-
-                        encompressionStream.Write(buffer, 0, dataRead);
-
-                        if (compressedStream.Position - startPosition > compressedBufferSize)
-                        {
-                            return false;
-                        }
-                    }
-
-                    encompressionStream.Flush();
-
-                    if (compressedStream.Position - startPosition > compressedBufferSize)
-                    {
-                        return false;
-                    }
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(buffer);
-                }
-
-                return true;
-            }
-
-            isCompressed = SizedCompress();
-
-            if (isCompressed)
+                )
+            )
             {
-                var compressedLength = compressedStream.Position;
-
-                compressedStream.Position = 0;
-                compressedStream.SetLength(compressedLength);
+                sourceInput.CopyTo(encompressionStream);
 
                 if (leaveOpen == false)
                 {
-                    inputStream.Dispose();
+                    sourceInput.Dispose();
                 }
                 leaveOpen = false;
+            }
 
-                inputStream = compressedStream;
+            logger.ZLogTrace(
+                $"Compress encryptor input from {sourceInput.Length} to {compressedStream.Length}"
+            );
+
+            compressedStream.Position = 0;
+
+            if (compressedStream.Length > compressedLengthLimit)
+            {
+                inputStream = new WrappedDecompressionStream(
+                    compressedStream,
+                    sourceLength,
+                    leaveOpen: false
+                );
 
                 logger.ZLogTrace(
-                    $"Compress encryptor input from {sourceInput.Length} to {compressedLength}"
+                    $"Compressed length ({compressedStream.Length}) is above the limit ({compressedLengthLimit})"
                 );
+            }
+            else
+            {
+                isCompressed = true;
+                inputStream = compressedStream;
             }
         }
 
@@ -559,7 +540,7 @@ partial class Aes256Cbc1
             isCompressed,
             (int)sourceLength,
             extraPayload,
-            leaveOpen
+            leaveOpen: leaveOpen
         );
 
         return encryptor;
@@ -665,10 +646,7 @@ partial class Aes256Cbc1
 
         public override void Flush()
         {
-            if (HeaderExamined)
-            {
-                _cryptoStream.Flush();
-            }
+            throw new NotSupportedException();
         }
 
         public override int Read(byte[] buffer, int offset, int count)
@@ -943,15 +921,15 @@ partial class Aes256Cbc1
             }
         }
 
-        bool _isDiposed;
+        bool _isDisposed;
 
         public void Dispose()
         {
-            if (_isDiposed)
+            if (_isDisposed)
             {
                 return;
             }
-            _isDiposed = true;
+            _isDisposed = true;
 
             _decStream.Dispose();
         }
@@ -986,15 +964,15 @@ partial class Aes256Cbc1
             _decStream.DecryptExternal(input, output);
         }
 
-        bool _isDiposed;
+        bool _isDisposed;
 
         public void Dispose()
         {
-            if (_isDiposed)
+            if (_isDisposed)
             {
                 return;
             }
-            _isDiposed = true;
+            _isDisposed = true;
 
             _decStream.Dispose();
         }

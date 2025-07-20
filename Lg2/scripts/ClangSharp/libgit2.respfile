@@ -21,6 +21,9 @@ git2-3f4182d
 --language
 c
 
+--with-using
+git_credential_username=System.Runtime.CompilerServices
+
 --with-type
 git_repository_init_flag_t=uint
 git_reference_format_t=uint

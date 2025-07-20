@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using ConsoleAppFramework;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Logging;
@@ -6,11 +7,22 @@ using ZLogger;
 
 namespace Git.Taut;
 
+static partial class GitRemoteHelperTraces
+{
+    [ZLoggerMessage(LogLevel.Trace, "Handle command '{line}'")]
+    internal static partial void TraceReceivedGitCommand(
+        this ILogger<GitRemoteHelper> logger,
+        string line
+    );
+}
+
 partial class GitRemoteHelper(
     ILogger<GitRemoteHelper> logger,
     GitCli gitCli,
     TautManager tautManager
-)
+);
+
+partial class GitRemoteHelper
 {
     // for pushing
     const string capPush = "push";
@@ -125,15 +137,6 @@ partial class GitRemoteHelper
     }
 
     readonly Options _options = new(logger);
-}
-
-static partial class GitRemoteHelperTraces
-{
-    [ZLoggerMessage(LogLevel.Trace, "Handle command '{line}'")]
-    internal static partial void TraceReceivedGitCommand(
-        this ILogger<GitRemoteHelper> logger,
-        string line
-    );
 }
 
 partial class GitRemoteHelper
@@ -417,7 +420,7 @@ partial class GitRemoteHelper
     /// <param name="remote">Remote name passed from Git.</param>
     /// <param name="address">Remote address passed from Git.</param>
     [Command("--remote-helper")]
-    public async Task HandleGitCommandsAsync(
+    public async Task TalkWithGitAsync(
         [Argument] string remote,
         [Argument] string address,
         CancellationToken cancellationToken
@@ -440,13 +443,13 @@ partial class GitRemoteHelper
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
-                    logger.ZLogWarning($"{nameof(HandleGitCommandsAsync)}: cancellation requested");
+                    logger.ZLogWarning($"{nameof(TalkWithGitAsync)}: cancellation requested");
                 }
 
                 if (_handleGitCommand is not null)
                 {
                     logger.ZLogWarning(
-                        $"{nameof(HandleGitCommandsAsync)}: no input when there is pending command"
+                        $"{nameof(TalkWithGitAsync)}: no input when there is pending command"
                     );
                 }
 
@@ -464,7 +467,7 @@ partial class GitRemoteHelper
             }
         }
 
-        logger.ZLogTrace($"Exiting {nameof(HandleGitCommandsAsync)}");
+        logger.ZLogTrace($"Exiting {nameof(TalkWithGitAsync)}");
     }
 
     void EnsureTautDir()
@@ -477,15 +480,15 @@ partial class GitRemoteHelper
 
         _hostRepoDir = gitDir;
 
-        var tautDir = Path.Join(_hostRepoDir, GitRepoHelper.TautDir);
-        var tautDirUri = new Uri(tautDir, UriKind.Absolute);
-        tautDir = tautDirUri.AbsolutePath;
+        logger.ZLogTrace($"Host repo locates at '{gitDir}'");
+
+        var tautDir = GitRepoHelper.GetTautDir(_hostRepoDir);
 
         Directory.CreateDirectory(tautDir);
 
-        logger.ZLogTrace($"Taut directory locates at '{tautDir}'");
-
         _tautRepoDir = tautDir;
+
+        logger.ZLogTrace($"Taut repo locates at '{tautDir}'");
     }
 
     void GitCloneTaut()
@@ -494,8 +497,7 @@ partial class GitRemoteHelper
 
         logger.ZLogTrace($"Clone '{_remote}' from '{_address}' to '{_tautRepoDir}'");
 
-        tautManager.Open(_tautRepoDir);
-        tautManager.SetupTautAndHost(_remote);
+        tautManager.Open(_tautRepoDir, _remote, newSetup: true);
     }
 
     void GitFetchTaut()
@@ -504,6 +506,6 @@ partial class GitRemoteHelper
 
         logger.ZLogTrace($"Update '{_tautRepoDir}'");
 
-        tautManager.Open(_tautRepoDir);
+        tautManager.Open(_tautRepoDir, _remote);
     }
 }

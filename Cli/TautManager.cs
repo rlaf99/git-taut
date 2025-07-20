@@ -70,14 +70,27 @@ class TautManager(
     [AllowNull]
     Lg2PathSpec _targetPathSpec;
 
+    [AllowNull]
+    string _remoteName;
+
     const int DELTA_ENCODING_MIN_BYTES = 100;
     const double DELTA_ENCODING_MAX_RATIO = 0.6;
     const double DATA_COMPRESSION_MAX_RATIO = 0.8;
 
-    internal void Open(string repoPath)
+    internal byte[] GetUserPasswordInBytes()
+    {
+        var result = Encoding.ASCII.GetBytes("Hello!");
+
+        logger.ZLogTrace($"Invoke {nameof(GetUserPasswordInBytes)}");
+
+        return result;
+    }
+
+    internal void Open(string repoPath, string? remoteName, bool newSetup = false)
     {
         _tautRepo = Lg2Repository.New(repoPath);
         _hostRepo = Lg2Repository.New(Path.Join(repoPath, ".."));
+        _remoteName = remoteName;
 
         if (_hostRepo.GetOidType() != Lg2OidType.LG2_OID_SHA1)
         {
@@ -89,12 +102,25 @@ class TautManager(
 
         kvStore.Init(KvStoreLocation);
 
-        cipher.Init();
+        cipher.Init(GetUserPasswordInBytes);
 
-        logger.ZLogTrace($"{nameof(TautManager)}: {nameof(Open)} '{repoPath}'");
+        if (newSetup)
+        {
+            ArgumentNullException.ThrowIfNull(remoteName);
+            SetupTautAndHost(remoteName);
+        }
+        else
+        {
+            if (remoteName is not null)
+            {
+                CheckTautAndHost(remoteName);
+            }
+        }
+
+        logger.ZLogTrace($"Open {nameof(TautManager)} with '{repoPath}'");
     }
 
-    internal void SetupTautAndHost(string remoteName)
+    void SetupTautAndHost(string remoteName)
     {
         var setupHelper = new TautSetupHelper(
             loggerFactory.CreateLogger<TautSetupHelper>(),
@@ -103,6 +129,30 @@ class TautManager(
             _hostRepo
         );
         setupHelper.SetupTautAndHost();
+    }
+
+    void CheckTautAndHost(string remoteName)
+    {
+        var tautRemote = _tautRepo.LookupRemote(remoteName);
+        var tautRemoteUrl = tautRemote.GetUrl();
+        var tautRemoteUri = new Uri(tautRemoteUrl);
+
+        var hostRemote = _hostRepo.LookupRemote(remoteName);
+        var hostRemoteUrl = hostRemote.GetUrl();
+        hostRemoteUrl = GitRepoHelper.RemoveTautRemoteHelperPrefix(hostRemoteUrl);
+        var hostRemoteUri = new Uri(hostRemoteUrl);
+
+        if (hostRemoteUri.IsFile)
+        {
+            if (hostRemoteUri.AbsolutePath != tautRemoteUri.AbsolutePath)
+            {
+                throw new InvalidOperationException(
+                    $"host remote '{remoteName}':'{hostRemoteUri.AbsolutePath}'"
+                        + $" and taut remote '{remoteName}':'{tautRemoteUri.AbsolutePath}'"
+                        + " do not have the same path"
+                );
+            }
+        }
     }
 
     internal List<string> RegainedTautRefs
