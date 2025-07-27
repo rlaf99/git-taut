@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
 
@@ -30,6 +31,28 @@ public sealed unsafe class Lg2Config
 
 public static unsafe class Lg2ConfigExtensions
 {
+    public static string GetString(this Lg2Config config, string name)
+    {
+        config.EnsureValid();
+
+        using var u8Name = new Lg2Utf8String(name);
+
+        git_buf buf = new();
+        try
+        {
+            var rc = git_config_get_string_buf(&buf, config.Ptr, u8Name.Ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+
+            var result = Marshal.PtrToStringUTF8((nint)buf.ptr);
+
+            return result!;
+        }
+        finally
+        {
+            git_buf_dispose(&buf);
+        }
+    }
+
     public static void SetString(this Lg2Config config, string name, string value)
     {
         config.EnsureValid();
@@ -50,6 +73,17 @@ unsafe partial class Lg2RepositoryExtensions
 
         git_config* pConfig = null;
         var rc = git_repository_config(&pConfig, repo.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new Lg2Config(pConfig);
+    }
+
+    public static Lg2Config GetConfigSnapshot(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        git_config* pConfig = null;
+        var rc = git_repository_config_snapshot(&pConfig, repo.Ptr);
         Lg2Exception.ThrowIfNotOk(rc);
 
         return new Lg2Config(pConfig);

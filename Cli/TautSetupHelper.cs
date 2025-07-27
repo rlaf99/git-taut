@@ -8,17 +8,20 @@ class TautSetupHelper(
     ILogger<TautSetupHelper> logger,
     string remoteName,
     Lg2Repository tautRepo,
-    Lg2Repository hostRepo
+    Lg2Repository hostRepo,
+    GitCli gitCli
 )
 {
     const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
+    const string tautCredentialUrl = "tautCredentialUrl";
+    const string tautCredentialKey = "tautCredentialKey";
 
     internal void SetupTautAndHost()
     {
         TautSetDescription();
         TautAddHostObjects();
-        TautSetConfig();
         TautSetRemote();
+        TautSetConfig();
     }
 
     void TautSetDescription()
@@ -49,25 +52,32 @@ class TautSetupHelper(
             var remoteUrl = remote.GetUrl();
             var remoteUri = new Uri(remoteUrl);
 
-            if (remoteUri.IsFile)
-            {
-                // normalize the remote's file path
-                tautRepo.SetRemoteUrl(remoteName, remoteUri.AbsolutePath);
+            // normalize the remote's file path
+            tautRepo.SetRemoteUrl(remoteName, remoteUri.AbsolutePath);
 
-                HostSetRemote(remoteUri);
+            using (var config = tautRepo.GetConfig())
+            {
+                var credUri = GitRepoHelper.ConvertToCredentialUri(remoteUri);
+                var credUrl = credUri.AbsoluteUri;
+
+                GitCredential gitCred = new(gitCli, credUrl);
+                gitCred.Fill();
+                gitCred.Approve();
+                gitCred.Reject();
+
+                var configName = $"remote.{remoteName}.{tautCredentialUrl}";
+                config.SetString(configName, $"{credUrl}");
             }
+
+            HostSetRemote(remoteUri);
         }
     }
 
     void HostSetRemote(Uri tautRemoteUri)
     {
-        if (tautRemoteUri.IsFile)
-        {
-            // var uriBuilder = new UriBuilder(tautRemoteUri) { Host = "localhost" };
-            var hostRemoteUrl = GitRepoHelper.AddTautRemoteHelperPrefix(tautRemoteUri.AbsoluteUri);
-
-            hostRepo.SetRemoteUrl(remoteName, hostRemoteUrl);
-        }
+        var hostRemoteUrl = GitRepoHelper.AddTautRemoteHelperPrefix(tautRemoteUri.AbsoluteUri);
+        logger.ZLogDebug($"hostRemoteUri {hostRemoteUrl}");
+        hostRepo.SetRemoteUrl(remoteName, hostRemoteUrl);
     }
 
     void TautAddHostObjects()

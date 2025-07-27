@@ -11,6 +11,7 @@ class TautManager(
     ILogger<TautManager> logger,
     KeyValueStore kvStore,
     Aes256Cbc1 cipher,
+    GitCli gitCli,
     ILoggerFactory loggerFactory
 )
 {
@@ -77,11 +78,51 @@ class TautManager(
     const double DELTA_ENCODING_MAX_RATIO = 0.6;
     const double DATA_COMPRESSION_MAX_RATIO = 0.8;
 
-    internal byte[] GetUserPasswordInBytes()
-    {
-        var result = Encoding.ASCII.GetBytes("Hello!");
+    [AllowNull]
+    List<string> _gitCredFillOutput;
 
-        logger.ZLogTrace($"Invoke {nameof(GetUserPasswordInBytes)}");
+    internal byte[] GetUserPasswordData()
+    {
+        var config = _hostRepo.GetConfigSnapshot();
+        var urlKey = $"remote.{_remoteName}.url";
+        var urlVal = config.GetString(urlKey);
+
+        logger.ZLogDebug($"Get config '{urlKey}' '{urlVal}'");
+
+        var uri = GitRepoHelper.ConvertHostUrlToCredentialUri(urlVal);
+
+        List<string> cliInput = [$"url={uri.AbsoluteUri}\n", $"username=dummy"];
+
+        var cliOutput = gitCli.ExecuteForOutput2(cliInput, "credential", "fill");
+
+        logger.ZLogDebug($"git credential output: {cliOutput}");
+
+        byte[] ParseForPasswordData()
+        {
+            foreach (var line in cliOutput)
+            {
+                var prefix = "password=";
+
+                if (line.StartsWith(prefix))
+                {
+                    var password = line[prefix.Length..];
+
+                    logger.ZLogDebug($"password {password}");
+
+                    var passwordData = Encoding.ASCII.GetBytes(password);
+
+                    logger.ZLogTrace($"Retrieve password from git");
+
+                    return passwordData;
+                }
+            }
+
+            throw new InvalidOperationException($"Cannot parse {cliOutput} for password");
+        }
+
+        var result = ParseForPasswordData();
+
+        _gitCredFillOutput = cliOutput;
 
         return result;
     }
@@ -102,7 +143,7 @@ class TautManager(
 
         kvStore.Init(KvStoreLocation);
 
-        cipher.Init(GetUserPasswordInBytes);
+        cipher.Init(GetUserPasswordData);
 
         if (newSetup)
         {
@@ -126,7 +167,8 @@ class TautManager(
             loggerFactory.CreateLogger<TautSetupHelper>(),
             remoteName,
             _tautRepo,
-            _hostRepo
+            _hostRepo,
+            gitCli
         );
         setupHelper.SetupTautAndHost();
     }
@@ -280,6 +322,17 @@ class TautManager(
     #region Regaining
 
     internal void RegainHostRefs()
+    {
+        RegainHostRefsPrivate();
+
+        if (_gitCredFillOutput is not null)
+        {
+            gitCli.Execute(_gitCredFillOutput, "credential", "approve");
+            _gitCredFillOutput = null;
+        }
+    }
+
+    void RegainHostRefsPrivate()
     {
         logger.ZLogTrace($"Start regaining host refs");
 
@@ -1093,221 +1146,220 @@ class TautManager(
     }
 
     #endregion Tautening
+}
 
+class PatchRegainStream : Stream
+{
+    readonly MemoryStream _targetStream;
 
-    class PatchRegainStream : Stream
+    static readonly byte[] s_diffGitDummyLine = Encoding.ASCII.GetBytes(
+        $"diff --git a/dummy b/dummy\n"
+    );
+
+    internal PatchRegainStream()
     {
-        readonly MemoryStream _targetStream;
+        _targetStream = new();
 
-        static readonly byte[] s_diffGitDummyLine = Encoding.ASCII.GetBytes(
-            $"diff --git a/dummy b/dummy\n"
-        );
+        _targetStream.Write(s_diffGitDummyLine);
+    }
 
-        internal PatchRegainStream()
+    public override bool CanRead => false;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => true;
+
+    public override long Length => _targetStream.Length;
+
+    public override long Position
+    {
+        get => _targetStream.Position;
+        set => throw new NotSupportedException();
+    }
+
+    public override void Flush()
+    {
+        throw new NotSupportedException();
+    }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override long Seek(long offset, SeekOrigin origin)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override void SetLength(long value)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        _targetStream.Write(buffer, offset, count);
+    }
+
+    internal byte[] GetBuffer()
+    {
+        return _targetStream.GetBuffer();
+    }
+}
+
+class PatchTautenStream : Stream
+{
+    readonly Stream _sourceStream;
+    readonly MemoryStream _headerStream;
+
+    readonly long _length;
+    readonly long _sourceHeaderOffset;
+
+    long _totalRead;
+
+    static readonly byte[] s_diffGit = Encoding.ASCII.GetBytes("diff --git");
+    static readonly byte[] s_tripleMinus = Encoding.ASCII.GetBytes("---");
+    static readonly byte[] s_tripleMinusDummyLine = Encoding.ASCII.GetBytes($"--- a/dummy\n");
+    static readonly byte[] s_triplePlus = Encoding.ASCII.GetBytes("+++");
+    static readonly byte[] s_triplePlusDummyLine = Encoding.ASCII.GetBytes($"+++ b/dummy\n");
+    static readonly byte[] s_doubleAt = Encoding.ASCII.GetBytes("@@");
+
+    internal PatchTautenStream(Stream patchInput)
+    {
+        _sourceStream = patchInput;
+        _headerStream = new();
+
+        PrepareHeaderStream();
+
+        _headerStream.Position = 0;
+        _sourceHeaderOffset = _sourceStream.Position;
+        _length = _headerStream.Length + _sourceStream.Length - _sourceHeaderOffset;
+    }
+
+    int ReadLine()
+    {
+        int dataRead = 0;
+
+        for (; ; )
         {
-            _targetStream = new();
+            var val = _sourceStream.ReadByte();
+            if (val == -1)
+            {
+                break;
+            }
 
-            _targetStream.Write(s_diffGitDummyLine);
+            _headerStream.WriteByte((byte)val);
+            dataRead++;
+
+            if (val == '\n')
+            {
+                break;
+            }
         }
 
-        public override bool CanRead => false;
+        return dataRead;
+    }
 
-        public override bool CanSeek => false;
-
-        public override bool CanWrite => true;
-
-        public override long Length => _targetStream.Length;
-
-        public override long Position
+    void PrepareHeaderStream()
+    {
+        for (int totalRead = 0; ; )
         {
-            get => _targetStream.Position;
-            set => throw new NotSupportedException();
-        }
+            var dataRead = ReadLine();
+            if (dataRead == 0)
+            {
+                break;
+            }
 
-        public override void Flush()
-        {
-            throw new NotSupportedException();
-        }
+            var buffer = _headerStream.GetBuffer();
+            var lineData = buffer.AsSpan(totalRead, dataRead);
+            if (lineData.StartsWith(s_diffGit))
+            {
+                _headerStream.SetLength(totalRead); // rewind
 
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            throw new NotSupportedException();
-        }
+                continue;
+            }
+            if (lineData.StartsWith(s_tripleMinus))
+            {
+                _headerStream.SetLength(totalRead); // rewind
+                _headerStream.Write(s_tripleMinusDummyLine);
+                totalRead = (int)_headerStream.Length;
 
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            throw new NotSupportedException();
-        }
+                continue;
+            }
+            if (lineData.StartsWith(s_triplePlus))
+            {
+                _headerStream.SetLength(totalRead); // rewind
+                _headerStream.Write(s_triplePlusDummyLine);
+                totalRead = (int)_headerStream.Length;
 
-        public override void SetLength(long value)
-        {
-            throw new NotSupportedException();
-        }
+                continue;
+            }
+            if (lineData.StartsWith(s_doubleAt))
+            {
+                break; // we have passed the diff header, time to break
+            }
 
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            _targetStream.Write(buffer, offset, count);
-        }
-
-        internal byte[] GetBuffer()
-        {
-            return _targetStream.GetBuffer();
+            totalRead = (int)_headerStream.Length;
         }
     }
 
-    class PatchTautenStream : Stream
+    public override bool CanRead => _sourceStream.CanRead;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => false;
+
+    public override long Length => _length;
+
+    public override long Position
     {
-        readonly Stream _sourceStream;
-        readonly MemoryStream _headerStream;
-
-        readonly long _length;
-        readonly long _sourceHeaderOffset;
-
-        long _totalRead;
-
-        static readonly byte[] s_diffGit = Encoding.ASCII.GetBytes("diff --git");
-        static readonly byte[] s_tripleMinus = Encoding.ASCII.GetBytes("---");
-        static readonly byte[] s_tripleMinusDummyLine = Encoding.ASCII.GetBytes($"--- a/dummy\n");
-        static readonly byte[] s_triplePlus = Encoding.ASCII.GetBytes("+++");
-        static readonly byte[] s_triplePlusDummyLine = Encoding.ASCII.GetBytes($"+++ b/dummy\n");
-        static readonly byte[] s_doubleAt = Encoding.ASCII.GetBytes("@@");
-
-        internal PatchTautenStream(Stream patchInput)
+        get => _totalRead;
+        set
         {
-            _sourceStream = patchInput;
-            _headerStream = new();
+            ArgumentOutOfRangeException.ThrowIfNotEqual(value, 0);
 
-            PrepareHeaderStream();
-
+            _totalRead = 0;
             _headerStream.Position = 0;
-            _sourceHeaderOffset = _sourceStream.Position;
-            _length = _headerStream.Length + _sourceStream.Length - _sourceHeaderOffset;
+            _sourceStream.Position = _sourceHeaderOffset;
         }
+    }
 
-        int ReadLine()
+    public override void Flush()
+    {
+        throw new NotSupportedException();
+    }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        int dataRead;
+
+        if (_headerStream.Position != _headerStream.Length)
         {
-            int dataRead = 0;
-
-            for (; ; )
-            {
-                var val = _sourceStream.ReadByte();
-                if (val == -1)
-                {
-                    break;
-                }
-
-                _headerStream.WriteByte((byte)val);
-                dataRead++;
-
-                if (val == '\n')
-                {
-                    break;
-                }
-            }
-
-            return dataRead;
+            dataRead = _headerStream.Read(buffer, offset, count);
         }
-
-        void PrepareHeaderStream()
+        else
         {
-            for (int totalRead = 0; ; )
-            {
-                var dataRead = ReadLine();
-                if (dataRead == 0)
-                {
-                    break;
-                }
-
-                var buffer = _headerStream.GetBuffer();
-                var lineData = buffer.AsSpan(totalRead, dataRead);
-                if (lineData.StartsWith(s_diffGit))
-                {
-                    _headerStream.SetLength(totalRead); // rewind
-
-                    continue;
-                }
-                if (lineData.StartsWith(s_tripleMinus))
-                {
-                    _headerStream.SetLength(totalRead); // rewind
-                    _headerStream.Write(s_tripleMinusDummyLine);
-                    totalRead = (int)_headerStream.Length;
-
-                    continue;
-                }
-                if (lineData.StartsWith(s_triplePlus))
-                {
-                    _headerStream.SetLength(totalRead); // rewind
-                    _headerStream.Write(s_triplePlusDummyLine);
-                    totalRead = (int)_headerStream.Length;
-
-                    continue;
-                }
-                if (lineData.StartsWith(s_doubleAt))
-                {
-                    break; // we have passed the diff header, time to break
-                }
-
-                totalRead = (int)_headerStream.Length;
-            }
+            dataRead = _sourceStream.Read(buffer, offset, count);
         }
 
-        public override bool CanRead => _sourceStream.CanRead;
+        _totalRead += dataRead;
 
-        public override bool CanSeek => false;
+        return dataRead;
+    }
 
-        public override bool CanWrite => false;
+    public override long Seek(long offset, SeekOrigin origin)
+    {
+        throw new NotSupportedException();
+    }
 
-        public override long Length => _length;
+    public override void SetLength(long value)
+    {
+        throw new NotSupportedException();
+    }
 
-        public override long Position
-        {
-            get => _totalRead;
-            set
-            {
-                ArgumentOutOfRangeException.ThrowIfNotEqual(value, 0);
-
-                _totalRead = 0;
-                _headerStream.Position = 0;
-                _sourceStream.Position = _sourceHeaderOffset;
-            }
-        }
-
-        public override void Flush()
-        {
-            throw new NotSupportedException();
-        }
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            int dataRead;
-
-            if (_headerStream.Position != _headerStream.Length)
-            {
-                dataRead = _headerStream.Read(buffer, offset, count);
-            }
-            else
-            {
-                dataRead = _sourceStream.Read(buffer, offset, count);
-            }
-
-            _totalRead += dataRead;
-
-            return dataRead;
-        }
-
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void SetLength(long value)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            throw new NotSupportedException();
-        }
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
     }
 }

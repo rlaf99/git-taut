@@ -50,7 +50,7 @@ internal class ExtraCommands
         [FromServices] TautManager tautManager
     )
     {
-        cipher.Init(tautManager.GetUserPasswordInBytes);
+        cipher.Init(tautManager.GetUserPasswordData);
 
         try
         {
@@ -114,7 +114,7 @@ internal class ExtraCommands
         [FromServices] TautManager tautManager
     )
     {
-        cipher.Init(tautManager.GetUserPasswordInBytes);
+        cipher.Init(tautManager.GetUserPasswordData);
 
         try
         {

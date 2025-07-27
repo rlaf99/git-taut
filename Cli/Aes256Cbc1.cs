@@ -1,52 +1,12 @@
-using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 using ZLogger;
 using ZstdSharp;
 
 namespace Git.Taut;
-
-class UserKeyBase
-{
-    [AllowNull]
-    byte[] _hashedPass;
-
-    internal byte[] HashedPass
-    {
-        get
-        {
-            if (_hashedPass is null)
-            {
-                if (GetUserPassword is null)
-                {
-                    throw new InvalidOperationException($"{nameof(GetUserPassword)} is null");
-                }
-
-                var userPassBytes = GetUserPassword();
-                _hashedPass = SHA256.HashData(userPassBytes);
-            }
-
-            return _hashedPass;
-        }
-    }
-
-    internal Func<byte[]>? GetUserPassword { get; set; }
-
-    internal byte[] GenerateCipherKey(ReadOnlySpan<byte> salt, int keyLength, int iterationCount)
-    {
-        return Rfc2898DeriveBytes.Pbkdf2(
-            HashedPass,
-            salt,
-            iterationCount,
-            HashAlgorithmName.SHA256,
-            keyLength
-        );
-    }
-}
 
 class InvalidTautenedDataException : Exception
 {
@@ -331,11 +291,11 @@ partial class Aes256Cbc1
 
             outputStream.Write(_ivData);
 
-            var encryptTransform = _cipher.GetEncryptionTransform(_encKey, _ivData);
+            var encTransform = _cipher.GetEncryptionTransform(_encKey, _ivData);
 
             using var cryptoStream = new CryptoStream(
                 this,
-                encryptTransform,
+                encTransform,
                 CryptoStreamMode.Read,
                 leaveOpen: true
             );
@@ -719,11 +679,11 @@ partial class Aes256Cbc1
         {
             ExamineOverallHeader();
 
-            var decryptTransform = _cipher.GetDecryptionTransform(_decKey!, _ivData);
+            var decTransform = _cipher.GetDecryptionTransform(_decKey!, _ivData);
 
             using var cryptoStream = new CryptoStream(
                 input,
-                decryptTransform,
+                decTransform,
                 CryptoStreamMode.Read,
                 leaveOpen: true
             );

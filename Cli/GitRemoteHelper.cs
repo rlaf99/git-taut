@@ -420,7 +420,7 @@ partial class GitRemoteHelper
     /// <param name="remote">Remote name passed from Git.</param>
     /// <param name="address">Remote address passed from Git.</param>
     [Command("--remote-helper")]
-    public async Task TalkWithGitAsync(
+    public async Task WorkWithGitAsync(
         [Argument] string remote,
         [Argument] string address,
         CancellationToken cancellationToken
@@ -443,13 +443,13 @@ partial class GitRemoteHelper
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
-                    logger.ZLogWarning($"{nameof(TalkWithGitAsync)}: cancellation requested");
+                    logger.ZLogWarning($"{nameof(WorkWithGitAsync)}: cancellation requested");
                 }
 
                 if (_handleGitCommand is not null)
                 {
                     logger.ZLogWarning(
-                        $"{nameof(TalkWithGitAsync)}: no input when there is pending command"
+                        $"{nameof(WorkWithGitAsync)}: no input when there is pending command"
                     );
                 }
 
@@ -467,7 +467,7 @@ partial class GitRemoteHelper
             }
         }
 
-        logger.ZLogTrace($"Exiting {nameof(TalkWithGitAsync)}");
+        logger.ZLogTrace($"Exiting {nameof(WorkWithGitAsync)}");
     }
 
     void EnsureTautDir()
