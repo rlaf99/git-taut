@@ -179,7 +179,72 @@ static class GitRepoHelper
 
 static class GitConfigHelper
 {
+    internal const string TautCredentialUrl = "tautCredentialUrl";
+    internal const string TautCredentialTag = "tautCredentialTag";
+
     internal const string Fetch_Prune = "fetch.prune";
+
+    internal static string GetNameOfTautCredentialUrl(string remoteName)
+    {
+        var result = $"remote.{remoteName}.{TautCredentialUrl}";
+
+        return result;
+    }
+
+    internal static string GetNameOfTautCredentialTag(string remoteName)
+    {
+        var result = $"remote.{remoteName}.{TautCredentialTag}";
+
+        return result;
+    }
+
+    internal static string GetTautCredentialUrl(this Lg2Config config, string remoteName)
+    {
+        config.EnsureValid();
+
+        var configName = GetNameOfTautCredentialUrl(remoteName);
+
+        var result = config.GetString(configName);
+
+        return result;
+    }
+
+    internal static string GetTautCredentialTag(this Lg2Config config, string remoteName)
+    {
+        config.EnsureValid();
+
+        var configName = GetNameOfTautCredentialTag(remoteName);
+
+        var result = config.GetString(configName);
+
+        return result;
+    }
+
+    internal static void SetTautCredentialTag(
+        this Lg2Config config,
+        string remoteName,
+        string value
+    )
+    {
+        config.EnsureValid();
+
+        var configName = GetNameOfTautCredentialTag(remoteName);
+
+        config.SetString(configName, value);
+    }
+
+    internal static void SetTautCredentialUrl(
+        this Lg2Config config,
+        string remoteName,
+        string value
+    )
+    {
+        config.EnsureValid();
+
+        var configName = GetNameOfTautCredentialUrl(remoteName);
+
+        config.SetString(configName, value);
+    }
 }
 
 static class ConfigurationExtensions

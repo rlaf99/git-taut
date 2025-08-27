@@ -81,53 +81,7 @@ class TautManager(
     [AllowNull]
     List<string> _gitCredFillOutput;
 
-    internal byte[] GetUserPasswordData()
-    {
-        var config = _hostRepo.GetConfigSnapshot();
-        var urlKey = $"remote.{_remoteName}.url";
-        var urlVal = config.GetString(urlKey);
-
-        logger.ZLogDebug($"Get config '{urlKey}' '{urlVal}'");
-
-        var uri = GitRepoHelper.ConvertHostUrlToCredentialUri(urlVal);
-
-        List<string> cliInput = [$"url={uri.AbsoluteUri}\n", $"username=dummy"];
-
-        var cliOutput = gitCli.ExecuteForOutput2(cliInput, "credential", "fill");
-
-        logger.ZLogDebug($"git credential output: {cliOutput}");
-
-        byte[] ParseForPasswordData()
-        {
-            foreach (var line in cliOutput)
-            {
-                var prefix = "password=";
-
-                if (line.StartsWith(prefix))
-                {
-                    var password = line[prefix.Length..];
-
-                    logger.ZLogDebug($"password {password}");
-
-                    var passwordData = Encoding.ASCII.GetBytes(password);
-
-                    logger.ZLogTrace($"Retrieve password from git");
-
-                    return passwordData;
-                }
-            }
-
-            throw new InvalidOperationException($"Cannot parse {cliOutput} for password");
-        }
-
-        var result = ParseForPasswordData();
-
-        _gitCredFillOutput = cliOutput;
-
-        return result;
-    }
-
-    internal void Open(string repoPath, string? remoteName, bool newSetup = false)
+    internal void Open(string repoPath, string remoteName, bool newSetup = false)
     {
         _tautRepo = Lg2Repository.New(repoPath);
         _hostRepo = Lg2Repository.New(Path.Join(repoPath, ".."));
@@ -143,25 +97,24 @@ class TautManager(
 
         kvStore.Init(KvStoreLocation);
 
-        cipher.Init(GetUserPasswordData);
+        UserKeyBase keyBase = new();
 
         if (newSetup)
         {
             ArgumentNullException.ThrowIfNull(remoteName);
-            SetupTautAndHost(remoteName);
+            SetupTautAndHost(remoteName, keyBase);
         }
         else
         {
-            if (remoteName is not null)
-            {
-                CheckTautAndHost(remoteName);
-            }
+            CheckTautAndHost(remoteName, keyBase);
         }
+
+        cipher.Init(keyBase);
 
         logger.ZLogTrace($"Open {nameof(TautManager)} with '{repoPath}'");
     }
 
-    void SetupTautAndHost(string remoteName)
+    void SetupTautAndHost(string remoteName, UserKeyBase keyBase)
     {
         var setupHelper = new TautSetupHelper(
             loggerFactory.CreateLogger<TautSetupHelper>(),
@@ -170,10 +123,10 @@ class TautManager(
             _hostRepo,
             gitCli
         );
-        setupHelper.SetupTautAndHost();
+        setupHelper.SetupTautAndHost(keyBase);
     }
 
-    void CheckTautAndHost(string remoteName)
+    void CheckTautAndHost(string remoteName, UserKeyBase keyBase)
     {
         var tautRemote = _tautRepo.LookupRemote(remoteName);
         var tautRemoteUrl = tautRemote.GetUrl();
@@ -193,6 +146,38 @@ class TautManager(
                         + $" and taut remote '{remoteName}':'{tautRemoteUri.AbsolutePath}'"
                         + " do not have the same path"
                 );
+            }
+        }
+
+        CheckCredentialTag(remoteName, keyBase);
+    }
+
+    void CheckCredentialTag(string remoteName, UserKeyBase keyBase)
+    {
+        using (var config = _tautRepo.GetConfig())
+        {
+            var credUrl = config.GetTautCredentialUrl(remoteName);
+            var credTag = config.GetTautCredentialTag(remoteName);
+
+            using (var gitCred = new GitCredential(gitCli, credUrl))
+            {
+                gitCred.Fill();
+
+                keyBase.SetPasswordData(gitCred.PasswordData);
+
+                var info = Encoding.ASCII.GetBytes(credUrl);
+                var credTagFromPass = keyBase.GenerateCredentialTag(info);
+
+                if (credTagFromPass.SequenceEqual(credTag) == false)
+                {
+                    gitCred.Reject();
+
+                    throw new InvalidOperationException(
+                        $"The credential for ${credUrl} does not match the existing one"
+                    );
+                }
+
+                gitCred.Approve();
             }
         }
     }

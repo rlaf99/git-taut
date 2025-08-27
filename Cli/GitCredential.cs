@@ -15,6 +15,10 @@ sealed class GitCredential : IDisposable
     [AllowNull]
     byte[] _passwordData;
 
+    internal byte[] PasswordData => _passwordData!;
+
+    internal string FilledInfo => _buf.ToString();
+
     internal GitCredential(GitCli cli, string url)
     {
         _cli = cli;
@@ -25,8 +29,8 @@ sealed class GitCredential : IDisposable
     {
         if (_buf.Length > 0)
         {
-            _buf.Append(line);
             _buf.Append('\n');
+            _buf.Append(line);
         }
         else
         {
@@ -80,11 +84,9 @@ sealed class GitCredential : IDisposable
     {
         ClearLastFill();
 
-        var uri = GitRepoHelper.ConvertHostUrlToCredentialUri(_url);
-
         void InputProvider(StreamWriter writer)
         {
-            var urlLine = $"url={uri.AbsoluteUri}";
+            var urlLine = $"url={_url}";
 
             writer.WriteLine(urlLine);
             writer.WriteLine();

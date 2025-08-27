@@ -50,7 +50,9 @@ internal class ExtraCommands
         [FromServices] TautManager tautManager
     )
     {
-        cipher.Init(tautManager.GetUserPasswordData);
+        var keyBase = ReadUserKeyBase();
+
+        cipher.Init(keyBase);
 
         try
         {
@@ -114,7 +116,9 @@ internal class ExtraCommands
         [FromServices] TautManager tautManager
     )
     {
-        cipher.Init(tautManager.GetUserPasswordData);
+        var keyBase = ReadUserKeyBase();
+
+        cipher.Init(keyBase);
 
         try
         {
@@ -177,6 +181,11 @@ internal class ExtraCommands
             throw new OperationCanceledException();
         }
         return tautRepo!;
+    }
+
+    UserKeyBase ReadUserKeyBase()
+    {
+        throw new NotImplementedException();
     }
 }
 

@@ -53,7 +53,7 @@ partial class Aes256Cbc1
 
     bool _initialized = false;
 
-    public void Init(Func<byte[]> userPasswordFetcher)
+    public void Init(UserKeyBase keyBase)
     {
         if (_initialized)
         {
@@ -62,12 +62,12 @@ partial class Aes256Cbc1
 
         _initialized = true;
 
+        _keyBase = keyBase;
+
         _aes = Aes.Create();
 
         _aes.Mode = UsedCipherMode;
         _aes.Padding = UsedPaddingMode;
-
-        _keyBase = new() { GetUserPassword = userPasswordFetcher };
 
         Debug.Assert(RANDOM_BYTES + KEY_TAG_BYTES == CIPHER_BLOCK_BYTES);
 
