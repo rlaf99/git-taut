@@ -109,9 +109,23 @@ class TautManager(
             CheckTautAndHost(remoteName, keyBase);
         }
 
+        ReadTautPatterns();
+
         cipher.Init(keyBase);
 
         logger.ZLogTrace($"Open {nameof(TautManager)} with '{repoPath}'");
+    }
+
+    void ReadTautPatterns()
+    {
+        using var config = _tautRepo.GetConfigSnapshot();
+
+        var tautPatterns = config.GetTautPatterns(_remoteName);
+
+        foreach (var pattern in tautPatterns)
+        {
+            logger.ZLogTrace($"Read {GitConfigHelper.TautPattern} '{pattern}'");
+        }
     }
 
     void SetupTautAndHost(string remoteName, UserKeyBase keyBase)

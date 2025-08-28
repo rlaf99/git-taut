@@ -182,6 +182,8 @@ static class GitConfigHelper
     internal const string TautCredentialUrl = "tautCredentialUrl";
     internal const string TautCredentialTag = "tautCredentialTag";
 
+    internal const string TautPattern = "tautPattern";
+
     internal const string Fetch_Prune = "fetch.prune";
 
     internal static string GetNameOfTautCredentialUrl(string remoteName)
@@ -194,6 +196,13 @@ static class GitConfigHelper
     internal static string GetNameOfTautCredentialTag(string remoteName)
     {
         var result = $"remote.{remoteName}.{TautCredentialTag}";
+
+        return result;
+    }
+
+    internal static string GetNameOfTautPattern(string remoteName)
+    {
+        var result = $"remote.{remoteName}.{TautPattern}";
 
         return result;
     }
@@ -245,9 +254,26 @@ static class GitConfigHelper
 
         config.SetString(configName, value);
     }
+
+    internal static List<string> GetTautPatterns(this Lg2Config config, string remoteName)
+    {
+        var name = GetNameOfTautPattern(remoteName);
+
+        var iter = config.NewIterator(name);
+
+        List<string> result = [];
+
+        for (Lg2ConfigIteratorEntry? entry; iter.Next(out entry); )
+        {
+            var val = entry.GetValue();
+            result.Add(val);
+        }
+
+        return result;
+    }
 }
 
-static class ConfigurationExtensions
+static class AppConfigurationExtensions
 {
     internal static bool GetGitTautTrace(this IConfiguration config)
     {

@@ -3,5 +3,6 @@
 
 #include "../../../thirdparty/libgit2/include/git2.h"
 #include "../../../thirdparty/libgit2/include/git2/sys/credential.h"
+#include "../../../thirdparty/libgit2/include/git2/sys/config.h"
 
 #endif

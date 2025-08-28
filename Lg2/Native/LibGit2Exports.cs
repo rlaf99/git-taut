@@ -1647,6 +1647,18 @@ namespace Lg2.Native
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_tag_name_is_valid(int* valid, [NativeTypeName("const char *")] sbyte* name);
 
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_init_backend(git_config_backend* backend, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_add_backend(git_config* cfg, git_config_backend* file, git_config_level_t level, [NativeTypeName("const git_repository *")] git_repository* repo, int force);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_backend_from_string(git_config_backend** @out, [NativeTypeName("const char *")] sbyte* cfg, [NativeTypeName("size_t")] nuint len, git_config_backend_memory_options* opts);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_config_backend_from_values(git_config_backend** @out, [NativeTypeName("const char **")] sbyte** values, [NativeTypeName("size_t")] nuint len, git_config_backend_memory_options* opts);
+
         [NativeTypeName("#define GIT_WIN32 1")]
         public const int GIT_WIN32 = 1;
 
@@ -1766,5 +1778,11 @@ namespace Lg2.Native
 
         [NativeTypeName("#define LIBGIT2_SOVERSION \"1.8\"")]
         public static ReadOnlySpan<byte> LIBGIT2_SOVERSION => "1.8"u8;
+
+        [NativeTypeName("#define GIT_CONFIG_BACKEND_VERSION 1")]
+        public const int GIT_CONFIG_BACKEND_VERSION = 1;
+
+        [NativeTypeName("#define GIT_CONFIG_BACKEND_MEMORY_OPTIONS_VERSION 1")]
+        public const int GIT_CONFIG_BACKEND_MEMORY_OPTIONS_VERSION = 1;
     }
 }
