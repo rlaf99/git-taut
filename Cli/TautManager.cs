@@ -66,11 +66,6 @@ class TautManager(
 
     internal Lg2RefSpec RemoteRefSpec => _remoteRefSpec!;
 
-    readonly List<string> targetPathSpecList = ["*.tt", "*.taut"];
-
-    [AllowNull]
-    Lg2PathSpec _targetPathSpec;
-
     [AllowNull]
     string _remoteName;
 
@@ -93,8 +88,6 @@ class TautManager(
             throw new InvalidOperationException($"Only oid type {name} is supported");
         }
 
-        _targetPathSpec = Lg2PathSpec.New(targetPathSpecList);
-
         kvStore.Init(KvStoreLocation);
 
         UserKeyBase keyBase = new();
@@ -109,23 +102,9 @@ class TautManager(
             CheckTautAndHost(remoteName, keyBase);
         }
 
-        ReadTautPatterns();
-
         cipher.Init(keyBase);
 
         logger.ZLogTrace($"Open {nameof(TautManager)} with '{repoPath}'");
-    }
-
-    void ReadTautPatterns()
-    {
-        using var config = _tautRepo.GetConfigSnapshot();
-
-        var tautPatterns = config.GetTautPatterns(_remoteName);
-
-        foreach (var pattern in tautPatterns)
-        {
-            logger.ZLogTrace($"Read {GitConfigHelper.TautPattern} '{pattern}'");
-        }
     }
 
     void SetupTautAndHost(string remoteName, UserKeyBase keyBase)
@@ -286,11 +265,13 @@ class TautManager(
 
             if (sourceOidText == targetOidText)
             {
-                logger.ZLogTrace($"Tauten {targetOidText} from same {objTypeName}");
+                logger.ZLogTrace(
+                    $"Tauten {objTypeName} {sourceOidText[..8]} into same {objTypeName}"
+                );
             }
             else
             {
-                logger.ZLogTrace($"Tauten {targetOidText} from {objTypeName} {sourceOidText[..8]}");
+                logger.ZLogTrace($"Tauten {objTypeName} {sourceOidText[..8]} into {targetOidText}");
             }
         }
     }
@@ -728,7 +709,7 @@ class TautManager(
 
             if (kvStore.HasTautened(hostCommit))
             {
-                logger.ZLogTrace($"Ignore tautened commit {commitOidHex8} '{commitSummary}'");
+                logger.ZLogTrace($"Skip tautened commit {commitOidHex8} '{commitSummary}'");
 
                 continue;
             }
@@ -740,11 +721,15 @@ class TautManager(
                 logger.ZLogTrace($"Start tautening files in diff");
 
                 TautenFilesInDiff(hostCommit, tautenedFilePaths);
+
+                logger.ZLogTrace($"Done tautening files in diff");
             }
 
             logger.ZLogTrace($"Start tautening commit {commitOidHex8} '{commitSummary}'");
 
             TautenCommit(hostCommit, tautenedFilePaths);
+
+            logger.ZLogTrace($"Done tautening commit {commitOidHex8} '{commitSummary}'");
         }
 
         foreach (var refName in hostRefList)
@@ -777,6 +762,8 @@ class TautManager(
         var hostHeadRefName = hostHeadRef.GetName();
         var tautHeadRefName = _tautenedRefSpec.TransformToTarget(hostHeadRefName);
         _tautRepo.SetHead(tautHeadRefName);
+
+        logger.ZLogTrace($"Done tautening host refs");
     }
 
     void TautenFilesInDiff(Lg2Commit hostCommit, Dictionary<string, string> tautenedFilePaths)
@@ -804,6 +791,15 @@ class TautManager(
         };
 
         hostDiffToParent.FindSimilar(ref diffFindOpts);
+
+        Lg2AttrOptions hostAttrOpts = new()
+        {
+            Flags =
+                Lg2AttrCheckFlags.LG2_ATTR_CHECK_NO_SYSTEM
+                | Lg2AttrCheckFlags.LG2_ATTR_CHECK_INCLUDE_COMMIT,
+        };
+
+        hostAttrOpts.SetCommitId(hostCommit);
 
         for (nuint i = 0, count = hostDiffToParent.GetDeltaCount(); i < count; i++)
         {
@@ -835,10 +831,9 @@ class TautManager(
 
             var newFilePath = newFile.GetPath();
 
-            if (
-                _targetPathSpec.MatchPath(newFilePath, Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE)
-                == false
-            )
+            var tautAttrVal = _hostRepo.GetAttrValue(newFilePath, GitAttrHelper.Taut, hostAttrOpts);
+
+            if (tautAttrVal.IsSetOrSpecified == false)
             {
                 continue;
             }
@@ -913,13 +908,25 @@ class TautManager(
 
         if (kvStore.HasTautened(hostTree))
         {
-            logger.ZLogTrace($"Ignore tautened tree {hostTreeOidHex8} '{hostTreePath}'");
+            logger.ZLogTrace($"Skip tautened tree {hostTreeOidHex8} '{hostTreePath}'");
         }
+        else
         {
             logger.ZLogTrace($"Start tautening tree {hostTreeOidHex8} '{hostTreePath}'");
 
-            var task = TautenTreeAsync(hostTree, hostTreePath, tautenedFilePaths);
+            Lg2AttrOptions hostAttrOpts = new()
+            {
+                Flags =
+                    Lg2AttrCheckFlags.LG2_ATTR_CHECK_NO_SYSTEM
+                    | Lg2AttrCheckFlags.LG2_ATTR_CHECK_INCLUDE_COMMIT,
+            };
+
+            hostAttrOpts.SetCommitId(hostCommit);
+
+            var task = TautenTreeAsync(hostTree, hostTreePath, tautenedFilePaths, hostAttrOpts);
             task.GetAwaiter().GetResult();
+
+            _hostRepo.FlushAttrCache();
         }
 
         var oid = new Lg2Oid();
@@ -950,7 +957,8 @@ class TautManager(
     async Task TautenTreeAsync(
         Lg2Tree hostTree,
         string hostTreePath,
-        Dictionary<string, string> tautenedFilePaths
+        Dictionary<string, string> tautenedFilePaths,
+        Lg2AttrOptions hostAttrOpts
     )
     {
         await Task.Yield(); // prevent it from running synchronously
@@ -976,7 +984,7 @@ class TautManager(
                 if (kvStore.HasTautened(entry) == false)
                 {
                     var tree = _hostRepo.LookupTree(entry);
-                    await TautenTreeAsync(tree, entryPath, tautenedFilePaths);
+                    await TautenTreeAsync(tree, entryPath, tautenedFilePaths, hostAttrOpts);
                 }
 
                 Lg2Oid oid = new();
@@ -992,7 +1000,13 @@ class TautManager(
             {
                 logger.ZLogTrace($"Start tautening blob {entryOidHex8} '{entryPath}'");
 
-                if (_targetPathSpec.MatchPath(entryName, Lg2PathSpecFlags.LG2_PATHSPEC_IGNORE_CASE))
+                var tautAttrVal = _hostRepo.GetAttrValue(
+                    entryPath,
+                    GitAttrHelper.Taut,
+                    hostAttrOpts
+                );
+
+                if (tautAttrVal.IsSetOrSpecified)
                 {
                     Lg2Oid oid = new();
                     if (kvStore.TryGetTautened(entry, ref oid) == false)
@@ -1005,7 +1019,7 @@ class TautManager(
                         if (tautenedFilePaths.ContainsKey(entryPath) == false)
                         {
                             var tautenedBlob = _tautRepo.LookupBlob(oid);
-                            TautenFileName(tautenedBlob, entryPath, tautenedFilePaths);
+                            TautenBlobName(tautenedBlob, entryPath, tautenedFilePaths);
                         }
                     }
 
@@ -1049,7 +1063,7 @@ class TautManager(
         }
     }
 
-    void TautenFileName(
+    void TautenBlobName(
         Lg2Blob tautenedBlob,
         string filePath,
         Dictionary<string, string> tautenedFilePaths
@@ -1061,7 +1075,8 @@ class TautManager(
         var recryptor = cipher.CreateRecryptor(readStream);
 
         var fileName = Path.GetFileName(filePath);
-        var fileNameStream = new MemoryStream(Encoding.UTF8.GetBytes(filePath), writable: false);
+        var fileNameStream = new MemoryStream(Encoding.UTF8.GetBytes(fileName), writable: false);
+
         var encryptedFileNameStream = new MemoryStream();
         recryptor.Encrypt(fileNameStream, encryptedFileNameStream);
 
@@ -1073,7 +1088,7 @@ class TautManager(
 
         tautenedFilePaths.Add(filePath, tautenedFilename);
 
-        logger.ZLogTrace($"Tauten '{tautenedFilename}' from file name '{filePath}'");
+        logger.ZLogTrace($"Tauten file name of '{filePath}' into '{tautenedFilename}'");
     }
 
     void TautenBlob(
@@ -1096,7 +1111,8 @@ class TautManager(
         );
 
         var fileName = Path.GetFileName(filePath);
-        var fileNameStream = new MemoryStream(Encoding.UTF8.GetBytes(filePath), writable: false);
+        var fileNameStream = new MemoryStream(Encoding.UTF8.GetBytes(fileName), writable: false);
+
         var encryptedFileNameStream = new MemoryStream();
 
         encryptor.ProduceOutput(writeStream, fileNameStream, encryptedFileNameStream);
@@ -1113,7 +1129,7 @@ class TautManager(
 
         tautenedFileNames.Add(filePath, tautenedFilename);
 
-        logger.ZLogTrace($"Tauten '{tautenedFilename}' from file name '{filePath}'");
+        logger.ZLogTrace($"Tauten file name of '{filePath}' into '{tautenedFilename}'");
     }
 
     internal void RebuildKvStore()

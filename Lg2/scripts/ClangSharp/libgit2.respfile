@@ -70,6 +70,7 @@ thirdparty/libgit2/include/git2/proxy.h
 thirdparty/libgit2/include/git2/cert.h
 thirdparty/libgit2/include/git2/indexer.h
 thirdparty/libgit2/include/git2/credential.h
+thirdparty/libgit2/include/git2/attr.h
 thirdparty/libgit2/include/git2/sys/credential.h
 thirdparty/libgit2/include/git2/sys/config.h
 

@@ -273,6 +273,11 @@ static class GitConfigHelper
     }
 }
 
+static class GitAttrHelper
+{
+    internal const string Taut = "taut";
+}
+
 static class AppConfigurationExtensions
 {
     internal static bool GetGitTautTrace(this IConfiguration config)

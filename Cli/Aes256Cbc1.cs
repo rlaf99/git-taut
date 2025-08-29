@@ -484,7 +484,7 @@ partial class Aes256Cbc1
                 );
 
                 logger.ZLogTrace(
-                    $"Compressed length ({compressedStream.Length}) is above the limit ({compressedLengthLimit})"
+                    $"Compression not applied as the compressed length ({compressedStream.Length}) is above the limit ({compressedLengthLimit})"
                 );
             }
             else

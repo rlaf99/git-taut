@@ -172,6 +172,7 @@ public enum Lg2DiffFlags : uint
     LG2_DIFF_FLAG_VALID_SIZE = git_diff_flag_t.GIT_DIFF_FLAG_VALID_SIZE,
 }
 
+[Flags]
 public enum Lg2DiffFindFlags : uint
 {
     LG2_DIFF_FIND_BY_CONFIG = git_diff_find_t.GIT_DIFF_FIND_BY_CONFIG,
@@ -231,4 +232,23 @@ public static class Lg2DeltaTypeExtensions
 
         return (char)val;
     }
+}
+
+public enum Lg2AttrValueType
+{
+    LG2_ATTR_VALUE_UNSPECIFIED = git_attr_value_t.GIT_ATTR_VALUE_UNSPECIFIED,
+    LG2_ATTR_VALUE_TRUE = git_attr_value_t.GIT_ATTR_VALUE_TRUE,
+    LG2_ATTR_VALUE_FALSE = git_attr_value_t.GIT_ATTR_VALUE_FALSE,
+    LG2_ATTR_VALUE_STRING = git_attr_value_t.GIT_ATTR_VALUE_STRING,
+}
+
+[Flags]
+public enum Lg2AttrCheckFlags : uint
+{
+    LG2_ATTR_CHECK_FILE_THEN_INDEX = GIT_ATTR_CHECK_FILE_THEN_INDEX,
+    LG2_ATTR_CHECK_INDEX_THEN_FILE = GIT_ATTR_CHECK_INDEX_THEN_FILE,
+    LG2_ATTR_CHECK_INDEX_ONLY = GIT_ATTR_CHECK_INDEX_ONLY,
+    LG2_ATTR_CHECK_NO_SYSTEM = GIT_ATTR_CHECK_NO_SYSTEM,
+    LG2_ATTR_CHECK_INCLUDE_HEAD = GIT_ATTR_CHECK_INCLUDE_HEAD,
+    LG2_ATTR_CHECK_INCLUDE_COMMIT = GIT_ATTR_CHECK_INCLUDE_COMMIT,
 }

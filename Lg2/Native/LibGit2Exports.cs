@@ -721,6 +721,33 @@ namespace Lg2.Native
         public static extern int git_apply(git_repository* repo, git_diff* diff, git_apply_location_t location, [NativeTypeName("const git_apply_options *")] git_apply_options* options);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern git_attr_value_t git_attr_value([NativeTypeName("const char *")] sbyte* attr);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_attr_get([NativeTypeName("const char **")] sbyte** value_out, git_repository* repo, [NativeTypeName("uint32_t")] uint flags, [NativeTypeName("const char *")] sbyte* path, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_attr_get_ext([NativeTypeName("const char **")] sbyte** value_out, git_repository* repo, git_attr_options* opts, [NativeTypeName("const char *")] sbyte* path, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_attr_get_many([NativeTypeName("const char **")] sbyte** values_out, git_repository* repo, [NativeTypeName("uint32_t")] uint flags, [NativeTypeName("const char *")] sbyte* path, [NativeTypeName("size_t")] nuint num_attr, [NativeTypeName("const char **")] sbyte** names);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_attr_get_many_ext([NativeTypeName("const char **")] sbyte** values_out, git_repository* repo, git_attr_options* opts, [NativeTypeName("const char *")] sbyte* path, [NativeTypeName("size_t")] nuint num_attr, [NativeTypeName("const char **")] sbyte** names);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_attr_foreach(git_repository* repo, [NativeTypeName("uint32_t")] uint flags, [NativeTypeName("const char *")] sbyte* path, [NativeTypeName("git_attr_foreach_cb")] delegate* unmanaged[Cdecl]<sbyte*, sbyte*, void*, int> callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_attr_foreach_ext(git_repository* repo, git_attr_options* opts, [NativeTypeName("const char *")] sbyte* path, [NativeTypeName("git_attr_foreach_cb")] delegate* unmanaged[Cdecl]<sbyte*, sbyte*, void*, int> callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_attr_cache_flush(git_repository* repo);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_attr_add_macro(git_repository* repo, [NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* values);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_blob_lookup(git_blob** blob, git_repository* repo, [NativeTypeName("const git_oid *")] git_oid* id);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -1712,6 +1739,27 @@ namespace Lg2.Native
 
         [NativeTypeName("#define GIT_APPLY_OPTIONS_VERSION 1")]
         public const int GIT_APPLY_OPTIONS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_ATTR_CHECK_FILE_THEN_INDEX 0")]
+        public const int GIT_ATTR_CHECK_FILE_THEN_INDEX = 0;
+
+        [NativeTypeName("#define GIT_ATTR_CHECK_INDEX_THEN_FILE 1")]
+        public const int GIT_ATTR_CHECK_INDEX_THEN_FILE = 1;
+
+        [NativeTypeName("#define GIT_ATTR_CHECK_INDEX_ONLY 2")]
+        public const int GIT_ATTR_CHECK_INDEX_ONLY = 2;
+
+        [NativeTypeName("#define GIT_ATTR_CHECK_NO_SYSTEM (1 << 2)")]
+        public const int GIT_ATTR_CHECK_NO_SYSTEM = (1 << 2);
+
+        [NativeTypeName("#define GIT_ATTR_CHECK_INCLUDE_HEAD (1 << 3)")]
+        public const int GIT_ATTR_CHECK_INCLUDE_HEAD = (1 << 3);
+
+        [NativeTypeName("#define GIT_ATTR_CHECK_INCLUDE_COMMIT (1 << 4)")]
+        public const int GIT_ATTR_CHECK_INCLUDE_COMMIT = (1 << 4);
+
+        [NativeTypeName("#define GIT_ATTR_OPTIONS_VERSION 1")]
+        public const int GIT_ATTR_OPTIONS_VERSION = 1;
 
         [NativeTypeName("#define GIT_BLOB_FILTER_OPTIONS_VERSION 1")]
         public const int GIT_BLOB_FILTER_OPTIONS_VERSION = 1;
