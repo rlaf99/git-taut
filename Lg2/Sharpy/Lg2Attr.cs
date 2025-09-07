@@ -31,7 +31,7 @@ public unsafe class Lg2AttrOptions
     }
 }
 
-public unsafe ref struct Lg2AttrValue
+public struct Lg2AttrValue
 {
     Lg2AttrValueType _type;
     string _stringValue;

@@ -429,9 +429,7 @@ partial class GitRemoteHelper
         _remote = remote;
         _address = address;
 
-        logger.ZLogTrace(
-            $"Start running {ProgramInfo.CommandName} with '{remote}' and '{address}'"
-        );
+        logger.ZLogTrace($"Run {ProgramInfo.CommandName} with '{remote}' and '{address}'");
 
         EnsureTautDir();
 
@@ -467,7 +465,7 @@ partial class GitRemoteHelper
             }
         }
 
-        logger.ZLogTrace($"Exiting {nameof(WorkWithGitAsync)}");
+        logger.ZLogTrace($"Exit {nameof(WorkWithGitAsync)}");
     }
 
     void EnsureTautDir()

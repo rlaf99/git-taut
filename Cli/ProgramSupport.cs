@@ -4,6 +4,7 @@ using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.IO;
 using ZLogger;
 
 internal class ExtraCommands
@@ -16,7 +17,7 @@ internal class ExtraCommands
         ConsoleApp.Log($"Libgit2 version: {lg2Version}");
         ConsoleApp.Log($"Cipher schema: {nameof(Aes256Cbc1)}");
         ConsoleApp.Log(
-            $"  Maximum plain text length: {Aes256Cbc1.PLAIN_TEXT_MAX_BYTES} Bytes ({Aes256Cbc1.PLAIN_TEXT_MAX_BYTES / 1024 / 1024} MB)"
+            $"  Maximum plain text length: {Aes256Cbc1.PLAIN_TEXT_MAX_SIZE} Bytes ({Aes256Cbc1.PLAIN_TEXT_MAX_SIZE / 1024 / 1024} MB)"
         );
     }
 
@@ -50,9 +51,9 @@ internal class ExtraCommands
         [FromServices] TautManager tautManager
     )
     {
-        var keyBase = ReadUserKeyBase();
+        var keyHolder = ReadUserKeyHolder();
 
-        cipher.Init(keyBase);
+        cipher.Init(keyHolder);
 
         try
         {
@@ -116,9 +117,9 @@ internal class ExtraCommands
         [FromServices] TautManager tautManager
     )
     {
-        var keyBase = ReadUserKeyBase();
+        var keyHolder = ReadUserKeyHolder();
 
-        cipher.Init(keyBase);
+        cipher.Init(keyHolder);
 
         try
         {
@@ -183,7 +184,7 @@ internal class ExtraCommands
         return tautRepo!;
     }
 
-    UserKeyBase ReadUserKeyBase()
+    UserKeyHolder ReadUserKeyHolder()
     {
         throw new NotImplementedException();
     }
@@ -227,5 +228,17 @@ internal class ExtraFilter(IServiceProvider serviceProvider, ConsoleAppFilter ne
         {
             ResetLg2TraceOutput();
         }
+    }
+}
+
+internal class ProgramSupport
+{
+    internal static void AddServices(IServiceCollection services)
+    {
+        services.AddSingleton<GitCli>();
+        services.AddSingleton<TautManager>();
+        services.AddSingleton<KeyValueStore>();
+        services.AddSingleton<Aes256Cbc1>();
+        services.AddSingleton<RecyclableMemoryStreamManager>();
     }
 }

@@ -3,7 +3,6 @@ using System.Text;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Logging;
 using ZLogger;
-using ZstdSharp;
 
 namespace Git.Taut;
 
@@ -90,36 +89,36 @@ class TautManager(
 
         kvStore.Init(KvStoreLocation);
 
-        UserKeyBase keyBase = new();
+        UserKeyHolder keyHolder = new();
 
         if (newSetup)
         {
-            ArgumentNullException.ThrowIfNull(remoteName);
-            SetupTautAndHost(remoteName, keyBase);
+            SetupTautAndHost(remoteName, keyHolder);
         }
         else
         {
-            CheckTautAndHost(remoteName, keyBase);
+            CheckTautAndHost(remoteName, keyHolder);
         }
 
-        cipher.Init(keyBase);
+        cipher.Init(keyHolder);
 
-        logger.ZLogTrace($"Open {nameof(TautManager)} with '{repoPath}'");
+        logger.ZLogTrace($"Opened {nameof(TautManager)} with '{repoPath}'");
     }
 
-    void SetupTautAndHost(string remoteName, UserKeyBase keyBase)
+    void SetupTautAndHost(string remoteName, UserKeyHolder keyHolder)
     {
         var setupHelper = new TautSetupHelper(
             loggerFactory.CreateLogger<TautSetupHelper>(),
             remoteName,
             _tautRepo,
             _hostRepo,
-            gitCli
+            gitCli,
+            keyHolder
         );
-        setupHelper.SetupTautAndHost(keyBase);
+        setupHelper.SetupTautAndHost();
     }
 
-    void CheckTautAndHost(string remoteName, UserKeyBase keyBase)
+    void CheckTautAndHost(string remoteName, UserKeyHolder keyHolder)
     {
         var tautRemote = _tautRepo.LookupRemote(remoteName);
         var tautRemoteUrl = tautRemote.GetUrl();
@@ -142,26 +141,48 @@ class TautManager(
             }
         }
 
-        CheckCredentialTag(remoteName, keyBase);
+        CheckCredentialKeyTrait(remoteName, keyHolder);
     }
 
-    void CheckCredentialTag(string remoteName, UserKeyBase keyBase)
+    void CheckCredentialKeyTrait(string remoteName, UserKeyHolder keyHolder)
     {
-        using (var config = _tautRepo.GetConfig())
+        using (var config = _hostRepo.GetConfig())
         {
             var credUrl = config.GetTautCredentialUrl(remoteName);
-            var credTag = config.GetTautCredentialTag(remoteName);
+            if (credUrl is null)
+            {
+                throw new InvalidOperationException(
+                    $"{GitConfigHelper.TautCredentialUrl} is not found in the repo config for remote '{remoteName}'"
+                );
+            }
+
+            var credKeyTrait = config.GetTautCredentialKeyTrait(remoteName);
+            if (credKeyTrait is null)
+            {
+                throw new InvalidOperationException(
+                    $"{GitConfigHelper.TautCredentialKeyTrait} is not found in the repo config for remote '{remoteName}'"
+                );
+            }
+
+            var credUserName = config.GetTautCredentialUserName(remoteName);
 
             using (var gitCred = new GitCredential(gitCli, credUrl))
             {
                 gitCred.Fill();
 
-                keyBase.SetPasswordData(gitCred.PasswordData);
+                byte[] passwordSalt = [];
 
-                var info = Encoding.ASCII.GetBytes(credUrl);
-                var credTagFromPass = keyBase.GenerateCredentialTag(info);
+                if (string.IsNullOrEmpty(credUserName) == false)
+                {
+                    passwordSalt = Encoding.UTF8.GetBytes(credUserName);
+                }
 
-                if (credTagFromPass.SequenceEqual(credTag) == false)
+                keyHolder.DeriveCrudeKey(gitCred.PasswordData, passwordSalt);
+
+                var credUrlData = Encoding.ASCII.GetBytes(credUrl);
+                var keyTrait = keyHolder.DeriveCredentialKeyTrait(credUrlData);
+
+                if (keyTrait.SequenceEqual(credKeyTrait) == false)
                 {
                     gitCred.Reject();
 
@@ -332,17 +353,21 @@ class TautManager(
             {
                 Lg2Oid hostOid = new();
                 _tautRepo.GetRefOid(refName, ref hostOid);
+
                 Lg2Oid tautOid = new();
                 kvStore.GetTautened(hostOid, ref tautOid);
-                revWalk.Hide(tautOid);
+
                 logger.ZLogTrace($"RevWalk.Hide {tautOid.ToHexDigits(8)} ({refName})");
+
+                revWalk.Hide(tautOid);
             }
         }
 
         foreach (var refName in tautRefList)
         {
-            revWalk.Push(refName);
             logger.ZLogTrace($"RevWalk.Push {refName}");
+
+            revWalk.Push(refName);
         }
 
         for (Lg2Oid oid = new(); revWalk.Next(ref oid); )
@@ -362,6 +387,8 @@ class TautManager(
             logger.ZLogTrace($"Start regaining commit {commitOidHex8} '{commitSummary}'");
 
             RegainCommit(tautCommit);
+
+            logger.ZLogTrace($"Done regaining commit {commitOidHex8} '{commitSummary}'");
         }
 
         foreach (var refName in tautRefList)
@@ -379,16 +406,20 @@ class TautManager(
             if (tautOid.Equals(ref hostOid))
             {
                 var message = $"Regain {refName} {hostOidHex8} from same object";
+
                 _tautRepo.SetRef(regainedRefName, hostOid, message);
                 logger.ZLogTrace($"{message}");
             }
             else
             {
                 var message = $"Regain {refName} {hostOidHex8} from {tautOidHex8}";
+
                 _tautRepo.SetRef(regainedRefName, hostOid, message);
                 logger.ZLogTrace($"{message}");
             }
         }
+
+        logger.ZLogTrace($"Done regaining host refs");
     }
 
     void RegainCommit(Lg2Commit tautCommit)
@@ -406,6 +437,8 @@ class TautManager(
 
             var task = RegainTreeAsync(tautTree);
             task.GetAwaiter().GetResult();
+
+            logger.ZLogTrace($"Done regaining tree {tautTreeOidHex8} '{tautTreePath}'");
         }
 
         Lg2Oid oid = new();
@@ -444,20 +477,51 @@ class TautManager(
         StoreRegained(objInfo, objInfo.GetOidPlainRef());
     }
 
-    bool IsPossiblyTautened(string entryName)
+    bool TryRegainEntryName(
+        string entryName,
+        Lg2OidPlainRef entryOid,
+        out string entryNameToUse,
+        out Lg2FileMode fileModeToUse
+    )
     {
-        if (entryName.Length % 32 != 0)
+        byte[] entryNameData;
+
+        try
         {
+            entryNameData = Base32Hex.GetBytes(entryName);
+        }
+        catch (FormatException)
+        {
+            entryNameToUse = entryName;
+            fileModeToUse = Lg2FileMode.LG2_FILEMODE_UNREADABLE;
+
             return false;
         }
 
-        foreach (char ch in entryName)
+        var entryOidData = entryOid.GetRawData();
+        var decDataStream = cipher.DecryptName(entryNameData, entryOidData);
+        var decData = decDataStream.GetBuffer().AsSpan(0, (int)decDataStream.Length);
+
+        var entryNameToUseData = decData[..^4];
+        entryNameToUse = Encoding.UTF8.GetString(entryNameToUseData);
+
+        var fileModeData = decData[^4..].ToArray();
+        if (BitConverter.IsLittleEndian)
         {
-            if (char.IsAsciiHexDigitLower(ch) == false)
-            {
-                return false;
-            }
+            Array.Reverse(fileModeData);
         }
+        var fileMode = BitConverter.ToInt32(fileModeData);
+
+        fileModeToUse = (Lg2FileMode)fileMode;
+
+        if (Enum.IsDefined(fileModeToUse))
+        {
+            throw new InvalidCastException(
+                $"Failed to restore {nameof(Lg2FileMode)} from integer value '{fileMode}'"
+            );
+        }
+
+        logger.ZLogTrace($"Regained name '{entryNameToUse}' from '{entryName}'");
 
         return true;
     }
@@ -473,9 +537,15 @@ class TautManager(
         {
             var entry = tautTree.GetEntry(i);
             var entryName = entry.GetName();
-            var entryFileMode = entry.GetFileModeRaw();
             var entryObjType = entry.GetObjectType();
             var entryOidHex8 = entry.GetOidHexDigits(8);
+
+            bool isTautened = TryRegainEntryName(
+                entryName,
+                entry,
+                out var entryNameToUse,
+                out var entryFileModeToUse
+            );
 
             if (entryObjType.IsTree())
             {
@@ -490,60 +560,50 @@ class TautManager(
                 var oid = new Lg2Oid();
                 kvStore.GetRegained(entry, ref oid);
 
-                if (oid.PlainRef.Equals(entry.GetOidPlainRef()) == false)
+                if (
+                    oid.PlainRef.Equals(entry.GetOidPlainRef()) == false
+                    || entryNameToUse != entryName
+                )
                 {
-                    treeBuilder.Insert(entryName, oid, entryFileMode);
+                    treeBuilder.Insert(entryNameToUse, oid, entryFileModeToUse);
                     regainedSet.Add(i);
                 }
+
+                logger.ZLogTrace($"Done regaining tree {entryOidHex8} '{entryName}'");
             }
             else if (entryObjType.IsBlob())
             {
                 logger.ZLogTrace($"Start regaining blob {entryOidHex8} '{entryName}'");
 
-                bool isReallyTautened = false;
-                if (IsPossiblyTautened(entryName))
+                if (isTautened)
                 {
-                    try
-                    {
-                        var blob = _tautRepo.LookupBlob(entry);
-                        string regainedFileName;
-                        Lg2Oid oid = new();
-                        if (kvStore.TryGetRegained(entry, ref oid) == false)
-                        {
-                            regainedFileName = RegainBlob(blob, ref oid, entryName);
-                        }
-                        else
-                        {
-                            regainedFileName = RegainFileName(blob, entryName);
-                        }
+                    var blob = _tautRepo.LookupBlob(entry);
 
-                        if (oid.PlainRef.Equals(entry.GetOidPlainRef()) == false)
-                        {
-                            treeBuilder.Insert(regainedFileName, oid, entryFileMode);
-                            regainedSet.Add(i);
-                        }
-
-                        isReallyTautened = true;
-                    }
-                    catch (InvalidTautenedDataException exn)
+                    Lg2Oid oid = new();
+                    if (kvStore.TryGetRegained(entry, ref oid) == false)
                     {
-                        if (exn.HasTautenedBytes)
-                        {
-                            // it is marked as tautened, but not processed correctly,
-                            // thus rethrow it
-                            throw;
-                        }
+                        RegainBlob(blob, ref oid);
                     }
+
+                    treeBuilder.Insert(entryNameToUse, oid, entryFileModeToUse);
+                    regainedSet.Add(i);
                 }
-
-                if (isReallyTautened == false)
+                else
                 {
                     RegainSameObject(entry);
                 }
+
+                logger.ZLogTrace($"Done regaining blob {entryOidHex8} '{entryName}'");
+            }
+            else if (entryObjType.IsCommit())
+            {
+                logger.ZLogTrace($"Skipped submodule {entryName}");
             }
             else
             {
-                logger.ZLogWarning($"Ignore invalid object type {entryObjType.GetName()}");
+                throw new InvalidOperationException(
+                    $"Unexpected object type {entryObjType.GetName()}"
+                );
             }
         }
 
@@ -566,7 +626,7 @@ class TautManager(
                 }
             }
 
-            var oid = new Lg2Oid();
+            Lg2Oid oid = new();
             treeBuilder.Write(ref oid);
 
             StoreRegained(tautTree, oid);
@@ -577,46 +637,19 @@ class TautManager(
         }
     }
 
-    string RegainFileName(Lg2Blob blob, string fileName)
+    void RegainBlob(Lg2Blob blob, ref Lg2Oid resultOid)
     {
         using var tautRepoOdb = _tautRepo.GetOdb();
         using var hostRepoOdb = _hostRepo.GetOdb();
 
         using var readStream = tautRepoOdb.ReadAsStream(blob);
-
-        var fileNameStream = new MemoryStream(Convert.FromHexString(fileName), writable: false);
-        var regainedFileNameStream = new MemoryStream();
-
-        var recryptor = cipher.CreateRecryptor(readStream);
-        recryptor.Decrypt(fileNameStream, regainedFileNameStream);
-
-        var regainedFileNameData = regainedFileNameStream
-            .GetBuffer()
-            .AsSpan(0, (int)regainedFileNameStream.Length);
-
-        var regainedFileName = Encoding.UTF8.GetString(regainedFileNameData);
-
-        logger.ZLogTrace($"Regain '{regainedFileName}' from file name '{fileName}'");
-
-        return regainedFileName;
-    }
-
-    string RegainBlob(Lg2Blob blob, ref Lg2Oid resultOid, string fileName)
-    {
-        using var tautRepoOdb = _tautRepo.GetOdb();
-        using var hostRepoOdb = _hostRepo.GetOdb();
-
-        using var readStream = tautRepoOdb.ReadAsStream(blob);
-
-        var fileNameStream = new MemoryStream(Convert.FromHexString(fileName), writable: false);
-        var regainedFileNameStream = new MemoryStream();
 
         var decryptor = cipher.CreateDecryptor(readStream);
         var extraPayload = decryptor.GetExtraPayload();
         if (extraPayload.Length > 0)
         {
             var resultStream = new PatchRegainStream();
-            decryptor.ProduceOutput(resultStream, fileNameStream, regainedFileNameStream);
+            decryptor.ProduceOutput(resultStream);
 
             var resultData = resultStream.GetBuffer().AsSpan(0, (int)resultStream.Length);
 
@@ -646,21 +679,11 @@ class TautManager(
         {
             var outputLength = decryptor.GetOutputLength();
             using var writeStream = hostRepoOdb.OpenWriteStream(outputLength, blob.GetObjectType());
-            decryptor.ProduceOutput(writeStream, fileNameStream, regainedFileNameStream);
+            decryptor.ProduceOutput(writeStream);
             writeStream.FinalizeWrite(ref resultOid);
 
             StoreRegained(blob, resultOid);
         }
-
-        var regainedFileNameData = regainedFileNameStream
-            .GetBuffer()
-            .AsSpan(0, (int)regainedFileNameStream.Length);
-
-        var regainedFileName = Encoding.UTF8.GetString(regainedFileNameData);
-
-        logger.ZLogTrace($"Regain '{regainedFileName}' from file name '{fileName}'");
-
-        return regainedFileName;
     }
 
     #endregion Regaining
@@ -687,17 +710,21 @@ class TautManager(
             {
                 Lg2Oid tautOid = new();
                 _tautRepo.GetRefOid(refName, ref tautOid);
+
                 Lg2Oid hostOid = new();
                 kvStore.GetRegained(tautOid, ref hostOid);
-                revWalk.Hide(hostOid);
+
                 logger.ZLogTrace($"RevWalk.Hide {hostOid.ToHexDigits(8)} ({refName})");
+
+                revWalk.Hide(hostOid);
             }
         }
 
         foreach (var refName in hostRefList)
         {
-            revWalk.Push(refName);
             logger.ZLogTrace($"RevWalk.Push {refName}");
+
+            revWalk.Push(refName);
         }
 
         for (Lg2Oid oid = new(); revWalk.Next(ref oid); )
@@ -714,22 +741,22 @@ class TautManager(
                 continue;
             }
 
-            Dictionary<string, string> tautenedFilePaths = [];
-
             if (hostCommit.GetParentCount() == 1)
             {
                 logger.ZLogTrace($"Start tautening files in diff");
 
-                TautenFilesInDiff(hostCommit, tautenedFilePaths);
+                TautenFilesInDiff(hostCommit);
 
                 logger.ZLogTrace($"Done tautening files in diff");
             }
 
             logger.ZLogTrace($"Start tautening commit {commitOidHex8} '{commitSummary}'");
 
-            TautenCommit(hostCommit, tautenedFilePaths);
+            TautenCommit(hostCommit);
 
             logger.ZLogTrace($"Done tautening commit {commitOidHex8} '{commitSummary}'");
+
+            _hostRepo.FlushAttrCache();
         }
 
         foreach (var refName in hostRefList)
@@ -747,12 +774,14 @@ class TautManager(
             if (hostOid.Equals(ref tautenedOid))
             {
                 var message = $"Tauten {refName} {tautenedOidHex8} from same object";
+
                 _tautRepo.SetRef(tautenedRefName, tautenedOid, message);
                 logger.ZLogTrace($"{message}");
             }
             else
             {
                 var message = $"Tauten {refName} {tautenedOidHex8} from {hostOidHex8}";
+
                 _tautRepo.SetRef(tautenedRefName, tautenedOid, message);
                 logger.ZLogTrace($"{message}");
             }
@@ -766,7 +795,7 @@ class TautManager(
         logger.ZLogTrace($"Done tautening host refs");
     }
 
-    void TautenFilesInDiff(Lg2Commit hostCommit, Dictionary<string, string> tautenedFilePaths)
+    void TautenFilesInDiff(Lg2Commit hostCommit)
     {
         var hostParentCommit = hostCommit.GetParent(0);
         var hostParentTree = hostParentCommit.GetTree();
@@ -831,7 +860,7 @@ class TautManager(
 
             var newFilePath = newFile.GetPath();
 
-            var tautAttrVal = _hostRepo.GetAttrValue(newFilePath, GitAttrHelper.Taut, hostAttrOpts);
+            var tautAttrVal = _hostRepo.GetTautAttrValue(newFilePath, hostAttrOpts);
 
             if (tautAttrVal.IsSetOrSpecified == false)
             {
@@ -870,14 +899,7 @@ class TautManager(
                 Lg2ObjectType.LG2_OBJECT_BLOB
             );
 
-            var fileName = Path.GetFileName(newFilePath);
-            var fileNameStream = new MemoryStream(
-                Encoding.UTF8.GetBytes(fileName),
-                writable: false
-            );
-            var compressedFileNameStream = new CompressionStream(fileNameStream);
-            var tautenedFileNameStream = new MemoryStream();
-            encryptor.ProduceOutput(writeStream, compressedFileNameStream, tautenedFileNameStream);
+            encryptor.ProduceOutput(writeStream);
 
             Lg2Oid resultOid = new();
             writeStream.FinalizeWrite(ref resultOid);
@@ -887,20 +909,10 @@ class TautManager(
             logger.ZLogTrace(
                 $"Tauten patch ({tautenStream.Length}:{newFileSize}) for '{newFilePath}'"
             );
-
-            var tautenedFilenameData = tautenedFileNameStream
-                .GetBuffer()
-                .AsSpan(0, (int)tautenedFileNameStream.Length);
-
-            var tautenedFilename = Convert.ToHexStringLower(tautenedFilenameData);
-
-            tautenedFilePaths.Add(newFilePath, tautenedFilename);
-
-            logger.ZLogTrace($"Tauten name '{fileName}' to '{tautenedFilename}'");
         }
     }
 
-    void TautenCommit(Lg2Commit hostCommit, Dictionary<string, string> tautenedFilePaths)
+    void TautenCommit(Lg2Commit hostCommit)
     {
         var hostTree = hostCommit.GetTree();
         var hostTreeOidHex8 = hostTree.GetOidHexDigits(8);
@@ -923,10 +935,10 @@ class TautManager(
 
             hostAttrOpts.SetCommitId(hostCommit);
 
-            var task = TautenTreeAsync(hostTree, hostTreePath, tautenedFilePaths, hostAttrOpts);
+            var task = TautenTreeAsync(hostTree, hostTreePath, hostAttrOpts);
             task.GetAwaiter().GetResult();
 
-            _hostRepo.FlushAttrCache();
+            logger.ZLogTrace($"Done tautening tree {hostTreeOidHex8} '{hostTreePath}'");
         }
 
         var oid = new Lg2Oid();
@@ -954,12 +966,7 @@ class TautManager(
         StoreTautened(hostCommit, oid);
     }
 
-    async Task TautenTreeAsync(
-        Lg2Tree hostTree,
-        string hostTreePath,
-        Dictionary<string, string> tautenedFilePaths,
-        Lg2AttrOptions hostAttrOpts
-    )
+    async Task TautenTreeAsync(Lg2Tree hostTree, string hostTreePath, Lg2AttrOptions hostAttrOpts)
     {
         await Task.Yield(); // prevent it from running synchronously
 
@@ -977,6 +984,27 @@ class TautManager(
             var entryFileMode = entry.GetFileModeRaw();
             var entryOidHex8 = entry.GetOidHexDigits(8);
 
+            var entryNameToUse = entryName;
+
+            void EncryptEntryNameToUse(scoped ref Lg2Oid oid)
+            {
+                var oidRawData = oid.GetRawData();
+                var encStream = cipher.EncryptName(entryName, oidRawData);
+
+                var fileModeData = BitConverter.GetBytes((uint)entryFileMode);
+                if (BitConverter.IsLittleEndian)
+                {
+                    Array.Reverse(fileModeData);
+                }
+                encStream.Write(fileModeData);
+
+                var encEntryNameData = encStream.GetBuffer().AsSpan(0, (int)encStream.Length);
+
+                entryNameToUse = Base32Hex.GetString(encEntryNameData);
+            }
+
+            var tautAttrVal = _hostRepo.GetTautAttrValue(entryPath, hostAttrOpts);
+
             if (entryObjType.IsTree())
             {
                 logger.ZLogTrace($"Start tautening tree {entryOidHex8} '{entryPath}'");
@@ -984,27 +1012,28 @@ class TautManager(
                 if (kvStore.HasTautened(entry) == false)
                 {
                     var tree = _hostRepo.LookupTree(entry);
-                    await TautenTreeAsync(tree, entryPath, tautenedFilePaths, hostAttrOpts);
+                    await TautenTreeAsync(tree, entryPath, hostAttrOpts);
                 }
 
                 Lg2Oid oid = new();
                 kvStore.GetTautened(entry, ref oid);
 
-                if (oid.PlainRef.Equals(entry.GetOidPlainRef()) == false)
+                if (tautAttrVal.IsSetOrSpecified)
                 {
-                    treeBuilder.Insert(entryName, oid, entryFileMode);
+                    EncryptEntryNameToUse(ref oid);
+                }
+
+                if (oid.PlainRefEquals(entry) == false || entryNameToUse != entryName)
+                {
+                    treeBuilder.Insert(entryNameToUse, oid, entryFileMode);
                     tautenedSet.Add(i);
                 }
+
+                logger.ZLogTrace($"Done tautening tree {entryOidHex8} '{entryPath}'");
             }
             else if (entryObjType.IsBlob())
             {
                 logger.ZLogTrace($"Start tautening blob {entryOidHex8} '{entryPath}'");
-
-                var tautAttrVal = _hostRepo.GetAttrValue(
-                    entryPath,
-                    GitAttrHelper.Taut,
-                    hostAttrOpts
-                );
 
                 if (tautAttrVal.IsSetOrSpecified)
                 {
@@ -1012,28 +1041,26 @@ class TautManager(
                     if (kvStore.TryGetTautened(entry, ref oid) == false)
                     {
                         var blob = _hostRepo.LookupBlob(entry);
-                        TautenBlob(blob, ref oid, entryPath, tautenedFilePaths);
-                    }
-                    else
-                    {
-                        if (tautenedFilePaths.ContainsKey(entryPath) == false)
-                        {
-                            var tautenedBlob = _tautRepo.LookupBlob(oid);
-                            TautenBlobName(tautenedBlob, entryPath, tautenedFilePaths);
-                        }
+                        TautenBlob(blob, ref oid, entryPath);
                     }
 
-                    if (oid.PlainRef.Equals(entry.GetOidPlainRef()) == false)
-                    {
-                        var tautenedFileName = tautenedFilePaths[entryPath];
-                        treeBuilder.Insert(tautenedFileName, oid, entryFileMode);
-                        tautenedSet.Add(i);
-                    }
+                    EncryptEntryNameToUse(ref oid);
+
+                    treeBuilder.Insert(entryNameToUse, oid, Lg2FileMode.LG2_FILEMODE_BLOB);
+                    tautenedSet.Add(i);
                 }
+
+                logger.ZLogTrace($"Done tautening blob {entryOidHex8} '{entryPath}'");
+            }
+            else if (entryObjType.IsCommit())
+            {
+                logger.ZLogTrace($"Skipped submodule {entryName}");
             }
             else
             {
-                logger.ZLogWarning($"Ignore invalid object type {entryObjType.GetName()}");
+                throw new InvalidOperationException(
+                    $"Unexpected object type {entryObjType.GetName()}"
+                );
             }
         }
 
@@ -1044,15 +1071,10 @@ class TautManager(
                 if (tautenedSet.Contains(i) == false)
                 {
                     var entry = hostTree.GetEntry(i);
-                    var entryObjType = entry.GetObjectType();
+                    var entryName = entry.GetName();
+                    var entryFileMode = entry.GetFileModeRaw();
 
-                    if (entryObjType.IsTree() || entryObjType.IsBlob())
-                    {
-                        var entryName = entry.GetName();
-                        var entryFileMode = entry.GetFileModeRaw();
-
-                        treeBuilder.Insert(entryName, entry, entryFileMode);
-                    }
+                    treeBuilder.Insert(entryName, entry, entryFileMode);
                 }
             }
 
@@ -1063,40 +1085,7 @@ class TautManager(
         }
     }
 
-    void TautenBlobName(
-        Lg2Blob tautenedBlob,
-        string filePath,
-        Dictionary<string, string> tautenedFilePaths
-    )
-    {
-        using var tautRepoOdb = _tautRepo.GetOdb();
-
-        var readStream = tautRepoOdb.ReadAsStream(tautenedBlob);
-        var recryptor = cipher.CreateRecryptor(readStream);
-
-        var fileName = Path.GetFileName(filePath);
-        var fileNameStream = new MemoryStream(Encoding.UTF8.GetBytes(fileName), writable: false);
-
-        var encryptedFileNameStream = new MemoryStream();
-        recryptor.Encrypt(fileNameStream, encryptedFileNameStream);
-
-        var tautenedFileNameData = encryptedFileNameStream
-            .GetBuffer()
-            .AsSpan(0, (int)encryptedFileNameStream.Length);
-
-        var tautenedFilename = Convert.ToHexStringLower(tautenedFileNameData);
-
-        tautenedFilePaths.Add(filePath, tautenedFilename);
-
-        logger.ZLogTrace($"Tauten file name of '{filePath}' into '{tautenedFilename}'");
-    }
-
-    void TautenBlob(
-        Lg2Blob blob,
-        scoped ref Lg2Oid resultOid,
-        string filePath,
-        Dictionary<string, string> tautenedFileNames
-    )
+    void TautenBlob(Lg2Blob blob, scoped ref Lg2Oid resultOid, string filePath)
     {
         using var hostRepoOdb = _hostRepo.GetOdb();
         using var tautRepoOdb = _tautRepo.GetOdb();
@@ -1110,27 +1099,14 @@ class TautManager(
             blob.GetObjectType()
         );
 
-        var fileName = Path.GetFileName(filePath);
-        var fileNameStream = new MemoryStream(Encoding.UTF8.GetBytes(fileName), writable: false);
-
-        var encryptedFileNameStream = new MemoryStream();
-
-        encryptor.ProduceOutput(writeStream, fileNameStream, encryptedFileNameStream);
+        encryptor.ProduceOutput(writeStream);
 
         writeStream.FinalizeWrite(ref resultOid);
 
         StoreTautened(blob, resultOid);
-
-        var tautenedFileNameData = encryptedFileNameStream
-            .GetBuffer()
-            .AsSpan(0, (int)encryptedFileNameStream.Length);
-
-        var tautenedFilename = Convert.ToHexStringLower(tautenedFileNameData);
-
-        tautenedFileNames.Add(filePath, tautenedFilename);
-
-        logger.ZLogTrace($"Tauten file name of '{filePath}' into '{tautenedFilename}'");
     }
+
+    #endregion Tautening
 
     internal void RebuildKvStore()
     {
@@ -1158,223 +1134,5 @@ class TautManager(
         RegainHostRefs();
 
         TautenHostRefs();
-    }
-
-    #endregion Tautening
-}
-
-class PatchRegainStream : Stream
-{
-    readonly MemoryStream _targetStream;
-
-    static readonly byte[] s_diffGitDummyLine = Encoding.ASCII.GetBytes(
-        $"diff --git a/dummy b/dummy\n"
-    );
-
-    internal PatchRegainStream()
-    {
-        _targetStream = new();
-
-        _targetStream.Write(s_diffGitDummyLine);
-    }
-
-    public override bool CanRead => false;
-
-    public override bool CanSeek => false;
-
-    public override bool CanWrite => true;
-
-    public override long Length => _targetStream.Length;
-
-    public override long Position
-    {
-        get => _targetStream.Position;
-        set => throw new NotSupportedException();
-    }
-
-    public override void Flush()
-    {
-        throw new NotSupportedException();
-    }
-
-    public override int Read(byte[] buffer, int offset, int count)
-    {
-        throw new NotSupportedException();
-    }
-
-    public override long Seek(long offset, SeekOrigin origin)
-    {
-        throw new NotSupportedException();
-    }
-
-    public override void SetLength(long value)
-    {
-        throw new NotSupportedException();
-    }
-
-    public override void Write(byte[] buffer, int offset, int count)
-    {
-        _targetStream.Write(buffer, offset, count);
-    }
-
-    internal byte[] GetBuffer()
-    {
-        return _targetStream.GetBuffer();
-    }
-}
-
-class PatchTautenStream : Stream
-{
-    readonly Stream _sourceStream;
-    readonly MemoryStream _headerStream;
-
-    readonly long _length;
-    readonly long _sourceHeaderOffset;
-
-    long _totalRead;
-
-    static readonly byte[] s_diffGit = Encoding.ASCII.GetBytes("diff --git");
-    static readonly byte[] s_tripleMinus = Encoding.ASCII.GetBytes("---");
-    static readonly byte[] s_tripleMinusDummyLine = Encoding.ASCII.GetBytes($"--- a/dummy\n");
-    static readonly byte[] s_triplePlus = Encoding.ASCII.GetBytes("+++");
-    static readonly byte[] s_triplePlusDummyLine = Encoding.ASCII.GetBytes($"+++ b/dummy\n");
-    static readonly byte[] s_doubleAt = Encoding.ASCII.GetBytes("@@");
-
-    internal PatchTautenStream(Stream patchInput)
-    {
-        _sourceStream = patchInput;
-        _headerStream = new();
-
-        PrepareHeaderStream();
-
-        _headerStream.Position = 0;
-        _sourceHeaderOffset = _sourceStream.Position;
-        _length = _headerStream.Length + _sourceStream.Length - _sourceHeaderOffset;
-    }
-
-    int ReadLine()
-    {
-        int dataRead = 0;
-
-        for (; ; )
-        {
-            var val = _sourceStream.ReadByte();
-            if (val == -1)
-            {
-                break;
-            }
-
-            _headerStream.WriteByte((byte)val);
-            dataRead++;
-
-            if (val == '\n')
-            {
-                break;
-            }
-        }
-
-        return dataRead;
-    }
-
-    void PrepareHeaderStream()
-    {
-        for (int totalRead = 0; ; )
-        {
-            var dataRead = ReadLine();
-            if (dataRead == 0)
-            {
-                break;
-            }
-
-            var buffer = _headerStream.GetBuffer();
-            var lineData = buffer.AsSpan(totalRead, dataRead);
-            if (lineData.StartsWith(s_diffGit))
-            {
-                _headerStream.SetLength(totalRead); // rewind
-
-                continue;
-            }
-            if (lineData.StartsWith(s_tripleMinus))
-            {
-                _headerStream.SetLength(totalRead); // rewind
-                _headerStream.Write(s_tripleMinusDummyLine);
-                totalRead = (int)_headerStream.Length;
-
-                continue;
-            }
-            if (lineData.StartsWith(s_triplePlus))
-            {
-                _headerStream.SetLength(totalRead); // rewind
-                _headerStream.Write(s_triplePlusDummyLine);
-                totalRead = (int)_headerStream.Length;
-
-                continue;
-            }
-            if (lineData.StartsWith(s_doubleAt))
-            {
-                break; // we have passed the diff header, time to break
-            }
-
-            totalRead = (int)_headerStream.Length;
-        }
-    }
-
-    public override bool CanRead => _sourceStream.CanRead;
-
-    public override bool CanSeek => false;
-
-    public override bool CanWrite => false;
-
-    public override long Length => _length;
-
-    public override long Position
-    {
-        get => _totalRead;
-        set
-        {
-            ArgumentOutOfRangeException.ThrowIfNotEqual(value, 0);
-
-            _totalRead = 0;
-            _headerStream.Position = 0;
-            _sourceStream.Position = _sourceHeaderOffset;
-        }
-    }
-
-    public override void Flush()
-    {
-        throw new NotSupportedException();
-    }
-
-    public override int Read(byte[] buffer, int offset, int count)
-    {
-        int dataRead;
-
-        if (_headerStream.Position != _headerStream.Length)
-        {
-            dataRead = _headerStream.Read(buffer, offset, count);
-        }
-        else
-        {
-            dataRead = _sourceStream.Read(buffer, offset, count);
-        }
-
-        _totalRead += dataRead;
-
-        return dataRead;
-    }
-
-    public override long Seek(long offset, SeekOrigin origin)
-    {
-        throw new NotSupportedException();
-    }
-
-    public override void SetLength(long value)
-    {
-        throw new NotSupportedException();
-    }
-
-    public override void Write(byte[] buffer, int offset, int count)
-    {
-        throw new NotSupportedException();
     }
 }

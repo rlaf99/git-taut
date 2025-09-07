@@ -1,12 +1,11 @@
-using System.Diagnostics.CodeAnalysis;
 using Lg2.Sharpy;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.IO;
 using ZLogger;
 
 [assembly: AssemblyFixture(typeof(Cli.Tests.Lg2GlobalFixture))]
+[assembly: AssemblyFixture(typeof(Cli.Tests.HostBuilderFixture))]
 [assembly: AssemblyFixture(typeof(Cli.Tests.LoggerFactoryFixture))]
-[assembly: AssemblyFixture(typeof(Cli.Tests.StreamManagerFixture))]
 
 namespace Cli.Tests;
 
@@ -22,6 +21,25 @@ public sealed class Lg2GlobalFixture : IDisposable
     public void Dispose()
     {
         _lg2.Dispose();
+    }
+}
+
+public sealed class HostBuilderFixture : IDisposable
+{
+    public IHost BuildHost()
+    {
+        var settings = new HostApplicationBuilderSettings();
+
+        var builder = Host.CreateEmptyApplicationBuilder(settings);
+
+        ProgramSupport.AddServices(builder.Services);
+
+        return builder.Build();
+    }
+
+    public void Dispose()
+    {
+        // do nothing
     }
 }
 
@@ -45,22 +63,4 @@ public sealed class LoggerFactoryFixture : IDisposable
     public ILogger<T> CreateLogger<T>() => _loggerFactory.CreateLogger<T>();
 
     public ILogger GetLogger(string categoryName) => _loggerFactory.CreateLogger(categoryName);
-}
-
-public sealed class StreamManagerFixture : IDisposable
-{
-    [AllowNull]
-    RecyclableMemoryStreamManager _streamManager;
-
-    public StreamManagerFixture()
-    {
-        _streamManager = new();
-    }
-
-    public void Dispose()
-    {
-        _streamManager = null;
-    }
-
-    public RecyclableMemoryStreamManager Get() => _streamManager!;
 }

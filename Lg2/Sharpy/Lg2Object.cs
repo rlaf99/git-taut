@@ -27,7 +27,7 @@ public static unsafe class Lg2objInfoExtensions
         return oidRef.Ref.NFmt(size);
     }
 
-    public static bool HasSameOid(this ILg2ObjectInfo objInfo, ILg2ObjectInfo other)
+    public static bool OidEquals(this ILg2ObjectInfo objInfo, ILg2ObjectInfo other)
     {
         var objType = objInfo.GetObjectType();
         var otherObjType = other.GetObjectType();

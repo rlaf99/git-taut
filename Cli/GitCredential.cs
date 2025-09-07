@@ -1,7 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Text;
-using Microsoft.Extensions.Logging;
-using ZLogger;
 
 namespace Git.Taut;
 
@@ -12,10 +9,13 @@ sealed class GitCredential : IDisposable
 
     StringBuilder _buf = new();
 
-    [AllowNull]
-    byte[] _passwordData;
+    string _userName = string.Empty;
 
-    internal byte[] PasswordData => _passwordData!;
+    internal string UserName => _userName;
+
+    byte[] _passwordData = [];
+
+    internal byte[] PasswordData => _passwordData;
 
     internal string FilledInfo => _buf.ToString();
 
@@ -37,6 +37,11 @@ sealed class GitCredential : IDisposable
             _buf.Append(line);
         }
 
+        if (string.IsNullOrEmpty(_userName))
+        {
+            _userName = ParseForUserName(line);
+        }
+
         if (_passwordData is null)
         {
             _passwordData = ParseForPasswordData(line);
@@ -48,7 +53,22 @@ sealed class GitCredential : IDisposable
         Console.Error.WriteLine(line);
     }
 
-    static byte[]? ParseForPasswordData(string line)
+    static string ParseForUserName(string line)
+    {
+        const string prefix = "username=";
+
+        var username = string.Empty;
+
+        if (line.StartsWith(prefix))
+        {
+            var value = line[prefix.Length..];
+            username = value.Trim();
+        }
+
+        return username;
+    }
+
+    static byte[] ParseForPasswordData(string line)
     {
         const string prefix = "password=";
 
@@ -61,7 +81,7 @@ sealed class GitCredential : IDisposable
             return passwordData;
         }
 
-        return null;
+        return [];
     }
 
     void ClearLastFill()
@@ -76,7 +96,9 @@ sealed class GitCredential : IDisposable
         if (_passwordData is not null)
         {
             Array.Fill<byte>(_passwordData, 0);
-            _passwordData = null;
+
+            _passwordData = [];
+            _userName = string.Empty;
         }
     }
 
@@ -95,7 +117,7 @@ sealed class GitCredential : IDisposable
         _cli.Execute(InputProvider, FillDataReceiver, ErrorDataReceiver, "credential", "fill");
     }
 
-    void BufInputProvider(StreamWriter writer)
+    void InputProvider(StreamWriter writer)
     {
         if (_buf.Length == 0)
         {
@@ -110,14 +132,14 @@ sealed class GitCredential : IDisposable
 
     internal void Approve()
     {
-        _cli.Execute(BufInputProvider, null, ErrorDataReceiver, "credential", "approve");
+        _cli.Execute(InputProvider, null, ErrorDataReceiver, "credential", "approve");
 
         ClearLastFill();
     }
 
     internal void Reject()
     {
-        _cli.Execute(BufInputProvider, null, ErrorDataReceiver, "credential", "reject");
+        _cli.Execute(InputProvider, null, ErrorDataReceiver, "credential", "reject");
 
         ClearLastFill();
     }

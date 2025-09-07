@@ -10,16 +10,17 @@ class TautSetupHelper(
     string remoteName,
     Lg2Repository tautRepo,
     Lg2Repository hostRepo,
-    GitCli gitCli
+    GitCli gitCli,
+    UserKeyHolder keyHolder
 )
 {
     const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
 
-    internal void SetupTautAndHost(UserKeyBase keyBase)
+    internal void SetupTautAndHost()
     {
         TautSetDescription();
         TautAddHostObjects();
-        TautSetRemote(keyBase);
+        TautSetRemote();
         TautSetConfig();
     }
 
@@ -44,7 +45,7 @@ class TautSetupHelper(
         config.SetString(GitConfigHelper.Fetch_Prune, "true");
     }
 
-    void TautSetRemote(UserKeyBase keyBase)
+    void TautSetRemote()
     {
         using (var remote = tautRepo.LookupRemote(remoteName))
         {
@@ -54,36 +55,45 @@ class TautSetupHelper(
             // normalize the remote's file path
             tautRepo.SetRemoteUrl(remoteName, remoteUri.AbsolutePath);
 
-            using (var config = tautRepo.GetConfig())
-            {
-                var credUri = GitRepoHelper.ConvertToCredentialUri(remoteUri);
-                var credUrl = credUri.AbsoluteUri;
+            var gitCredUri = GitRepoHelper.ConvertToCredentialUri(remoteUri);
+            var gitCredUrl = gitCredUri.AbsoluteUri;
 
-                using (var gitCred = new GitCredential(gitCli, credUrl))
-                {
-                    gitCred.Fill();
-
-                    keyBase.SetPasswordData(gitCred.PasswordData);
-
-                    var info = Encoding.ASCII.GetBytes(credUrl);
-                    var credTag = keyBase.GenerateCredentialTag(info);
-
-                    config.SetTautCredentialTag(remoteName, credTag);
-
-                    gitCred.Approve();
-                }
-
-                config.SetTautCredentialUrl(remoteName, credUrl);
-            }
-
-            HostSetRemote(remoteUri);
+            HostSetRemote(remoteUri, gitCredUrl, keyHolder);
         }
     }
 
-    void HostSetRemote(Uri tautRemoteUri)
+    void HostSetRemote(Uri tautRemoteUri, string gitCredUrl, UserKeyHolder keyHolder)
     {
         var hostRemoteUrl = GitRepoHelper.AddTautRemoteHelperPrefix(tautRemoteUri.AbsoluteUri);
         hostRepo.SetRemoteUrl(remoteName, hostRemoteUrl);
+
+        using (var config = hostRepo.GetConfig())
+        {
+            using (var gitCred = new GitCredential(gitCli, gitCredUrl))
+            {
+                gitCred.Fill();
+
+                byte[] passwordSalt = [];
+
+                if (string.IsNullOrEmpty(gitCred.UserName) == false)
+                {
+                    config.SetTautCredentialUserName(remoteName, gitCred.UserName);
+
+                    passwordSalt = Encoding.UTF8.GetBytes(gitCred.UserName);
+                }
+
+                keyHolder.DeriveCrudeKey(gitCred.PasswordData, passwordSalt);
+
+                var info = Encoding.ASCII.GetBytes(gitCredUrl);
+                var credTag = keyHolder.DeriveCredentialKeyTrait(info);
+
+                config.SetTautCredentialKeyTrait(remoteName, credTag);
+
+                gitCred.Approve();
+            }
+
+            config.SetTautCredentialUrl(remoteName, gitCredUrl);
+        }
     }
 
     void TautAddHostObjects()

@@ -115,19 +115,24 @@ public unsafe ref struct Lg2Oid
 
 public static unsafe class Lg2OidExtensions
 {
-    public static string ToHexDigits(this ref Lg2Oid oid)
+    public static string ToHexDigits(this scoped ref Lg2Oid oid)
     {
         return oid.Raw.Fmt();
     }
 
-    public static string ToHexDigits(this ref Lg2Oid oid, int size)
+    public static string ToHexDigits(this scoped ref Lg2Oid oid, int size)
     {
         return oid.Raw.NFmt(size);
     }
 
-    public static Span<byte> GetRawData(this ref Lg2Oid oid)
+    public static Span<byte> GetRawData(this scoped ref Lg2Oid oid)
     {
         return MemoryMarshal.CreateSpan(ref oid.Raw.id[0], GIT_OID_MAX_SIZE);
+    }
+
+    public static bool PlainRefEquals(this scoped ref Lg2Oid oid, Lg2OidPlainRef otherRef)
+    {
+        return oid.PlainRef.Equals(otherRef);
     }
 }
 

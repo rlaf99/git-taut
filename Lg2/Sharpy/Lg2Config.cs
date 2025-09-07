@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Lg2.Native;
+using static Lg2.Native.git_error_code;
 using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
@@ -125,6 +126,35 @@ public sealed unsafe class Lg2ConfigIteratorEntry
 
 public static unsafe class Lg2ConfigExtensions
 {
+    public static bool TryGetString(this Lg2Config config, string name, out string value)
+    {
+        config.EnsureValid();
+
+        using var u8Name = new Lg2Utf8String(name);
+
+        git_buf buf = new();
+        try
+        {
+            var rc = git_config_get_string_buf(&buf, config.Ptr, u8Name.Ptr);
+            if (rc == (int)GIT_ENOTFOUND)
+            {
+                value = string.Empty;
+                return false;
+            }
+
+            Lg2Exception.ThrowIfNotOk(rc);
+
+            var result = Marshal.PtrToStringUTF8((nint)buf.ptr)!;
+
+            value = result;
+            return true;
+        }
+        finally
+        {
+            git_buf_dispose(&buf);
+        }
+    }
+
     public static string GetString(this Lg2Config config, string name)
     {
         config.EnsureValid();

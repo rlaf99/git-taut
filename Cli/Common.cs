@@ -180,56 +180,48 @@ static class GitRepoHelper
 static class GitConfigHelper
 {
     internal const string TautCredentialUrl = "tautCredentialUrl";
-    internal const string TautCredentialTag = "tautCredentialTag";
-
-    internal const string TautPattern = "tautPattern";
+    internal const string TautCredentialUserName = "tautCredentialUserName";
+    internal const string TautCredentialKeyTrait = "tautCredentialKeyTrait";
 
     internal const string Fetch_Prune = "fetch.prune";
 
-    internal static string GetNameOfTautCredentialUrl(string remoteName)
-    {
-        var result = $"remote.{remoteName}.{TautCredentialUrl}";
+    internal static string GetNameOfItemUnderRemote(string remoteName, string itemName) =>
+        $"remote.{remoteName}.{itemName}";
 
-        return result;
-    }
-
-    internal static string GetNameOfTautCredentialTag(string remoteName)
-    {
-        var result = $"remote.{remoteName}.{TautCredentialTag}";
-
-        return result;
-    }
-
-    internal static string GetNameOfTautPattern(string remoteName)
-    {
-        var result = $"remote.{remoteName}.{TautPattern}";
-
-        return result;
-    }
-
-    internal static string GetTautCredentialUrl(this Lg2Config config, string remoteName)
+    internal static string? GetTautCredentialUrl(this Lg2Config config, string remoteName)
     {
         config.EnsureValid();
 
-        var configName = GetNameOfTautCredentialUrl(remoteName);
+        var configName = GetNameOfItemUnderRemote(remoteName, TautCredentialUrl);
 
-        var result = config.GetString(configName);
+        var result = config.TryGetString(configName, out var value);
 
-        return result;
+        return result ? value : null;
     }
 
-    internal static string GetTautCredentialTag(this Lg2Config config, string remoteName)
+    internal static string? GetTautCredentialUserName(this Lg2Config config, string remoteName)
     {
         config.EnsureValid();
 
-        var configName = GetNameOfTautCredentialTag(remoteName);
+        var configName = GetNameOfItemUnderRemote(remoteName, TautCredentialUserName);
 
-        var result = config.GetString(configName);
+        var result = config.TryGetString(configName, out var value);
 
-        return result;
+        return result ? value : null;
     }
 
-    internal static void SetTautCredentialTag(
+    internal static string? GetTautCredentialKeyTrait(this Lg2Config config, string remoteName)
+    {
+        config.EnsureValid();
+
+        var configName = GetNameOfItemUnderRemote(remoteName, TautCredentialKeyTrait);
+
+        var result = config.TryGetString(configName, out var value);
+
+        return result ? value : null;
+    }
+
+    internal static void SetTautCredentialKeyTrait(
         this Lg2Config config,
         string remoteName,
         string value
@@ -237,7 +229,20 @@ static class GitConfigHelper
     {
         config.EnsureValid();
 
-        var configName = GetNameOfTautCredentialTag(remoteName);
+        var configName = GetNameOfItemUnderRemote(remoteName, TautCredentialKeyTrait);
+
+        config.SetString(configName, value);
+    }
+
+    internal static void SetTautCredentialUserName(
+        this Lg2Config config,
+        string remoteName,
+        string value
+    )
+    {
+        config.EnsureValid();
+
+        var configName = GetNameOfItemUnderRemote(remoteName, TautCredentialUserName);
 
         config.SetString(configName, value);
     }
@@ -250,32 +255,28 @@ static class GitConfigHelper
     {
         config.EnsureValid();
 
-        var configName = GetNameOfTautCredentialUrl(remoteName);
+        var configName = GetNameOfItemUnderRemote(remoteName, TautCredentialUrl);
 
         config.SetString(configName, value);
-    }
-
-    internal static List<string> GetTautPatterns(this Lg2Config config, string remoteName)
-    {
-        var name = GetNameOfTautPattern(remoteName);
-
-        var iter = config.NewIterator(name);
-
-        List<string> result = [];
-
-        for (Lg2ConfigIteratorEntry? entry; iter.Next(out entry); )
-        {
-            var val = entry.GetValue();
-            result.Add(val);
-        }
-
-        return result;
     }
 }
 
 static class GitAttrHelper
 {
-    internal const string Taut = "taut";
+    internal const string TautAttrName = "taut";
+
+    internal static Lg2AttrValue GetTautAttrValue(
+        this Lg2Repository repo,
+        string pathName,
+        Lg2AttrOptions attrOpts
+    )
+    {
+        repo.EnsureValid();
+
+        var result = repo.GetAttrValue(pathName, TautAttrName, attrOpts);
+
+        return result;
+    }
 }
 
 static class AppConfigurationExtensions

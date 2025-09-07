@@ -1,6 +1,6 @@
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 using ZLogger;
@@ -8,12 +8,12 @@ using ZstdSharp;
 
 namespace Git.Taut;
 
-class InvalidTautenedDataException : Exception
+class InvalidHallmarkException : Exception
 {
-    internal InvalidTautenedDataException(string? message)
+    internal InvalidHallmarkException(string? message)
         : base(message) { }
 
-    internal bool HasTautenedBytes { get; set; }
+    internal bool HasHallmarkBytes { get; set; }
     internal bool HasReservedBytes { get; set; }
 }
 
@@ -21,25 +21,31 @@ partial class Aes256Cbc1(ILogger<Aes256Cbc1> logger, RecyclableMemoryStreamManag
 
 partial class Aes256Cbc1
 {
-    internal const int PLAIN_TEXT_MAX_BYTES = 100 * 1024 * 1024;
+    internal const int PLAIN_TEXT_MAX_SIZE = 100 * 1024 * 1024;
 
-    internal const int TAUTENED_BYTES = 4;
-    internal const int RESERVED_BYTES = 4;
-    internal const int RANDOM_BYTES = 12;
-    internal const int KEY_TAG_BYTES = 4;
+    internal const int HALLMARK_SIZE = 4;
+    internal const int RESERVED_SIZE = 4;
+    internal const int RANDOM_FILL_SIZE = 20;
+    internal const int RANDOM_FILL_SALT_OFFSET = 4;
 
-    internal const int CIPHER_TEXT_OFFSET =
-        TAUTENED_BYTES + RESERVED_BYTES + RANDOM_BYTES + KEY_TAG_BYTES;
-    internal const int CIPHER_BLOCK_BYTES = 16;
-    internal const int CIPHER_KEY_BYTES = 32;
+    internal const int CIPHER_TEXT_OFFSET = HALLMARK_SIZE + RESERVED_SIZE + RANDOM_FILL_SIZE;
+    internal const int CIPHER_BLOCK_SIZE = 16;
 
-    internal const int KEY_ITERATION_COUNT = 64007;
+    internal const int NAME_HALLMARK_SIZE = 2;
+    internal const int NAME_HASH_MIN_SIZE = 20;
+    internal const int NAME_HASH_SALT_OFFSET = 4;
 
-    internal const int PLAIN_TEXT_SCRAMBLE_BYTES = 4;
+    internal const int PLAIN_TEXT_SCRAMBLE_SIZE = 4;
 
 #pragma warning disable IDE0300 // Simplify collection initialization
-    internal static readonly byte[] TAUTENED_DATA = new byte[TAUTENED_BYTES] { 0, 9, 9, 0xa1 };
-    internal static readonly byte[] RESERVED_DATA = new byte[RESERVED_BYTES] { 0, 0, 0, 0 };
+    internal static readonly byte[] HALLMARK_DATA = new byte[HALLMARK_SIZE] { 0, 9, 9, 0xa1 };
+    internal static readonly byte[] RESERVED_DATA = new byte[RESERVED_SIZE] { 0, 0, 0, 0 };
+
+    internal static readonly byte[] NAME_HALLMARK_DATA = new byte[NAME_HALLMARK_SIZE]
+    {
+        0x99,
+        0xa1,
+    };
 #pragma warning restore IDE0300 // Simplify collection initialization
 
     internal static CipherMode UsedCipherMode => CipherMode.CBC;
@@ -49,11 +55,13 @@ partial class Aes256Cbc1
     Aes _aes;
 
     [AllowNull]
-    UserKeyBase _keyBase;
+    UserKeyHolder _keyHolder;
+
+    internal UserKeyHolder KeyHolder => _keyHolder!;
 
     bool _initialized = false;
 
-    public void Init(UserKeyBase keyBase)
+    public void Init(UserKeyHolder keyHolder)
     {
         if (_initialized)
         {
@@ -62,17 +70,15 @@ partial class Aes256Cbc1
 
         _initialized = true;
 
-        _keyBase = keyBase;
+        _keyHolder = keyHolder;
 
         _aes = Aes.Create();
 
         _aes.Mode = UsedCipherMode;
         _aes.Padding = UsedPaddingMode;
 
-        Debug.Assert(RANDOM_BYTES + KEY_TAG_BYTES == CIPHER_BLOCK_BYTES);
-
         logger.ZLogTrace(
-            $"Initialize {nameof(Aes256Cbc1)} mode '{Enum.GetName(UsedCipherMode)}' padding '{Enum.GetName(UsedPaddingMode)}'"
+            $"Initialized {nameof(Aes256Cbc1)} mode '{Enum.GetName(UsedCipherMode)}' padding '{Enum.GetName(UsedPaddingMode)}'"
         );
     }
 
@@ -92,35 +98,70 @@ partial class Aes256Cbc1
 
         return result;
     }
-}
 
-partial class Aes256Cbc1
-{
-    byte[] PrepareEncryptionKey(byte[] ivData)
+    #region  Encryption
+
+    internal MemoryStream EncryptName(string name, ReadOnlySpan<byte> hash)
     {
-        if (ivData.Length != CIPHER_BLOCK_BYTES)
-        {
-            throw new ArgumentException($"Length must be {CIPHER_BLOCK_BYTES}", nameof(ivData));
-        }
+        ArgumentException.ThrowIfNullOrEmpty(name, nameof(name));
 
-        var randomData = new Span<byte>(ivData, 0, RANDOM_BYTES);
-        RandomNumberGenerator.Fill(randomData);
+        ArgumentOutOfRangeException.ThrowIfLessThan(hash.Length, NAME_HASH_MIN_SIZE, nameof(hash));
 
-        var keyTagData = new Span<byte>(ivData, RANDOM_BYTES, KEY_TAG_BYTES);
-        HKDF.Expand(HashAlgorithmName.SHA256, _keyBase.HashedPass, keyTagData, randomData);
+        var ivData = hash[0..CIPHER_BLOCK_SIZE].ToArray();
+        var encKeySalt = hash[NAME_HASH_SALT_OFFSET..NAME_HASH_MIN_SIZE];
+        var encKey = KeyHolder.DeriveCipherKey(encKeySalt, 1000);
 
-        var key = _keyBase.GenerateCipherKey(randomData, CIPHER_KEY_BYTES, KEY_ITERATION_COUNT);
+        var encryptTransform = GetEncryptionTransform(encKey, ivData);
 
-        return key;
+        var entryNameData = Encoding.UTF8.GetBytes(name);
+        var plainTextData = new byte[NAME_HALLMARK_SIZE + entryNameData.Length];
+
+        NAME_HALLMARK_DATA.CopyTo(plainTextData.AsSpan(0, NAME_HALLMARK_SIZE));
+        entryNameData.CopyTo(plainTextData.AsSpan(NAME_HALLMARK_SIZE));
+
+        var plainTextDataStream = new MemoryStream(plainTextData, writable: false);
+
+        using var cryptoStream = new CryptoStream(
+            plainTextDataStream,
+            encryptTransform,
+            CryptoStreamMode.Read
+        );
+
+        MemoryStream result = new();
+
+        cryptoStream.CopyTo(result);
+
+        return result;
     }
 
-    ICryptoTransform GetEncryptionTransform(byte[] encKey, byte[] ivData)
+    byte[] PrepareEncryptionKey(byte[] ivData, byte[] extraSalt)
     {
-        _aes.Key = encKey;
-        _aes.IV = ivData;
+        ArgumentOutOfRangeException.ThrowIfNotEqual(
+            ivData.Length,
+            CIPHER_BLOCK_SIZE,
+            nameof(ivData)
+        );
 
-        return _aes.CreateEncryptor();
+        ArgumentOutOfRangeException.ThrowIfNotEqual(
+            extraSalt.Length,
+            RANDOM_FILL_SIZE - CIPHER_BLOCK_SIZE,
+            nameof(extraSalt)
+        );
+
+        var randomFill = RandomNumberGenerator.GetBytes(20);
+
+        randomFill.AsSpan(0, CIPHER_BLOCK_SIZE).CopyTo(ivData);
+        randomFill.AsSpan(CIPHER_BLOCK_SIZE).CopyTo(extraSalt);
+
+        var encKeySalt = randomFill.AsSpan(RANDOM_FILL_SALT_OFFSET);
+
+        var result = _keyHolder.DeriveCipherKey(encKeySalt, 1000);
+
+        return result;
     }
+
+    ICryptoTransform GetEncryptionTransform(byte[] encKey, byte[] ivData) =>
+        _aes.CreateEncryptor(encKey, ivData);
 
     [Flags]
     internal enum ContentHeaderPrimaryFlags : byte
@@ -133,7 +174,8 @@ partial class Aes256Cbc1
     internal sealed class EncryptorStream : Stream
     {
         readonly Aes256Cbc1 _cipher;
-        readonly byte[] _ivData = new byte[CIPHER_BLOCK_BYTES];
+        readonly byte[] _ivData = new byte[CIPHER_BLOCK_SIZE];
+        readonly byte[] _extraSalt = new byte[RANDOM_FILL_SIZE - CIPHER_BLOCK_SIZE];
         readonly byte[] _encKey;
 
         readonly MemoryStream _headerStream = new();
@@ -155,7 +197,7 @@ partial class Aes256Cbc1
         )
         {
             _cipher = cihper;
-            _encKey = _cipher.PrepareEncryptionKey(_ivData);
+            _encKey = _cipher.PrepareEncryptionKey(_ivData, _extraSalt);
 
             _sourceStream = inputStream;
             _sourceLength = sourceLength;
@@ -183,14 +225,13 @@ partial class Aes256Cbc1
                 primaryFlags |= ContentHeaderPrimaryFlags.ExtraPayloadPresent;
             }
 
-            var scrambleData = new byte[PLAIN_TEXT_SCRAMBLE_BYTES];
-            RandomNumberGenerator.Fill(scrambleData);
+            var scrambleData = RandomNumberGenerator.GetBytes(PLAIN_TEXT_SCRAMBLE_SIZE);
             scrambleData[0] = (byte)primaryFlags;
 
             _headerStream.Write(scrambleData);
 
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(_sourceLength, 0);
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(_sourceLength, PLAIN_TEXT_MAX_BYTES);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(_sourceLength, PLAIN_TEXT_MAX_SIZE);
 
             var sourceLengthData = BitConverter.GetBytes(_sourceLength);
             if (BitConverter.IsLittleEndian)
@@ -209,14 +250,14 @@ partial class Aes256Cbc1
                 _headerStream.Write(extraPayload);
             }
 
-            var sourceBeginningData = new byte[TAUTENED_BYTES];
+            var sourceBeginningData = new byte[HALLMARK_SIZE];
             var sourceBeginningSize = _sourceStream.Read(sourceBeginningData);
             if (
-                sourceBeginningSize == TAUTENED_BYTES
-                && sourceBeginningData.SequenceEqual(TAUTENED_DATA)
+                sourceBeginningSize == HALLMARK_SIZE
+                && sourceBeginningData.SequenceEqual(HALLMARK_DATA)
             )
             {
-                throw new InvalidDataException($"{nameof(TAUTENED_DATA)} found in source");
+                throw new InvalidDataException($"{nameof(HALLMARK_DATA)} found in source");
             }
 
             _headerStream.Write(sourceBeginningData, 0, sourceBeginningSize);
@@ -286,10 +327,11 @@ partial class Aes256Cbc1
 
         internal void WriteToEnd(Stream outputStream)
         {
-            outputStream.Write(TAUTENED_DATA);
+            outputStream.Write(HALLMARK_DATA);
             outputStream.Write(RESERVED_DATA);
 
             outputStream.Write(_ivData);
+            outputStream.Write(_extraSalt);
 
             var encTransform = _cipher.GetEncryptionTransform(_encKey, _ivData);
 
@@ -436,7 +478,7 @@ partial class Aes256Cbc1
     {
         var sourceLength = sourceInput.Length - sourceInput.Position;
 
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(sourceLength, PLAIN_TEXT_MAX_BYTES);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(sourceLength, PLAIN_TEXT_MAX_SIZE);
 
         var isCompressed = false;
         var inputStream = sourceInput;
@@ -505,45 +547,81 @@ partial class Aes256Cbc1
 
         return encryptor;
     }
-}
 
-partial class Aes256Cbc1
-{
-    byte[] GetDecryptionKey(byte[] ivData)
+    #endregion Encryption
+
+    #region  Decryption
+
+    internal MemoryStream DecryptName(byte[] data, ReadOnlySpan<byte> hash)
     {
-        if (ivData.Length != CIPHER_BLOCK_BYTES)
+        ArgumentOutOfRangeException.ThrowIfLessThan(hash.Length, NAME_HASH_MIN_SIZE, nameof(hash));
+
+        if (data.Length < NAME_HALLMARK_SIZE)
         {
-            throw new ArgumentException($"Length must be {CIPHER_BLOCK_BYTES}", nameof(ivData));
+            throw new InvalidHallmarkException($"Data less than {NAME_HALLMARK_SIZE} bytes");
         }
 
-        var randomData = new ReadOnlySpan<byte>(ivData, 0, RANDOM_BYTES);
-        var keyTagData = new ReadOnlySpan<byte>(ivData, RANDOM_BYTES, KEY_TAG_BYTES);
-
-        var expectedKeyTagData = new byte[KEY_TAG_BYTES];
-        HKDF.Expand(HashAlgorithmName.SHA256, _keyBase.HashedPass, expectedKeyTagData, randomData);
-
-        if (keyTagData.SequenceEqual(expectedKeyTagData) == false)
+        if (
+            data.Length < (NAME_HALLMARK_SIZE + CIPHER_BLOCK_SIZE)
+            || (data.Length - NAME_HALLMARK_SIZE) % CIPHER_BLOCK_SIZE != 0
+        )
         {
-            throw new InvalidDataException($"Failed to verify key");
+            throw new FormatException($"Data not aligned on {CIPHER_BLOCK_SIZE} bytes boundary");
         }
 
-        var key = _keyBase.GenerateCipherKey(randomData, CIPHER_KEY_BYTES, KEY_ITERATION_COUNT);
+        if (data[0..NAME_HALLMARK_SIZE].SequenceEqual(NAME_HALLMARK_DATA) == false)
+        {
+            var hallmark = Convert.ToHexString(NAME_HALLMARK_DATA);
+            throw new InvalidHallmarkException($"Hallmark '{hallmark}' not present");
+        }
 
-        return key;
+        var ivData = hash[0..CIPHER_BLOCK_SIZE].ToArray();
+        var decKeySalt = hash[NAME_HASH_SALT_OFFSET..NAME_HASH_MIN_SIZE];
+        var decKey = KeyHolder.DeriveCipherKey(decKeySalt, 1000);
+
+        var decryptTransform = GetDecryptionTransform(decKey, ivData);
+
+        var entryNameCipherTextDataStream = new MemoryStream(data, writable: false);
+
+        using var cryptoStream = new CryptoStream(
+            entryNameCipherTextDataStream,
+            decryptTransform,
+            CryptoStreamMode.Read
+        );
+
+        MemoryStream result = new();
+
+        cryptoStream.CopyTo(result);
+
+        return result;
     }
 
-    ICryptoTransform GetDecryptionTransform(byte[] decKey, byte[] ivData)
+    byte[] PrepareDecryptionKey(byte[] ivData, ReadOnlySpan<byte> encKeySalt)
     {
-        _aes.Key = decKey;
-        _aes.IV = ivData;
+        ArgumentOutOfRangeException.ThrowIfNotEqual(
+            ivData.Length,
+            CIPHER_BLOCK_SIZE,
+            nameof(ivData)
+        );
 
-        return _aes.CreateDecryptor();
+        ArgumentOutOfRangeException.ThrowIfNotEqual(
+            encKeySalt.Length,
+            CIPHER_BLOCK_SIZE,
+            nameof(encKeySalt)
+        );
+
+        var result = _keyHolder.DeriveCipherKey(encKeySalt, 1000);
+
+        return result;
     }
+
+    ICryptoTransform GetDecryptionTransform(byte[] decKey, byte[] ivData) =>
+        _aes.CreateDecryptor(decKey, ivData);
 
     internal class DecryptorStream : Stream
     {
         readonly Aes256Cbc1 _cipher;
-        readonly byte[] _ivData = new byte[CIPHER_BLOCK_BYTES];
+        readonly byte[] _ivData = new byte[CIPHER_BLOCK_SIZE];
 
         readonly Stream _sourceStream;
         readonly bool _leaveOpen;
@@ -730,39 +808,36 @@ partial class Aes256Cbc1
             }
             _overallHeaderExamined = true;
 
-            var tautenedData = new byte[TAUTENED_BYTES];
-            var tautenedSize = _sourceStream.Read(tautenedData);
-            if (tautenedSize != TAUTENED_BYTES)
+            var hallmarkData = new byte[HALLMARK_SIZE];
+            var hallmarkSize = _sourceStream.Read(hallmarkData);
+            if (hallmarkSize != HALLMARK_SIZE)
             {
-                throw new InvalidTautenedDataException($"Cannot read {nameof(TAUTENED_BYTES)}");
+                throw new InvalidHallmarkException($"Cannot read {nameof(HALLMARK_SIZE)}");
             }
-            if (tautenedData.SequenceEqual(TAUTENED_DATA) == false)
+            if (hallmarkData.SequenceEqual(HALLMARK_DATA) == false)
             {
-                throw new InvalidTautenedDataException($"Invalid {nameof(TAUTENED_DATA)}");
+                throw new InvalidHallmarkException($"Invalid {nameof(HALLMARK_DATA)}");
             }
 
-            var reservedData = new byte[RESERVED_BYTES];
+            var reservedData = new byte[RESERVED_SIZE];
             var reservedSize = _sourceStream.Read(reservedData);
-            if (reservedSize != RESERVED_BYTES)
+            if (reservedSize != RESERVED_SIZE)
             {
-                throw new InvalidDataException($"Cannot read {nameof(RESERVED_BYTES)}");
+                throw new InvalidDataException($"Cannot read {nameof(RESERVED_SIZE)}");
             }
 
-            var randomData = new Span<byte>(_ivData, 0, RANDOM_BYTES);
-            var randomSize = _sourceStream.Read(randomData);
-            if (randomSize != RANDOM_BYTES)
+            var randomData = new byte[RANDOM_FILL_SIZE];
+            var randomDataSize = _sourceStream.Read(randomData);
+            if (randomDataSize != RANDOM_FILL_SIZE)
             {
-                throw new InvalidDataException($"Cannot read {nameof(RANDOM_BYTES)}");
+                throw new InvalidDataException($"Cannot read {nameof(RANDOM_FILL_SIZE)}");
             }
 
-            var keyTagData = new Span<byte>(_ivData, RANDOM_BYTES, KEY_TAG_BYTES);
-            var keyTagSize = _sourceStream.Read(keyTagData);
-            if (keyTagSize != KEY_TAG_BYTES)
-            {
-                throw new InvalidDataException($"Cannot read {nameof(KEY_TAG_BYTES)}");
-            }
+            randomData.AsSpan(0, CIPHER_BLOCK_SIZE).CopyTo(_ivData);
 
-            _decKey = _cipher.GetDecryptionKey(_ivData);
+            var encKeySalt = randomData.AsSpan(RANDOM_FILL_SALT_OFFSET);
+
+            _decKey = _cipher.PrepareDecryptionKey(_ivData, encKeySalt);
         }
 
         internal void ExamineContentHeader()
@@ -781,9 +856,9 @@ partial class Aes256Cbc1
                 CryptoStreamMode.Read
             );
 
-            var scrambleData = new byte[PLAIN_TEXT_SCRAMBLE_BYTES];
+            var scrambleData = new byte[PLAIN_TEXT_SCRAMBLE_SIZE];
             _cryptoStream.ReadExactly(scrambleData);
-            _outputOffset += PLAIN_TEXT_SCRAMBLE_BYTES;
+            _outputOffset += PLAIN_TEXT_SCRAMBLE_SIZE;
             var primaryFlags = (ContentHeaderPrimaryFlags)scrambleData[0];
 
             if (primaryFlags.HasFlag(ContentHeaderPrimaryFlags.ContentIsCompressed))
@@ -791,15 +866,15 @@ partial class Aes256Cbc1
                 _isCompressed = true;
             }
 
-            const int lengthBytes = sizeof(int);
-            var lengthData = new byte[lengthBytes];
-            _cryptoStream.ReadExactly(lengthData, 0, lengthBytes);
+            const int lengthSize = sizeof(int);
+            var lengthData = new byte[lengthSize];
+            _cryptoStream.ReadExactly(lengthData, 0, lengthSize);
             if (BitConverter.IsLittleEndian)
             {
                 Array.Reverse(lengthData);
             }
             _outputLength = BitConverter.ToInt32(lengthData);
-            _outputOffset += lengthBytes;
+            _outputOffset += lengthSize;
 
             if (primaryFlags.HasFlag(ContentHeaderPrimaryFlags.ExtraPayloadPresent))
             {
@@ -902,46 +977,5 @@ partial class Aes256Cbc1
         return decryptor;
     }
 
-    internal sealed class Recryptor : IDisposable
-    {
-        readonly DecryptorStream _decStream;
-
-        internal Recryptor(Aes256Cbc1 cipher, Stream inputStream)
-        {
-            cipher.EnsureInitialized();
-
-            _decStream = new DecryptorStream(cipher, inputStream, leaveOpen: true);
-            _decStream.ExamineOverallHeader();
-        }
-
-        internal void Encrypt(Stream input, Stream output)
-        {
-            _decStream.EncryptExternal(input, output);
-        }
-
-        internal void Decrypt(Stream input, Stream output)
-        {
-            _decStream.DecryptExternal(input, output);
-        }
-
-        bool _isDisposed;
-
-        public void Dispose()
-        {
-            if (_isDisposed)
-            {
-                return;
-            }
-            _isDisposed = true;
-
-            _decStream.Dispose();
-        }
-    }
-
-    internal Recryptor CreateRecryptor(Stream inputStream)
-    {
-        var recryptor = new Recryptor(this, inputStream);
-
-        return recryptor;
-    }
+    #endregion  Decryption
 }

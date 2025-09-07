@@ -35,7 +35,7 @@ sealed class KeyValueStore(ILogger<KeyValueStore> logger) : IDisposable
 
         Open();
 
-        logger.ZLogTrace($"Initialize '{_dbPath}'");
+        logger.ZLogTrace($"Initialized '{_dbPath}'");
     }
 
     void Open()
