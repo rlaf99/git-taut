@@ -45,11 +45,7 @@ internal class ExtraCommands
     /// </summary>
     /// <param name="filePath">The tautened file to reveal.</param>
     [Command("--reveal")]
-    public void Reveal(
-        [FromServices] Aes256Cbc1 cipher,
-        [Argument] string filePath,
-        [FromServices] TautManager tautManager
-    )
+    public void Reveal([FromServices] Aes256Cbc1 cipher, [Argument] string filePath)
     {
         var keyHolder = ReadUserKeyHolder();
 
@@ -151,13 +147,21 @@ internal class ExtraCommands
     {
         using (var tautRepo = LocateTautRepo())
         {
-            tautManager.Open(tautRepo.GetPath(), null);
+            tautManager.Init(tautRepo.GetPath(), null);
         }
 
         tautManager.RebuildKvStore();
     }
 
-    Lg2Repository LocateTautRepo()
+    void OpenTautManager(TautManager tautManager)
+    {
+        using (var tautRepo = LocateTautRepo())
+        {
+            tautManager.Init(tautRepo.GetPath(), null);
+        }
+    }
+
+    Lg2Repository LocateHostRepo()
     {
         var currentDir = Directory.GetCurrentDirectory();
         if (Lg2Repository.TryDiscover(currentDir, out var hostRepo) == false)
@@ -166,6 +170,15 @@ internal class ExtraCommands
 
             throw new OperationCanceledException();
         }
+
+        return hostRepo;
+    }
+
+    Lg2Repository LocateTautRepo()
+    {
+        var currentDir = Directory.GetCurrentDirectory();
+
+        var hostRepo = LocateHostRepo();
 
         var tautRepoFullPath = Path.Join(hostRepo.GetPath(), GitRepoHelper.TautDir);
         var tautRepoRelPath = Path.GetRelativePath(currentDir, tautRepoFullPath);

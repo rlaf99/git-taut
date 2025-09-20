@@ -495,7 +495,7 @@ partial class GitRemoteHelper
 
         logger.ZLogTrace($"Clone '{_remote}' from '{_address}' to '{_tautRepoDir}'");
 
-        tautManager.Open(_tautRepoDir, _remote, newSetup: true);
+        tautManager.Init(_hostRepoDir, _remote, newSetup: true);
     }
 
     void GitFetchTaut()
@@ -504,6 +504,6 @@ partial class GitRemoteHelper
 
         logger.ZLogTrace($"Update '{_tautRepoDir}'");
 
-        tautManager.Open(_tautRepoDir, _remote);
+        tautManager.Init(_hostRepoDir, _remote);
     }
 }

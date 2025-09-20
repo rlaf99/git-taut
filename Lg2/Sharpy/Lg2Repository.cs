@@ -93,6 +93,18 @@ public static unsafe partial class Lg2RepositoryExtensions
         return new(pRef);
     }
 
+    public static Lg2Commit GetHeadCommit(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        var headRef = repo.GetHead();
+        var headOid = headRef.GetTarget();
+
+        var result = repo.LookupCommit(headOid);
+
+        return result;
+    }
+
     public static void SetHead(this Lg2Repository repo, string refName)
     {
         repo.EnsureValid();
@@ -101,6 +113,26 @@ public static unsafe partial class Lg2RepositoryExtensions
 
         var rc = git_repository_set_head(repo.Ptr, u8Refname.Ptr);
         Lg2Exception.ThrowIfNotOk(rc);
+    }
+
+    public static bool IsHeadUnborn(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        var rc = git_repository_head_unborn(repo.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return rc == 1;
+    }
+
+    public static bool IsHeadDetached(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        var rc = git_repository_head_detached(repo.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return rc == 1;
     }
 
     public static Lg2OidType GetOidType(this Lg2Repository repo)

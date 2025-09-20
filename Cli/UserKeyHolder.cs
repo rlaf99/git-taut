@@ -15,6 +15,8 @@ sealed class UserKeyHolder : IDisposable
 
     internal ReadOnlySpan<byte> CrudeKey => _crudeKey!;
 
+    internal bool CrudeKeyIsNull => _crudeKey is null;
+
     internal void DeriveCrudeKey(ReadOnlySpan<byte> passwordData, ReadOnlySpan<byte> passwordSalt)
     {
         CleanUp();

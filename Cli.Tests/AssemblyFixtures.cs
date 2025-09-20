@@ -26,7 +26,7 @@ public sealed class Lg2GlobalFixture : IDisposable
 
 public sealed class HostBuilderFixture : IDisposable
 {
-    public IHost BuildHost()
+    public IHost BuildHost(Action<ILoggingBuilder>? configLogging = null)
     {
         var settings = new HostApplicationBuilderSettings();
 
@@ -34,7 +34,26 @@ public sealed class HostBuilderFixture : IDisposable
 
         ProgramSupport.AddServices(builder.Services);
 
+        if (configLogging is not null)
+        {
+            configLogging(builder.Logging);
+        }
+
         return builder.Build();
+    }
+
+    public IHost BuildHost(ITestOutputHelper output)
+    {
+        return BuildHost(
+            configLogging: (logging) =>
+            {
+                logging.ClearProviders();
+                logging.AddZLoggerInMemory(processor =>
+                {
+                    processor.MessageReceived += msg => output.WriteLine(msg);
+                });
+            }
+        );
     }
 
     public void Dispose()

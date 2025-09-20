@@ -1,1 +1,0 @@
-namespace Cli.Tests.GitRemoteHelper;

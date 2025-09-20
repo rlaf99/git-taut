@@ -147,17 +147,18 @@ sealed class KeyValueStore(ILogger<KeyValueStore> logger) : IDisposable
 
     void Dispose(bool disposing)
     {
-        if (!_disposed)
+        if (_disposed)
         {
-            _disposed = true;
-
-            if (disposing)
-            {
-                _tautenedDb?.Dispose();
-                _regainedDb?.Dispose();
-                _dbEnv?.Dispose();
-            } // managed resource
+            return;
         }
+        _disposed = true;
+
+        if (disposing)
+        {
+            _tautenedDb?.Dispose();
+            _regainedDb?.Dispose();
+            _dbEnv?.Dispose();
+        } // managed resource
     }
 
     public void Dispose()

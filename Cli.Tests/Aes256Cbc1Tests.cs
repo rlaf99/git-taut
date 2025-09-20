@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
 using System.Text;
 using Git.Taut;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,9 +23,14 @@ Why lovest thou that which thou receivest not gladly,
 Or else receivest with pleasure thine annoy?
 """;
 
-    byte[] GetUserPasswordData()
+    internal static byte[] GetUserPasswordData()
     {
         return Encoding.ASCII.GetBytes("Hello!");
+    }
+
+    internal static byte[] GetUserPasswordSalt()
+    {
+        return [];
     }
 
     public Aes256Cbc1Tests(HostBuilderFixture hostBuilder)
@@ -47,15 +53,64 @@ Or else receivest with pleasure thine annoy?
         _cihper = null;
     }
 
-    public class TestNotInitialized(HostBuilderFixture hostBuilder)
+    public class TestNotInitialized(ITestOutputHelper testOutput, HostBuilderFixture hostBuilder)
     {
         [Fact]
         public void NotInitialized()
         {
-            var host = hostBuilder.BuildHost();
+            var host = hostBuilder.BuildHost(testOutput);
             var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
             Assert.Throws<InvalidOperationException>(() => cipher.EnsureInitialized());
             Assert.Throws<InvalidOperationException>(() => cipher.GetCipherTextLength(100));
+        }
+
+        [Fact]
+        public void InvalidInitialization()
+        {
+            var host = hostBuilder.BuildHost(testOutput);
+            var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
+
+            UserKeyHolder keyHolder = new();
+
+            {
+                var ex = Assert.Throws<ArgumentException>(() => cipher.Init(keyHolder));
+                Assert.Equal("CrudeKeyIsNull (Parameter 'keyHolder')", ex.Message);
+            }
+
+            keyHolder.DeriveCrudeKey(GetUserPasswordData(), GetUserPasswordSalt());
+
+            cipher.Init(keyHolder);
+
+            {
+                var ex = Assert.Throws<InvalidOperationException>(() => cipher.Init(keyHolder));
+                Assert.Equal("Already initialized", ex.Message);
+            }
+        }
+    }
+
+    public class TestNameEncryption(ITestOutputHelper testOutput, HostBuilderFixture hostBuilder)
+    {
+        [Fact]
+        public void EncryptDecrypt()
+        {
+            var host = hostBuilder.BuildHost(testOutput);
+
+            var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
+
+            UserKeyHolder keyHolder = new();
+            keyHolder.DeriveCrudeKey(GetUserPasswordData(), GetUserPasswordSalt());
+            cipher.Init(keyHolder);
+
+            var name = "taut";
+            var hash = RandomNumberGenerator.GetBytes(20);
+            var nameData = Encoding.UTF8.GetBytes(name);
+            var encStream = cipher.EncryptName(nameData, hash);
+            var encStreamData = encStream.ToArray();
+            var decStream = cipher.DecryptName(encStreamData, hash);
+            var decStreamData = decStream.ToArray();
+            var recoveredName = Encoding.UTF8.GetString(decStreamData);
+
+            Assert.Equal(name, recoveredName);
         }
     }
 

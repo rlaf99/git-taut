@@ -89,6 +89,8 @@ thirdparty/libgit2/include
 
 --exclude
 GIT_OID_DEFAULT
+# C# does not support octal literals
+git_filemode_t
 # unused for now
 git_odb_writepack
 git_odb_write_pack

@@ -65,7 +65,17 @@ partial class Aes256Cbc1
     {
         if (_initialized)
         {
-            return;
+            throw new InvalidOperationException("Already initialized");
+        }
+        else
+        {
+            if (keyHolder.CrudeKeyIsNull)
+            {
+                throw new ArgumentException(
+                    $"{nameof(keyHolder.CrudeKeyIsNull)}",
+                    nameof(keyHolder)
+                );
+            }
         }
 
         _initialized = true;
@@ -101,10 +111,9 @@ partial class Aes256Cbc1
 
     #region  Encryption
 
-    internal MemoryStream EncryptName(string name, ReadOnlySpan<byte> hash)
+    internal MemoryStream EncryptName(byte[] nameData, ReadOnlySpan<byte> hash)
     {
-        ArgumentException.ThrowIfNullOrEmpty(name, nameof(name));
-
+        ArgumentOutOfRangeException.ThrowIfZero(nameData.Length, nameof(nameData));
         ArgumentOutOfRangeException.ThrowIfLessThan(hash.Length, NAME_HASH_MIN_SIZE, nameof(hash));
 
         var ivData = hash[0..CIPHER_BLOCK_SIZE].ToArray();
@@ -112,24 +121,22 @@ partial class Aes256Cbc1
         var encKey = KeyHolder.DeriveCipherKey(encKeySalt, 1000);
 
         var encryptTransform = GetEncryptionTransform(encKey, ivData);
-
-        var entryNameData = Encoding.UTF8.GetBytes(name);
-        var plainTextData = new byte[NAME_HALLMARK_SIZE + entryNameData.Length];
-
-        NAME_HALLMARK_DATA.CopyTo(plainTextData.AsSpan(0, NAME_HALLMARK_SIZE));
-        entryNameData.CopyTo(plainTextData.AsSpan(NAME_HALLMARK_SIZE));
-
-        var plainTextDataStream = new MemoryStream(plainTextData, writable: false);
-
-        using var cryptoStream = new CryptoStream(
-            plainTextDataStream,
-            encryptTransform,
-            CryptoStreamMode.Read
-        );
+        var nameDataStream = new MemoryStream(nameData, writable: false);
 
         MemoryStream result = new();
 
-        cryptoStream.CopyTo(result);
+        result.Write(NAME_HALLMARK_DATA);
+
+        using (
+            var cryptoStream = new CryptoStream(
+                nameDataStream,
+                encryptTransform,
+                CryptoStreamMode.Read
+            )
+        )
+        {
+            cryptoStream.CopyTo(result);
+        }
 
         return result;
     }
@@ -552,24 +559,24 @@ partial class Aes256Cbc1
 
     #region  Decryption
 
-    internal MemoryStream DecryptName(byte[] data, ReadOnlySpan<byte> hash)
+    internal MemoryStream DecryptName(byte[] nameData, ReadOnlySpan<byte> hash)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(hash.Length, NAME_HASH_MIN_SIZE, nameof(hash));
 
-        if (data.Length < NAME_HALLMARK_SIZE)
+        if (nameData.Length < NAME_HALLMARK_SIZE)
         {
             throw new InvalidHallmarkException($"Data less than {NAME_HALLMARK_SIZE} bytes");
         }
 
         if (
-            data.Length < (NAME_HALLMARK_SIZE + CIPHER_BLOCK_SIZE)
-            || (data.Length - NAME_HALLMARK_SIZE) % CIPHER_BLOCK_SIZE != 0
+            nameData.Length < (NAME_HALLMARK_SIZE + CIPHER_BLOCK_SIZE)
+            || (nameData.Length - NAME_HALLMARK_SIZE) % CIPHER_BLOCK_SIZE != 0
         )
         {
             throw new FormatException($"Data not aligned on {CIPHER_BLOCK_SIZE} bytes boundary");
         }
 
-        if (data[0..NAME_HALLMARK_SIZE].SequenceEqual(NAME_HALLMARK_DATA) == false)
+        if (nameData[0..NAME_HALLMARK_SIZE].SequenceEqual(NAME_HALLMARK_DATA) == false)
         {
             var hallmark = Convert.ToHexString(NAME_HALLMARK_DATA);
             throw new InvalidHallmarkException($"Hallmark '{hallmark}' not present");
@@ -581,17 +588,19 @@ partial class Aes256Cbc1
 
         var decryptTransform = GetDecryptionTransform(decKey, ivData);
 
-        var entryNameCipherTextDataStream = new MemoryStream(data, writable: false);
-
-        using var cryptoStream = new CryptoStream(
-            entryNameCipherTextDataStream,
-            decryptTransform,
-            CryptoStreamMode.Read
-        );
+        var nameStream = new MemoryStream(nameData, writable: false)
+        {
+            Position = NAME_HALLMARK_SIZE,
+        };
 
         MemoryStream result = new();
 
-        cryptoStream.CopyTo(result);
+        using (
+            var cryptoStream = new CryptoStream(nameStream, decryptTransform, CryptoStreamMode.Read)
+        )
+        {
+            cryptoStream.CopyTo(result);
+        }
 
         return result;
     }
