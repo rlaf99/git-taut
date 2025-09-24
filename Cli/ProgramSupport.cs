@@ -22,10 +22,10 @@ internal class ExtraCommands
     }
 
     /// <summary>
-    ///  Invoke git on the taut repo.
+    ///  Invoke git commands on the taut repo.
     /// </summary>
-    [Command("--repo")]
-    public void Repo([FromServices] GitCli gitCli, [Argument] params string[] args)
+    [Command("--git")]
+    public void Git([FromServices] GitCli gitCli, [Argument] params string[] args)
     {
         using var tautRepo = LocateTautRepo();
 
@@ -41,137 +41,218 @@ internal class ExtraCommands
     }
 
     /// <summary>
-    /// Reveal a tautened file.
+    /// Initialize a taut repo from a remote.
     /// </summary>
-    /// <param name="filePath">The tautened file to reveal.</param>
-    [Command("--reveal")]
-    public void Reveal([FromServices] Aes256Cbc1 cipher, [Argument] string filePath)
-    {
-        var keyHolder = ReadUserKeyHolder();
-
-        cipher.Init(keyHolder);
-
-        try
-        {
-            using var fileStream = File.OpenRead(filePath);
-            var decryptor = cipher.CreateDecryptor(fileStream);
-
-            var fileName = Path.GetFileName(filePath);
-            var encryptedFileNameStream = new MemoryStream(
-                Convert.FromHexString(fileName),
-                writable: false
-            );
-            var regainedFileNameStream = new MemoryStream();
-
-            decryptor.ProduceOutput(Stream.Null, encryptedFileNameStream, regainedFileNameStream);
-
-            var regainedFileNameData = regainedFileNameStream
-                .GetBuffer()
-                .AsSpan(0, (int)regainedFileNameStream.Length);
-
-            var regainedFileName = Encoding.UTF8.GetString(regainedFileNameData);
-
-            var isCompressed = decryptor.IsCompressed;
-            var outputLength = decryptor.GetOutputLength();
-            var extraInfo = decryptor.GetExtraPayload();
-            var extraInfoText = Convert.ToHexStringLower(extraInfo);
-
-            Console.WriteLine($"File name: {regainedFileName}");
-            Console.WriteLine($"Compressed: {isCompressed}");
-            Console.WriteLine($"Output length: {outputLength}");
-            if (string.IsNullOrEmpty(extraInfoText))
-            {
-                Console.WriteLine($"Extra payload: <Empty>");
-            }
-            else
-            {
-                Console.WriteLine($"Extra payload: {extraInfoText}");
-            }
-        }
-        catch (Exception ex)
-        {
-            ConsoleApp.LogError($"Failed to reveal '{filePath}': {ex.Message}");
-#if DEBUG
-            if (ex.StackTrace is not null)
-            {
-                ConsoleApp.LogError($"{ex.StackTrace}");
-            }
-#endif
-
-            throw new OperationCanceledException();
-        }
-    }
-
-    /// <summary>
-    /// Regain a tautened file and dump its content to stdout.
-    /// </summary>
-    /// <param name="filePath">The tautened file to regain.</param>
-    [Command("--regain")]
-    public void Regain(
-        [FromServices] Aes256Cbc1 cipher,
-        [Argument] string filePath,
-        [FromServices] TautManager tautManager
+    [Command("--init")]
+    public void Init(
+        [FromServices] GitCli gitCli,
+        [FromServices] TautSetup tautSetup,
+        [FromServices] TautManager tautManager,
+        [Argument] string remoteAddress,
+        string remoteName
     )
     {
-        var keyHolder = ReadUserKeyHolder();
+        string remoteUrl;
 
-        cipher.Init(keyHolder);
+        if (Directory.Exists(remoteAddress))
+        {
+            try
+            {
+                using var repo = Lg2Repository.New(
+                    remoteAddress,
+                    Lg2RepositoryOpenFlags.LG2_REPOSITORY_OPEN_NO_SEARCH
+                );
+
+                remoteUrl = repo.GetPath();
+            }
+            catch (Lg2Exception)
+            {
+                ConsoleApp.LogError($"Failed to open '{remoteAddress}' as a local git repo");
+
+                throw new OperationCanceledException();
+            }
+        }
+        else if (remoteAddress.Contains(':'))
+        {
+            remoteUrl = remoteAddress;
+        }
+        else
+        {
+            ConsoleApp.LogError($"Unrecoginized repo path '{remoteAddress}'");
+
+            throw new OperationCanceledException();
+        }
+
+        var hostRepo = LocateHostRepo();
+
+        if (hostRepo.TryLookupRemote(remoteName, out _))
+        {
+            ConsoleApp.LogError($"Remote '{remoteName}' already exists in the host repo.");
+            throw new OperationCanceledException();
+        }
+
+        var tautPath = GitRepoHelper.GetTautDir(hostRepo.GetPath());
+
+        if (Directory.Exists(tautPath) == false)
+        {
+            Directory.CreateDirectory(tautPath);
+
+            gitCli.Run("--git-dir", tautPath, "init", "--bare");
+        }
+
+        var tautRepo = OpenTautRepo(tautPath);
+
+        if (tautRepo.TryLookupRemote(remoteName, out _))
+        {
+            ConsoleApp.LogError($"Remote '{remoteName}' already exists in the taut repo.");
+            throw new OperationCanceledException();
+        }
+
+        tautRepo.NewRemote(remoteName, remoteUrl);
 
         try
         {
-            using var fileStream = File.OpenRead(filePath);
-            var decryptor = cipher.CreateDecryptor(fileStream);
-
-            using var outputStream = Console.OpenStandardOutput();
-            decryptor.ProduceOutput(outputStream);
+            gitCli.Run("--git-dir", tautPath, "fetch", remoteName);
         }
-        catch (Exception ex)
+        catch (GitCliException)
         {
-            ConsoleApp.LogError($"Failed to regain '{filePath}': {ex.Message}");
-#if DEBUG
-            if (ex.StackTrace is not null)
-            {
-                ConsoleApp.LogError($"{ex.StackTrace}");
-            }
-#endif
+            ConsoleApp.LogError($"Failed to fetch from '{remoteUrl}'");
+        }
 
-            throw new OperationCanceledException();
+        hostRepo.NewRemote(remoteName, GitRepoHelper.AddTautRemoteHelperPrefix(remoteUrl));
+
+        tautSetup.Init(remoteName, hostRepo, tautRepo, brandNewSetup: true);
+    }
+
+    /// <summary>
+    /// Consult the index and reveal tautened information about a file in a remote.
+    /// </summary>
+    ///
+    /// <param name="filePath">The file to reveal.</param>
+    [Command("--reveal")]
+    public void Reveal(
+        [FromServices] TautSetup tautSetup,
+        [FromServices] TautManager tautManager,
+        [FromServices] TautMapping tautMapping,
+        [FromServices] Aes256Cbc1 cipher,
+        [Argument] string filePath,
+        string remoteName = "origin"
+    )
+    {
+        var hostRepo = LocateHostRepo();
+        var tautPath = GitRepoHelper.GetTautDir(hostRepo.GetPath());
+        var tautRepo = OpenTautRepo(tautPath);
+
+        tautSetup.Init(remoteName, hostRepo, tautRepo, brandNewSetup: false);
+
+        if (File.Exists(filePath))
+        {
+            if (hostRepo.TryGetRelativePathToWorkDir(filePath, out var relPath) == false)
+            {
+                ConsoleApp.LogError($"'{filePath}' not inside the workdir");
+
+                throw new OperationCanceledException();
+            }
+
+            var fileStatus = hostRepo.GetFileStatus(relPath);
+            if (fileStatus != Lg2StatusFlags.LG2_STATUS_CURRENT)
+            {
+                ConsoleApp.LogError(
+                    $"The file either contians outstanding change, or is not managed by git."
+                );
+
+                throw new OperationCanceledException();
+            }
+
+            var index = hostRepo.GetIndex();
+            var entry = index.GetEntry(relPath, 0);
+
+            var oidEntryHex = entry.GetOidPlainRef().GetOidHexDigits();
+            ConsoleApp.Log($"Source object id: {oidEntryHex}");
+
+            Lg2Oid targetOid = new();
+            tautMapping.GetTautened(entry, ref targetOid);
+
+            ConsoleApp.Log($"Target object id: {targetOid.ToHexDigits()}");
+
+            var tautOdb = tautRepo.GetOdb();
+
+            using (var stream = tautOdb.ReadAsStream(targetOid))
+            {
+                var decryptor = cipher.CreateDecryptor(stream);
+
+                decryptor.ProduceOutput(Stream.Null);
+
+                var isCompressed = decryptor.IsCompressed;
+                var outputLength = decryptor.GetOutputLength();
+                var extraInfo = decryptor.GetExtraPayload();
+                var extraInfoText = Convert.ToHexStringLower(extraInfo);
+
+                Console.WriteLine($"Compressed: {isCompressed}");
+                Console.WriteLine($"Output length: {outputLength}");
+                if (string.IsNullOrEmpty(extraInfoText))
+                {
+                    Console.WriteLine($"Extra payload: <Empty>");
+                }
+                else
+                {
+                    Console.WriteLine($"Extra payload: {extraInfoText}");
+                }
+            }
+        }
+        else
+        {
+            ConsoleApp.LogError($"Not a valid path: '{filePath}'");
         }
     }
 
     /// <summary>
-    /// Rescan the taut repo and rebuild mapping.
+    /// Rescan the taut repo and rebuild the object mapping store.
     /// </summary>
     [Command("--rescan")]
     public void Rescan([FromServices] TautManager tautManager)
     {
         using (var tautRepo = LocateTautRepo())
         {
-            tautManager.Init(tautRepo.GetPath(), null);
+            // tautManager.Init(tautRepo.GetPath(), null);
         }
 
         tautManager.RebuildKvStore();
     }
 
-    void OpenTautManager(TautManager tautManager)
-    {
-        using (var tautRepo = LocateTautRepo())
-        {
-            tautManager.Init(tautRepo.GetPath(), null);
-        }
-    }
-
     Lg2Repository LocateHostRepo()
     {
+        var gitDir = KnownEnvironVars.GetGitDir();
+        if (gitDir is not null)
+        {
+            return Lg2Repository.New(gitDir);
+        }
+
         var currentDir = Directory.GetCurrentDirectory();
         if (Lg2Repository.TryDiscover(currentDir, out var hostRepo) == false)
         {
-            ConsoleApp.LogError($"Not inside a git repository");
+            ConsoleApp.LogError($"Failed to locate host repo: not inside a git repository");
 
             throw new OperationCanceledException();
         }
 
         return hostRepo;
+    }
+
+    Lg2Repository OpenTautRepo(string repoPath)
+    {
+        try
+        {
+            var tautRepo = Lg2Repository.New(repoPath);
+
+            return tautRepo;
+        }
+        catch (Exception)
+        {
+            ConsoleApp.LogError($"Cannot open taut repo at path '{repoPath}'");
+
+            throw new OperationCanceledException();
+        }
     }
 
     Lg2Repository LocateTautRepo()
@@ -180,21 +261,10 @@ internal class ExtraCommands
 
         var hostRepo = LocateHostRepo();
 
-        var tautRepoFullPath = Path.Join(hostRepo.GetPath(), GitRepoHelper.TautDir);
+        var tautRepoFullPath = GitRepoHelper.GetTautDir(hostRepo.GetPath());
         var tautRepoRelPath = Path.GetRelativePath(currentDir, tautRepoFullPath);
 
-        Lg2Repository? tautRepo = null;
-        try
-        {
-            tautRepo = Lg2Repository.New(tautRepoRelPath);
-        }
-        catch (Exception)
-        {
-            ConsoleApp.LogError($"Cannot find taut repo at path '{tautRepoRelPath}'");
-
-            throw new OperationCanceledException();
-        }
-        return tautRepo!;
+        return OpenTautRepo(tautRepoRelPath);
     }
 
     UserKeyHolder ReadUserKeyHolder()
@@ -249,8 +319,9 @@ internal class ProgramSupport
     internal static void AddServices(IServiceCollection services)
     {
         services.AddSingleton<GitCli>();
+        services.AddSingleton<TautSetup>();
         services.AddSingleton<TautManager>();
-        services.AddSingleton<KeyValueStore>();
+        services.AddSingleton<TautMapping>();
         services.AddSingleton<Aes256Cbc1>();
         services.AddSingleton<RecyclableMemoryStreamManager>();
     }

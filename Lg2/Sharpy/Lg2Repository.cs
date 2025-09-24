@@ -23,11 +23,22 @@ public unsafe class Lg2Repository
     {
         using var u8Path = new Lg2Utf8String(repoPath);
 
-        git_repository* pRepo;
-        var rc = git_repository_open(&pRepo, u8Path.Ptr);
+        git_repository* ptr;
+        var rc = git_repository_open(&ptr, u8Path.Ptr);
         Lg2Exception.ThrowIfNotOk(rc);
 
-        return new(pRepo);
+        return new(ptr);
+    }
+
+    public static Lg2Repository New(string repoPath, Lg2RepositoryOpenFlags flags)
+    {
+        using var u8Path = new Lg2Utf8String(repoPath);
+
+        git_repository* ptr;
+        var rc = git_repository_open_ext(&ptr, u8Path.Ptr, (uint)flags, null);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(ptr);
     }
 
     public static bool TryDiscover(string path, out Lg2Repository repo)
@@ -40,11 +51,11 @@ public unsafe class Lg2Repository
             var rc = git_repository_discover(&buf, u8Path.Ptr, 0, null);
             if (rc == 0)
             {
-                git_repository* pRepo;
-                rc = git_repository_open(&pRepo, u8Path.Ptr);
+                git_repository* ptr;
+                rc = git_repository_open(&ptr, buf.ptr);
                 Lg2Exception.ThrowIfNotOk(rc);
 
-                repo = new(pRepo);
+                repo = new(ptr);
 
                 return true;
             }
@@ -142,5 +153,31 @@ public static unsafe partial class Lg2RepositoryExtensions
         var result = git_repository_oid_type(repo.Ptr);
 
         return (Lg2OidType)result;
+    }
+
+    public static Lg2Index GetIndex(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        git_index* ptr;
+        var rc = git_repository_index(&ptr, repo.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(ptr);
+    }
+
+    public static string GetWorkDir(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        var ptr = git_repository_workdir(repo.Ptr);
+        if (ptr is null)
+        {
+            throw new InvalidOperationException($"Result is null");
+        }
+
+        var result = Marshal.PtrToStringUTF8((nint)ptr)!;
+
+        return result;
     }
 }

@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_repository_open_flag_t
+    [NativeTypeName("int")]
+    public enum git_repository_open_flag_t : uint
     {
         GIT_REPOSITORY_OPEN_NO_SEARCH = (1 << 0),
         GIT_REPOSITORY_OPEN_CROSS_FS = (1 << 1),

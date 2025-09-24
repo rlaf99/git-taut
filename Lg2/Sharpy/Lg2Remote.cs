@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Lg2.Native;
+using static Lg2.Native.git_error_code;
 using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
@@ -88,6 +89,20 @@ public static unsafe class Lg2RemoteExtensions
 
 unsafe partial class Lg2RepositoryExtensions
 {
+    public static Lg2Remote NewRemote(this Lg2Repository repo, string remoteName, string remoteUrl)
+    {
+        repo.EnsureValid();
+
+        using var u8RemoteName = new Lg2Utf8String(remoteName);
+        using var u8RemoteUrl = new Lg2Utf8String(remoteUrl);
+
+        git_remote* ptr = null;
+        var rc = git_remote_create(&ptr, repo.Ptr, u8RemoteName.Ptr, u8RemoteUrl.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(ptr);
+    }
+
     public static Lg2Remote LookupRemote(this Lg2Repository repo, string remoteName)
     {
         repo.EnsureValid();
@@ -99,6 +114,32 @@ unsafe partial class Lg2RepositoryExtensions
         Lg2Exception.ThrowIfNotOk(rc);
 
         return new(ptr);
+    }
+
+    public static bool TryLookupRemote(
+        this Lg2Repository repo,
+        string remoteName,
+        out Lg2Remote remote
+    )
+    {
+        repo.EnsureValid();
+
+        using var u8RemoteName = new Lg2Utf8String(remoteName);
+
+        git_remote* ptr = null;
+        var rc = git_remote_lookup(&ptr, repo.Ptr, u8RemoteName.Ptr);
+        if (rc == (int)GIT_ENOTFOUND)
+        {
+            remote = new();
+            return false;
+        }
+        else
+        {
+            Lg2Exception.ThrowIfNotOk(rc);
+
+            remote = new(ptr);
+            return true;
+        }
     }
 
     public static void SetRemoteUrl(this Lg2Repository repo, string remoteName, string url)

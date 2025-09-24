@@ -8,7 +8,7 @@ using ZLogger;
 
 namespace Git.Taut;
 
-sealed class KeyValueStore(ILogger<KeyValueStore> logger) : IDisposable
+sealed class TautMapping(ILogger<TautMapping> logger) : IDisposable
 {
     [AllowNull]
     LightningEnvironment _dbEnv;
@@ -28,17 +28,23 @@ sealed class KeyValueStore(ILogger<KeyValueStore> logger) : IDisposable
 
     internal string DbPath => _dbPath;
 
+    bool _initialized;
+
     internal void Init(string location)
     {
+        ThrowHelper.InvalidOperationIfAlreadyInitalized(_initialized);
+
+        _initialized = true;
+
         _dbPath = Path.Join(location, DbDirectoryName);
         Directory.CreateDirectory(_dbPath);
 
-        Open();
+        OpenDb();
 
-        logger.ZLogTrace($"Initialized '{_dbPath}'");
+        logger.ZLogTrace($"Initialized {nameof(TautMapping)} '{DbDirectoryName}' at '{location}'");
     }
 
-    void Open()
+    void OpenDb()
     {
         var envConfig = new EnvironmentConfiguration() { MaxDatabases = 2 };
         _dbEnv = new LightningEnvironment(_dbPath, envConfig);
@@ -74,7 +80,7 @@ sealed class KeyValueStore(ILogger<KeyValueStore> logger) : IDisposable
         Directory.Delete(_dbPath, recursive: true);
         Directory.CreateDirectory(_dbPath);
 
-        Open();
+        OpenDb();
     }
 
     internal bool HasTautened(Lg2OidPlainRef oidRef)

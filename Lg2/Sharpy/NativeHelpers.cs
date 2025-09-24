@@ -48,7 +48,7 @@ public abstract unsafe class NativeSafePointer<TDerived, TNative> : SafeHandle
     {
         if (IsInvalid)
         {
-            ThrowHelper.ThrowInvalidNullInstance<TDerived>();
+            ThrowHelper.InvalidNullInstance<TDerived>();
         }
     }
 }
@@ -82,7 +82,7 @@ public abstract unsafe class NativeOwnedRef<TOwner, TNative>
     {
         if (_ownerWeakRef.TryGetTarget(out _) == false)
         {
-            ThrowHelper.ThrowInvalidNullInstance<TOwner>();
+            ThrowHelper.InvalidNullInstance<TOwner>();
         }
     }
 
@@ -90,7 +90,7 @@ public abstract unsafe class NativeOwnedRef<TOwner, TNative>
     {
         if (_ownerWeakRef.TryGetTarget(out var owner) == false)
         {
-            ThrowHelper.ThrowInvalidNullInstance<TOwner>();
+            ThrowHelper.InvalidNullInstance<TOwner>();
         }
 
         return owner!;

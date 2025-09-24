@@ -35,6 +35,10 @@ git_diff_stats_format_t=uint
 git_diff_find_t=uint
 git_index_add_option_t=uint
 git_credential_t=uint
+git_repository_open_flag_t=uint
+git_status_t=uint
+git_status_opt_t=uint
+GIT_STATUS_OPT_DEFAULTS=git_status_opt_t
 
 --traverse
 thirdparty/libgit2/include/git2/global.h
@@ -71,6 +75,7 @@ thirdparty/libgit2/include/git2/cert.h
 thirdparty/libgit2/include/git2/indexer.h
 thirdparty/libgit2/include/git2/credential.h
 thirdparty/libgit2/include/git2/attr.h
+thirdparty/libgit2/include/git2/status.h
 thirdparty/libgit2/include/git2/sys/credential.h
 thirdparty/libgit2/include/git2/sys/config.h
 

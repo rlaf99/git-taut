@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using static Lg2.Native.git_status_opt_t;
 
 namespace Lg2.Native
 {
@@ -1322,6 +1323,35 @@ namespace Lg2.Native
         public static extern int git_trace_set(git_trace_level_t level, [NativeTypeName("git_trace_cb")] delegate* unmanaged[Cdecl]<git_trace_level_t, sbyte*, void> cb);
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_status_options_init(git_status_options* opts, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_status_foreach(git_repository* repo, [NativeTypeName("git_status_cb")] delegate* unmanaged[Cdecl]<sbyte*, uint, void*, int> callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_status_foreach_ext(git_repository* repo, [NativeTypeName("const git_status_options *")] git_status_options* opts, [NativeTypeName("git_status_cb")] delegate* unmanaged[Cdecl]<sbyte*, uint, void*, int> callback, void* payload);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_status_file([NativeTypeName("unsigned int *")] uint* status_flags, git_repository* repo, [NativeTypeName("const char *")] sbyte* path);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_status_list_new(git_status_list** @out, git_repository* repo, [NativeTypeName("const git_status_options *")] git_status_options* opts);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("size_t")]
+        public static extern nuint git_status_list_entrycount(git_status_list* statuslist);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("const git_status_entry *")]
+        public static extern git_status_entry* git_status_byindex(git_status_list* statuslist, [NativeTypeName("size_t")] nuint idx);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_status_list_free(git_status_list* statuslist);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_status_should_ignore(int* ignored, git_repository* repo, [NativeTypeName("const char *")] sbyte* path);
+
+        [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_libgit2_init();
 
         [DllImport("git2-3f4182d", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -1796,6 +1826,12 @@ namespace Lg2.Native
 
         [NativeTypeName("#define GIT_REMOTE_CONNECT_OPTIONS_VERSION 1")]
         public const int GIT_REMOTE_CONNECT_OPTIONS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_STATUS_OPT_DEFAULTS (GIT_STATUS_OPT_INCLUDE_IGNORED | \\\r\n\tGIT_STATUS_OPT_INCLUDE_UNTRACKED | \\\r\n\tGIT_STATUS_OPT_RECURSE_UNTRACKED_DIRS)")]
+        public const git_status_opt_t GIT_STATUS_OPT_DEFAULTS = (GIT_STATUS_OPT_INCLUDE_IGNORED | GIT_STATUS_OPT_INCLUDE_UNTRACKED | GIT_STATUS_OPT_RECURSE_UNTRACKED_DIRS);
+
+        [NativeTypeName("#define GIT_STATUS_OPTIONS_VERSION 1")]
+        public const int GIT_STATUS_OPTIONS_VERSION = 1;
 
         [NativeTypeName("#define GIT_ODB_OPTIONS_VERSION 1")]
         public const int GIT_ODB_OPTIONS_VERSION = 1;

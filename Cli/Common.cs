@@ -16,6 +16,13 @@ static class KnownEnvironVars
     internal const string GitTautTrace = "GIT_TAUT_TRACE";
 
     internal const string GitAlternateObjectDirectories = "GIT_ALTERNATE_OBJECT_DIRECTORIES";
+
+    internal static string? GetGitDir()
+    {
+        var result = Environment.GetEnvironmentVariable(GitDir);
+
+        return result;
+    }
 }
 
 static class GitRepoHelper
@@ -31,14 +38,24 @@ static class GitRepoHelper
     internal const string TautRemoteHelperPrefix = "taut::";
     internal const string TautCredentialSchemePrefix = "taut+";
 
-    internal static string UseForwardSlash(string path)
+    internal static string UseForwardSlash(string somePath)
     {
         if (Path.DirectorySeparatorChar == '\\')
         {
-            return path.Replace('\\', '/');
+            return somePath.Replace('\\', '/');
         }
 
-        return path;
+        return somePath;
+    }
+
+    internal static string TrimEndingSlash(string somePath)
+    {
+        if (somePath.Length > 1 && somePath[^1] == '/')
+        {
+            return somePath[..^1];
+        }
+
+        return somePath;
     }
 
     internal static string GetTautDir(string repoPath)
@@ -92,6 +109,32 @@ static class GitRepoHelper
         result = UseForwardSlash(result);
 
         return result;
+    }
+
+    internal static bool TryGetRelativePathToWorkDir(
+        this Lg2Repository repo,
+        string somePath,
+        out string result
+    )
+    {
+        repo.EnsureValid();
+
+        var fullPath = UseForwardSlash(Path.GetFullPath(somePath));
+        var workDir = TrimEndingSlash(repo.GetWorkDir());
+
+        if (fullPath.StartsWith(workDir))
+        {
+            var relPath = Path.GetRelativePath(workDir, fullPath);
+            result = UseForwardSlash(relPath);
+
+            return true;
+        }
+        else
+        {
+            result = string.Empty;
+
+            return false;
+        }
     }
 
     internal static string AddTautRemoteHelperPrefix(string input)
@@ -383,5 +426,38 @@ sealed class WrappedDecompressionStream(Stream stream, long length, bool leaveOp
         }
 
         base.Dispose(disposing);
+    }
+}
+
+static class ThrowHelper
+{
+    internal static void InvalidOperationIfAlreadyInitalized(bool initialized, string? name = null)
+    {
+        if (initialized == true)
+        {
+            if (name is not null)
+            {
+                throw new InvalidOperationException($"{name} is already initialized");
+            }
+            else
+            {
+                throw new InvalidOperationException($"Already initialized");
+            }
+        }
+    }
+
+    internal static void InvalidOperationIfNotInitialized(bool initialized, string? name = null)
+    {
+        if (initialized == false)
+        {
+            if (name is not null)
+            {
+                throw new InvalidOperationException($"{name} is not initialized");
+            }
+            else
+            {
+                throw new InvalidOperationException($"Not initialized");
+            }
+        }
     }
 }

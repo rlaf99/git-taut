@@ -63,20 +63,12 @@ partial class Aes256Cbc1
 
     public void Init(UserKeyHolder keyHolder)
     {
-        if (_initialized)
+        if (keyHolder.CrudeKeyIsNull)
         {
-            throw new InvalidOperationException("Already initialized");
+            throw new ArgumentException($"{nameof(keyHolder.CrudeKeyIsNull)}", nameof(keyHolder));
         }
-        else
-        {
-            if (keyHolder.CrudeKeyIsNull)
-            {
-                throw new ArgumentException(
-                    $"{nameof(keyHolder.CrudeKeyIsNull)}",
-                    nameof(keyHolder)
-                );
-            }
-        }
+
+        ThrowHelper.InvalidOperationIfAlreadyInitalized(_initialized);
 
         _initialized = true;
 

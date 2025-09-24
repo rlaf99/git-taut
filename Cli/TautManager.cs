@@ -9,43 +9,22 @@ namespace Git.Taut;
 
 class TautManager(
     ILogger<TautManager> logger,
-    KeyValueStore kvStore,
-    Aes256Cbc1 cipher,
-    GitCli gitCli,
-    ILoggerFactory loggerFactory
+    TautMapping tautMapping,
+    Aes256Cbc1 tautCipher,
+    GitCli gitCli
 )
 {
     [AllowNull]
+    string _remoteName;
+    internal string RemoteName => _remoteName!;
+
+    [AllowNull]
     Lg2Repository _tautRepo;
+    internal Lg2Repository TautRepo => _tautRepo!;
 
     [AllowNull]
     Lg2Repository _hostRepo;
-
-    internal Lg2Repository TautRepo => _tautRepo!;
-
     internal Lg2Repository HostRepo => _hostRepo!;
-
-    string? _tautRepoPath = null;
-    internal string TautRepoPath
-    {
-        get
-        {
-            _tautRepoPath ??= _tautRepo.GetPath();
-            return _tautRepoPath;
-        }
-    }
-
-    string? _hostRepoPath = null;
-    internal string HostRepoPath
-    {
-        get
-        {
-            _hostRepoPath ??= _hostRepo.GetPath();
-            return _hostRepoPath;
-        }
-    }
-
-    internal string KvStoreLocation => TautRepo.GetObjectInfoDir();
 
     const string TautenedRefGlob = "refs/tautened/*";
     const string RegainedRefGlob = "refs/regained/*";
@@ -66,9 +45,6 @@ class TautManager(
 
     internal Lg2RefSpec RemoteRefSpec => _remoteRefSpec!;
 
-    [AllowNull]
-    string _remoteName;
-
     const int DELTA_ENCODING_MIN_BYTES = 100;
     const double DELTA_ENCODING_MAX_RATIO = 0.6;
     const double DATA_COMPRESSION_MAX_RATIO = 0.8;
@@ -76,133 +52,26 @@ class TautManager(
     [AllowNull]
     List<string> _gitCredFillOutput;
 
-    internal void Init(string hostRepoPath, string remoteName, bool newSetup = false)
+    bool _initialized;
+
+    internal void Init(string remoteName, Lg2Repository hostRepo, Lg2Repository tautRepo)
     {
-        var tautRepoPath = GitRepoHelper.GetTautDir(hostRepoPath);
-        _tautRepo = Lg2Repository.New(tautRepoPath);
-        _hostRepo = Lg2Repository.New(hostRepoPath);
+        ThrowHelper.InvalidOperationIfAlreadyInitalized(_initialized);
+
+        _initialized = true;
+
         _remoteName = remoteName;
+        _hostRepo = hostRepo;
+        _tautRepo = tautRepo;
 
-        if (_hostRepo.GetOidType() != Lg2OidType.LG2_OID_SHA1)
-        {
-            var name = Enum.GetName(Lg2OidType.LG2_OID_SHA1);
-            throw new InvalidOperationException($"Only oid type {name} is supported");
-        }
-
-        kvStore.Init(KvStoreLocation);
-
-        UserKeyHolder keyHolder = new();
-
-        if (newSetup)
-        {
-            SetupTautAndHost(remoteName, keyHolder);
-        }
-        else
-        {
-            CheckTautAndHost(remoteName, keyHolder);
-        }
-
-        cipher.Init(keyHolder);
-
-        logger.ZLogTrace($"Opened {nameof(TautManager)} with '{hostRepoPath}'");
-    }
-
-    void SetupTautAndHost(string remoteName, UserKeyHolder keyHolder)
-    {
-        var setupHelper = new TautSetupHelper(
-            loggerFactory.CreateLogger<TautSetupHelper>(),
-            remoteName,
-            _tautRepo,
-            _hostRepo,
-            gitCli,
-            keyHolder
-        );
-        setupHelper.SetupTautAndHost();
-    }
-
-    void CheckTautAndHost(string remoteName, UserKeyHolder keyHolder)
-    {
-        var tautRemote = _tautRepo.LookupRemote(remoteName);
-        var tautRemoteUrl = tautRemote.GetUrl();
-        var tautRemoteUri = new Uri(tautRemoteUrl);
-
-        var hostRemote = _hostRepo.LookupRemote(remoteName);
-        var hostRemoteUrl = hostRemote.GetUrl();
-        hostRemoteUrl = GitRepoHelper.RemoveTautRemoteHelperPrefix(hostRemoteUrl);
-        var hostRemoteUri = new Uri(hostRemoteUrl);
-
-        if (hostRemoteUri.IsFile)
-        {
-            if (hostRemoteUri.AbsolutePath != tautRemoteUri.AbsolutePath)
-            {
-                throw new InvalidOperationException(
-                    $"host remote '{remoteName}':'{hostRemoteUri.AbsolutePath}'"
-                        + $" and taut remote '{remoteName}':'{tautRemoteUri.AbsolutePath}'"
-                        + " do not have the same path"
-                );
-            }
-        }
-
-        CheckCredentialKeyTrait(remoteName, keyHolder);
-    }
-
-    void CheckCredentialKeyTrait(string remoteName, UserKeyHolder keyHolder)
-    {
-        using (var config = _hostRepo.GetConfig())
-        {
-            var credUrl = config.GetTautCredentialUrl(remoteName);
-            if (credUrl is null)
-            {
-                throw new InvalidOperationException(
-                    $"{GitConfigHelper.TautCredentialUrl} is not found in the repo config for remote '{remoteName}'"
-                );
-            }
-
-            var credKeyTrait = config.GetTautCredentialKeyTrait(remoteName);
-            if (credKeyTrait is null)
-            {
-                throw new InvalidOperationException(
-                    $"{GitConfigHelper.TautCredentialKeyTrait} is not found in the repo config for remote '{remoteName}'"
-                );
-            }
-
-            var credUserName = config.GetTautCredentialUserName(remoteName);
-
-            using (var gitCred = new GitCredential(gitCli, credUrl))
-            {
-                gitCred.Fill();
-
-                byte[] passwordSalt = [];
-
-                if (string.IsNullOrEmpty(credUserName) == false)
-                {
-                    passwordSalt = Encoding.UTF8.GetBytes(credUserName);
-                }
-
-                keyHolder.DeriveCrudeKey(gitCred.PasswordData, passwordSalt);
-
-                var credUrlData = Encoding.ASCII.GetBytes(credUrl);
-                var keyTrait = keyHolder.DeriveCredentialKeyTrait(credUrlData);
-
-                if (keyTrait.SequenceEqual(credKeyTrait) == false)
-                {
-                    gitCred.Reject();
-
-                    throw new InvalidOperationException(
-                        $"The credential for ${credUrl} does not match the existing one"
-                    );
-                }
-
-                gitCred.Approve();
-            }
-        }
+        logger.ZLogTrace($"Initialized {nameof(TautManager)}");
     }
 
     internal List<string> RegainedTautRefs
     {
         get
         {
-            var iter = _tautRepo.NewRefIteratorGlob(RegainedRefGlob);
+            var iter = TautRepo.NewRefIteratorGlob(RegainedRefGlob);
 
             List<string> result = [];
             while (iter.NextName(out var refName))
@@ -218,7 +87,7 @@ class TautManager(
     {
         get
         {
-            var iter = _tautRepo.NewRefIteratorGlob(TautenedRefGlob);
+            var iter = TautRepo.NewRefIteratorGlob(TautenedRefGlob);
 
             List<string> result = [];
             while (iter.NextName(out var refName))
@@ -230,7 +99,7 @@ class TautManager(
         }
     }
 
-    internal List<string> OrdinaryTautRefs => FilterTautSpecificRefs(_tautRepo.GetRefList());
+    internal List<string> OrdinaryTautRefs => FilterTautSpecificRefs(TautRepo.GetRefList());
 
     List<string> FilterTautSpecificRefs(List<string> refList)
     {
@@ -278,7 +147,7 @@ class TautManager(
 
     void StoreTautened(Lg2OidPlainRef source, Lg2OidPlainRef target, Lg2ObjectType objType)
     {
-        kvStore.PutSameTautened(source, target);
+        tautMapping.PutSameTautened(source, target);
 
         if (logger.IsEnabled(LogLevel.Trace))
         {
@@ -305,7 +174,7 @@ class TautManager(
     {
         var source = objInfo.GetOidPlainRef();
 
-        kvStore.PutSameRegained(source, target);
+        tautMapping.PutSameRegained(source, target);
 
         if (logger.IsEnabled(LogLevel.Trace))
         {
@@ -341,9 +210,9 @@ class TautManager(
     {
         logger.ZLogTrace($"Start regaining host refs");
 
-        var tautRefList = FilterTautSpecificRefs(_tautRepo.GetRefList());
+        var tautRefList = FilterTautSpecificRefs(TautRepo.GetRefList());
 
-        var revWalk = _tautRepo.NewRevWalk();
+        var revWalk = TautRepo.NewRevWalk();
 
         revWalk.ResetSorting(
             Lg2SortFlags.LG2_SORT_TOPOLOGICAL
@@ -351,15 +220,15 @@ class TautManager(
                 | Lg2SortFlags.LG2_SORT_REVERSE
         );
 
-        using (var regainedRefIter = _tautRepo.NewRefIteratorGlob(RegainedRefGlob))
+        using (var regainedRefIter = TautRepo.NewRefIteratorGlob(RegainedRefGlob))
         {
             for (string refName; regainedRefIter.NextName(out refName); )
             {
                 Lg2Oid hostOid = new();
-                _tautRepo.GetRefOid(refName, ref hostOid);
+                TautRepo.GetRefOid(refName, ref hostOid);
 
                 Lg2Oid tautOid = new();
-                kvStore.GetTautened(hostOid, ref tautOid);
+                tautMapping.GetTautened(hostOid, ref tautOid);
 
                 logger.ZLogTrace($"RevWalk.Hide {tautOid.ToHexDigits(8)} ({refName})");
 
@@ -376,12 +245,12 @@ class TautManager(
 
         for (Lg2Oid oid = new(); revWalk.Next(ref oid); )
         {
-            var tautCommit = _tautRepo.LookupCommit(oid);
+            var tautCommit = TautRepo.LookupCommit(oid);
 
             var commitOidHex8 = oid.ToHexDigits(8);
             var commitSummary = tautCommit.GetSummary();
 
-            if (kvStore.HasRegained(tautCommit))
+            if (tautMapping.HasRegained(tautCommit))
             {
                 logger.ZLogTrace($"Ignore regained commit {commitOidHex8} '{commitSummary}'");
 
@@ -398,11 +267,11 @@ class TautManager(
         foreach (var refName in tautRefList)
         {
             var tautOid = new Lg2Oid();
-            _tautRepo.GetRefOid(refName, ref tautOid);
+            TautRepo.GetRefOid(refName, ref tautOid);
             var tautOidHex8 = tautOid.ToHexDigits(8);
 
             var hostOid = new Lg2Oid();
-            kvStore.GetRegained(tautOid, ref hostOid);
+            tautMapping.GetRegained(tautOid, ref hostOid);
             var hostOidHex8 = hostOid.ToHexDigits(8);
 
             var regainedRefName = _regainedRefSpec.TransformToTarget(refName);
@@ -411,14 +280,14 @@ class TautManager(
             {
                 var message = $"Regain {refName} {hostOidHex8} from same object";
 
-                _tautRepo.SetRef(regainedRefName, hostOid, message);
+                TautRepo.SetRef(regainedRefName, hostOid, message);
                 logger.ZLogTrace($"{message}");
             }
             else
             {
                 var message = $"Regain {refName} {hostOidHex8} from {tautOidHex8}";
 
-                _tautRepo.SetRef(regainedRefName, hostOid, message);
+                TautRepo.SetRef(regainedRefName, hostOid, message);
                 logger.ZLogTrace($"{message}");
             }
         }
@@ -432,7 +301,7 @@ class TautManager(
         var tautTreeOidHex8 = tautTree.GetOidHexDigits(8);
         var tautTreePath = string.Empty;
 
-        if (kvStore.HasRegained(tautTree))
+        if (tautMapping.HasRegained(tautTree))
         {
             logger.ZLogTrace($"Ignore regained tree {tautTreeOidHex8} '{tautTreePath}'");
         }
@@ -446,9 +315,9 @@ class TautManager(
         }
 
         Lg2Oid oid = new();
-        kvStore.GetRegained(tautTree, ref oid);
+        tautMapping.GetRegained(tautTree, ref oid);
 
-        var hostTree = _hostRepo.LookupTree(oid);
+        var hostTree = HostRepo.LookupTree(oid);
 
         var author = tautCommit.GetAuthor();
         var committer = tautCommit.GetCommitter();
@@ -459,21 +328,21 @@ class TautManager(
 
         foreach (var parent in tautParents)
         {
-            kvStore.GetRegained(parent, ref oid);
+            tautMapping.GetRegained(parent, ref oid);
 
-            var hostCommit = _hostRepo.LookupCommit(oid);
+            var hostCommit = HostRepo.LookupCommit(oid);
             hostParents.Add(hostCommit);
         }
 
-        _hostRepo.NewCommit(author, committer, message, hostTree, hostParents, ref oid);
+        HostRepo.NewCommit(author, committer, message, hostTree, hostParents, ref oid);
 
         StoreRegained(tautCommit, oid);
     }
 
     void RegainSameObject(ILg2ObjectInfo objInfo)
     {
-        using var tautRepoOdb = _tautRepo.GetOdb();
-        using var hostRepoOdb = _hostRepo.GetOdb();
+        using var tautRepoOdb = TautRepo.GetOdb();
+        using var hostRepoOdb = HostRepo.GetOdb();
 
         // XXX use hardlink to improve performance
         tautRepoOdb.CopyObjectIfNotExists(hostRepoOdb, objInfo.GetOidPlainRef());
@@ -503,7 +372,7 @@ class TautManager(
         }
 
         var entryOidData = entryOid.GetRawData();
-        var decDataStream = cipher.DecryptName(entryNameData, entryOidData);
+        var decDataStream = tautCipher.DecryptName(entryNameData, entryOidData);
         var decData = decDataStream.GetBuffer().AsSpan(0, (int)decDataStream.Length);
 
         var entryNameToUseData = decData[..^4];
@@ -534,7 +403,7 @@ class TautManager(
     {
         await Task.Yield(); // prevent it from running synchronously
 
-        var treeBuilder = _hostRepo.NewTreeBuilder();
+        var treeBuilder = HostRepo.NewTreeBuilder();
         var regainedSet = new HashSet<nuint>();
 
         for (nuint i = 0, count = tautTree.GetEntryCount(); i < count; i++)
@@ -555,14 +424,14 @@ class TautManager(
             {
                 logger.ZLogTrace($"Start regaining tree {entryOidHex8} '{entryName}'");
 
-                if (kvStore.HasRegained(entry) == false)
+                if (tautMapping.HasRegained(entry) == false)
                 {
-                    var tree = _tautRepo.LookupTree(entry);
+                    var tree = TautRepo.LookupTree(entry);
                     await RegainTreeAsync(tree);
                 }
 
                 var oid = new Lg2Oid();
-                kvStore.GetRegained(entry, ref oid);
+                tautMapping.GetRegained(entry, ref oid);
 
                 if (
                     oid.PlainRef.Equals(entry.GetOidPlainRef()) == false
@@ -581,10 +450,10 @@ class TautManager(
 
                 if (isTautened)
                 {
-                    var blob = _tautRepo.LookupBlob(entry);
+                    var blob = TautRepo.LookupBlob(entry);
 
                     Lg2Oid oid = new();
-                    if (kvStore.TryGetRegained(entry, ref oid) == false)
+                    if (tautMapping.TryGetRegained(entry, ref oid) == false)
                     {
                         RegainBlob(blob, ref oid);
                     }
@@ -643,12 +512,12 @@ class TautManager(
 
     void RegainBlob(Lg2Blob blob, ref Lg2Oid resultOid)
     {
-        using var tautRepoOdb = _tautRepo.GetOdb();
-        using var hostRepoOdb = _hostRepo.GetOdb();
+        using var tautRepoOdb = TautRepo.GetOdb();
+        using var hostRepoOdb = HostRepo.GetOdb();
 
         using var readStream = tautRepoOdb.ReadAsStream(blob);
 
-        var decryptor = cipher.CreateDecryptor(readStream);
+        var decryptor = tautCipher.CreateDecryptor(readStream);
         var extraPayload = decryptor.GetExtraPayload();
         if (extraPayload.Length > 0)
         {
@@ -698,9 +567,9 @@ class TautManager(
     {
         logger.ZLogTrace($"Start tautening host refs");
 
-        var hostRefList = FilterRemoteRefs(_hostRepo.GetRefList());
+        var hostRefList = FilterRemoteRefs(HostRepo.GetRefList());
 
-        var revWalk = _hostRepo.NewRevWalk();
+        var revWalk = HostRepo.NewRevWalk();
 
         revWalk.ResetSorting(
             Lg2SortFlags.LG2_SORT_TOPOLOGICAL
@@ -708,15 +577,15 @@ class TautManager(
                 | Lg2SortFlags.LG2_SORT_REVERSE
         );
 
-        using (var tautenedRefIter = _tautRepo.NewRefIteratorGlob(TautenedRefGlob))
+        using (var tautenedRefIter = TautRepo.NewRefIteratorGlob(TautenedRefGlob))
         {
             for (string refName; tautenedRefIter.NextName(out refName); )
             {
                 Lg2Oid tautOid = new();
-                _tautRepo.GetRefOid(refName, ref tautOid);
+                TautRepo.GetRefOid(refName, ref tautOid);
 
                 Lg2Oid hostOid = new();
-                kvStore.GetRegained(tautOid, ref hostOid);
+                tautMapping.GetRegained(tautOid, ref hostOid);
 
                 logger.ZLogTrace($"RevWalk.Hide {hostOid.ToHexDigits(8)} ({refName})");
 
@@ -733,12 +602,12 @@ class TautManager(
 
         for (Lg2Oid oid = new(); revWalk.Next(ref oid); )
         {
-            var hostCommit = _hostRepo.LookupCommit(oid);
+            var hostCommit = HostRepo.LookupCommit(oid);
 
             var commitOidHex8 = oid.ToHexDigits(8);
             var commitSummary = hostCommit.GetSummary();
 
-            if (kvStore.HasTautened(hostCommit))
+            if (tautMapping.HasTautened(hostCommit))
             {
                 logger.ZLogTrace($"Skip tautened commit {commitOidHex8} '{commitSummary}'");
 
@@ -755,11 +624,11 @@ class TautManager(
         foreach (var refName in hostRefList)
         {
             var hostOid = new Lg2Oid();
-            _hostRepo.GetRefOid(refName, ref hostOid);
+            HostRepo.GetRefOid(refName, ref hostOid);
             var hostOidHex8 = hostOid.ToHexDigits(8);
 
             var tautenedOid = new Lg2Oid();
-            kvStore.GetTautened(hostOid, ref tautenedOid);
+            tautMapping.GetTautened(hostOid, ref tautenedOid);
             var tautenedOidHex8 = tautenedOid.ToHexDigits(8);
 
             var tautenedRefName = _tautenedRefSpec.TransformToTarget(refName);
@@ -768,22 +637,22 @@ class TautManager(
             {
                 var message = $"Tauten {refName} {tautenedOidHex8} from same object";
 
-                _tautRepo.SetRef(tautenedRefName, tautenedOid, message);
+                TautRepo.SetRef(tautenedRefName, tautenedOid, message);
                 logger.ZLogTrace($"{message}");
             }
             else
             {
                 var message = $"Tauten {refName} {tautenedOidHex8} from {hostOidHex8}";
 
-                _tautRepo.SetRef(tautenedRefName, tautenedOid, message);
+                TautRepo.SetRef(tautenedRefName, tautenedOid, message);
                 logger.ZLogTrace($"{message}");
             }
         }
 
-        var hostHeadRef = _hostRepo.GetHead();
+        var hostHeadRef = HostRepo.GetHead();
         var hostHeadRefName = hostHeadRef.GetName();
         var tautHeadRefName = _tautenedRefSpec.TransformToTarget(hostHeadRefName);
-        _tautRepo.SetHead(tautHeadRefName);
+        TautRepo.SetHead(tautHeadRefName);
 
         logger.ZLogTrace($"Done tautening host refs");
     }
@@ -793,7 +662,7 @@ class TautManager(
         var hostParentCommit = hostCommit.GetParent(0);
         var hostParentTree = hostParentCommit.GetTree();
         var hostTree = hostCommit.GetTree();
-        var tautRepoOdb = _tautRepo.GetOdb();
+        var tautRepoOdb = TautRepo.GetOdb();
 
         Lg2DiffOptions diffOptions = new()
         {
@@ -802,7 +671,7 @@ class TautManager(
                 | Lg2DiffOptionFlags.LG2_DIFF_IGNORE_SUBMODULES,
         };
 
-        var hostDiffToParent = _hostRepo.NewDiff(hostParentTree, hostTree, ref diffOptions);
+        var hostDiffToParent = HostRepo.NewDiff(hostParentTree, hostTree, ref diffOptions);
 
         Lg2DiffFindOptions diffFindOpts = new()
         {
@@ -837,14 +706,14 @@ class TautManager(
             var newFile = delta.GetNewFile();
             var oldFile = delta.GetOldFile();
 
-            if (kvStore.HasTautened(newFile))
+            if (tautMapping.HasTautened(newFile))
             {
                 continue;
             }
 
             var newFilePath = newFile.GetPath();
 
-            var tautAttrVal = _hostRepo.GetTautAttrValue(newFilePath, hostAttrOpts);
+            var tautAttrVal = HostRepo.GetTautAttrValue(newFilePath, hostAttrOpts);
 
             if (tautAttrVal.IsSetOrSpecified == false)
             {
@@ -872,7 +741,7 @@ class TautManager(
 
             var oldFileOidRef = oldFile.GetOidPlainRef();
 
-            var encryptor = cipher.CreateEncryptor(
+            var encryptor = tautCipher.CreateEncryptor(
                 tautenStream,
                 DATA_COMPRESSION_MAX_RATIO,
                 oldFileOidRef.GetRawData()
@@ -902,7 +771,7 @@ class TautManager(
         var hostTreeOidHex8 = hostTree.GetOidHexDigits(8);
         var hostTreePath = string.Empty;
 
-        if (kvStore.HasTautened(hostTree))
+        if (tautMapping.HasTautened(hostTree))
         {
             logger.ZLogTrace($"Skip tautened tree {hostTreeOidHex8} '{hostTreePath}'");
         }
@@ -933,13 +802,13 @@ class TautManager(
 
             logger.ZLogTrace($"Done tautening tree {hostTreeOidHex8} '{hostTreePath}'");
 
-            _hostRepo.FlushAttrCache();
+            HostRepo.FlushAttrCache();
         }
 
         var oid = new Lg2Oid();
-        kvStore.GetTautened(hostTree, ref oid);
+        tautMapping.GetTautened(hostTree, ref oid);
 
-        var tautTree = _tautRepo.LookupTree(oid);
+        var tautTree = TautRepo.LookupTree(oid);
 
         var author = hostCommit.GetAuthor();
         var committer = hostCommit.GetCommitter();
@@ -950,13 +819,13 @@ class TautManager(
 
         foreach (var parent in hostParents)
         {
-            kvStore.GetTautened(parent, ref oid);
+            tautMapping.GetTautened(parent, ref oid);
 
-            var tautCommit = _tautRepo.LookupCommit(oid);
+            var tautCommit = TautRepo.LookupCommit(oid);
             tautParents.Add(tautCommit);
         }
 
-        _tautRepo.NewCommit(author, committer, message, tautTree, tautParents, ref oid);
+        TautRepo.NewCommit(author, committer, message, tautTree, tautParents, ref oid);
 
         StoreTautened(hostCommit, oid);
     }
@@ -976,7 +845,7 @@ class TautManager(
 
         var entryNameData = entryNameDataBuffer.WrittenSpan.ToArray();
         var oidRawData = oid.GetRawData();
-        var encStream = cipher.EncryptName(entryNameData, oidRawData);
+        var encStream = tautCipher.EncryptName(entryNameData, oidRawData);
         var encData = encStream.GetBuffer().AsSpan(0, (int)encStream.Length);
 
         var result = Base32Hex.GetString(encData);
@@ -988,7 +857,7 @@ class TautManager(
     {
         await Task.Yield(); // prevent it from running synchronously
 
-        var treeBuilder = _tautRepo.NewTreeBuilder();
+        var treeBuilder = TautRepo.NewTreeBuilder();
         var tautenedSet = new HashSet<nuint>();
 
         for (nuint i = 0, count = hostTree.GetEntryCount(); i < count; i++)
@@ -1004,15 +873,15 @@ class TautManager(
 
             var entryNameToUse = entryName;
 
-            var tautAttrVal = _hostRepo.GetTautAttrValue(entryPath, hostAttrOpts);
+            var tautAttrVal = HostRepo.GetTautAttrValue(entryPath, hostAttrOpts);
 
             if (entryObjType.IsTree())
             {
-                if (kvStore.HasTautened(entry) == false)
+                if (tautMapping.HasTautened(entry) == false)
                 {
                     logger.ZLogTrace($"Start tautening tree {entryOidHex8} '{entryPath}'");
 
-                    var tree = _hostRepo.LookupTree(entry);
+                    var tree = HostRepo.LookupTree(entry);
                     await TautenTreeAsync(tree, entryPath, hostAttrOpts);
 
                     logger.ZLogTrace($"Done tautening tree {entryOidHex8} '{entryPath}'");
@@ -1023,7 +892,7 @@ class TautManager(
                 }
 
                 Lg2Oid oid = new();
-                kvStore.GetTautened(entry, ref oid);
+                tautMapping.GetTautened(entry, ref oid);
 
                 if (tautAttrVal.IsSetOrSpecified)
                 {
@@ -1041,11 +910,11 @@ class TautManager(
                 if (tautAttrVal.IsSetOrSpecified)
                 {
                     Lg2Oid oid = new();
-                    if (kvStore.TryGetTautened(entry, ref oid) == false)
+                    if (tautMapping.TryGetTautened(entry, ref oid) == false)
                     {
                         logger.ZLogTrace($"Start tautening blob {entryOidHex8} '{entryPath}'");
 
-                        var blob = _hostRepo.LookupBlob(entry);
+                        var blob = HostRepo.LookupBlob(entry);
                         TautenBlob(blob, ref oid, entryPath);
 
                         logger.ZLogTrace($"Done tautening blob {entryOidHex8} '{entryPath}'");
@@ -1104,12 +973,12 @@ class TautManager(
 
     void TautenBlob(Lg2Blob blob, scoped ref Lg2Oid resultOid, string filePath)
     {
-        using var hostRepoOdb = _hostRepo.GetOdb();
-        using var tautRepoOdb = _tautRepo.GetOdb();
+        using var hostRepoOdb = HostRepo.GetOdb();
+        using var tautRepoOdb = TautRepo.GetOdb();
 
         var readStream = hostRepoOdb.ReadAsStream(blob);
 
-        var encryptor = cipher.CreateEncryptor(readStream, DATA_COMPRESSION_MAX_RATIO);
+        var encryptor = tautCipher.CreateEncryptor(readStream, DATA_COMPRESSION_MAX_RATIO);
 
         using var writeStream = tautRepoOdb.OpenWriteStream(
             encryptor.GetOutputLength(),
@@ -1127,24 +996,24 @@ class TautManager(
 
     internal void RebuildKvStore()
     {
-        if (_tautRepo is null)
+        if (TautRepo is null)
         {
             throw new InvalidOperationException($"Taut repo is null");
         }
 
-        logger.ZLogTrace($"Rebuilding {nameof(kvStore)}");
+        logger.ZLogTrace($"Rebuilding {nameof(tautMapping)}");
 
-        kvStore.Truncate();
+        tautMapping.Truncate();
 
         foreach (var refName in RegainedTautRefs)
         {
-            _tautRepo.DeleteRef(refName);
+            TautRepo.DeleteRef(refName);
             logger.ZLogTrace($"Delete {refName}");
         }
 
         foreach (var refName in TautenedTautRefs)
         {
-            _tautRepo.DeleteRef(refName);
+            TautRepo.DeleteRef(refName);
             logger.ZLogTrace($"Delete {refName}");
         }
 

@@ -4,7 +4,7 @@ using Lg2.Sharpy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace Cli.Tests.TautManager;
+namespace Cli.Tests.Functions;
 
 [Collection("GitTautPaths")]
 public class TauteningTests : IDisposable
@@ -26,7 +26,7 @@ public class TauteningTests : IDisposable
 
     public void Dispose()
     {
-        var kvStore = _host.Services.GetRequiredService<KeyValueStore>();
+        var kvStore = _host.Services.GetRequiredService<TautMapping>();
         kvStore.Dispose();
 
         _scene.PreserveContentWhenFailed(_output);
@@ -97,15 +97,17 @@ public class TauteningTests : IDisposable
         gitCli.Run("add", "--all");
         gitCli.Run("commit", "-m", a_md);
 
-        var tautManager = _host.Services.GetRequiredService<Git.Taut.TautManager>();
+        var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
-        tautManager.Init(".git", "origin");
+        tautSetup.Init("origin", ".git", brandNewSetup: false);
+
+        var tautManager = _host.Services.GetRequiredService<Git.Taut.TautManager>();
 
         var hostHeadCommit = tautManager.HostRepo.GetHeadCommit();
 
         tautManager.TautenCommit(hostHeadCommit);
 
-        var kvStore = _host.Services.GetRequiredService<KeyValueStore>();
+        var kvStore = _host.Services.GetRequiredService<TautMapping>();
 
         Lg2Oid resultOid = new();
         Assert.True(kvStore.TryGetTautened(hostHeadCommit, ref resultOid));
@@ -131,15 +133,17 @@ public class TauteningTests : IDisposable
         gitCli.Run("add", "--all");
         gitCli.Run("commit", "-m", a_tt);
 
-        var tautManager = _host.Services.GetRequiredService<Git.Taut.TautManager>();
+        var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
-        tautManager.Init(".git", "origin");
+        tautSetup.Init("origin", ".git", brandNewSetup: false);
+
+        var tautManager = _host.Services.GetRequiredService<Git.Taut.TautManager>();
 
         var hostHeadCommit = tautManager.HostRepo.GetHeadCommit();
 
         tautManager.TautenCommit(hostHeadCommit);
 
-        var kvStore = _host.Services.GetRequiredService<KeyValueStore>();
+        var kvStore = _host.Services.GetRequiredService<TautMapping>();
 
         Lg2Oid resultOid = new();
         Assert.True(kvStore.TryGetTautened(hostHeadCommit, ref resultOid));

@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Text;
 using ConsoleAppFramework;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Logging;
@@ -19,6 +18,7 @@ static partial class GitRemoteHelperTraces
 partial class GitRemoteHelper(
     ILogger<GitRemoteHelper> logger,
     GitCli gitCli,
+    TautSetup tautSetup,
     TautManager tautManager
 );
 
@@ -359,13 +359,19 @@ partial class GitRemoteHelper
                         _tautRepoDir,
                         "push",
                         "--dry-run",
-                        _remote,
+                        _remoteName,
                         refSpecTextToUse
                     );
                 }
                 else
                 {
-                    gitCli.Execute("--git-dir", _tautRepoDir, "push", _remote, refSpecTextToUse);
+                    gitCli.Execute(
+                        "--git-dir",
+                        _tautRepoDir,
+                        "push",
+                        _remoteName,
+                        refSpecTextToUse
+                    );
                 }
             }
 
@@ -403,10 +409,10 @@ partial class GitRemoteHelper
 partial class GitRemoteHelper
 {
     [AllowNull]
-    string _remote;
+    string _remoteName;
 
     [AllowNull]
-    string _address;
+    string _remoteAddress;
 
     [AllowNull]
     string _hostRepoDir;
@@ -417,19 +423,21 @@ partial class GitRemoteHelper
     /// <summary>
     /// Act as a Git remote helper.
     /// </summary>
-    /// <param name="remote">Remote name passed from Git.</param>
-    /// <param name="address">Remote address passed from Git.</param>
+    /// <param name="remoteName">Remote name passed from Git.</param>
+    /// <param name="remoteAddress">Remote address passed from Git.</param>
     [Command("--remote-helper")]
     public async Task WorkWithGitAsync(
-        [Argument] string remote,
-        [Argument] string address,
+        [Argument] string remoteName,
+        [Argument] string remoteAddress,
         CancellationToken cancellationToken
     )
     {
-        _remote = remote;
-        _address = address;
+        _remoteName = remoteName;
+        _remoteAddress = remoteAddress;
 
-        logger.ZLogTrace($"Run {ProgramInfo.CommandName} with '{remote}' and '{address}'");
+        logger.ZLogTrace(
+            $"Run {ProgramInfo.CommandName} with '{remoteName}' and '{remoteAddress}'"
+        );
 
         EnsureTautDir();
 
@@ -470,11 +478,9 @@ partial class GitRemoteHelper
 
     void EnsureTautDir()
     {
-        var gitDir = Environment.GetEnvironmentVariable(KnownEnvironVars.GitDir);
-        if (gitDir is null)
-        {
-            throw new InvalidOperationException("Git dir is null");
-        }
+        var gitDir =
+            Environment.GetEnvironmentVariable(KnownEnvironVars.GitDir)
+            ?? throw new InvalidOperationException($"{KnownEnvironVars.GitDir} is null");
 
         _hostRepoDir = gitDir;
 
@@ -491,19 +497,25 @@ partial class GitRemoteHelper
 
     void GitCloneTaut()
     {
-        gitCli.Execute("clone", "--bare", _address, _tautRepoDir);
+        gitCli.Execute("clone", "--bare", _remoteAddress, _tautRepoDir);
 
-        logger.ZLogTrace($"Clone '{_remote}' from '{_address}' to '{_tautRepoDir}'");
+        logger.ZLogTrace($"Cloned '{_remoteName}' from '{_remoteAddress}' to '{_tautRepoDir}'");
 
-        tautManager.Init(_hostRepoDir, _remote, newSetup: true);
+        tautSetup.Init(_remoteName, _hostRepoDir, brandNewSetup: true);
     }
 
     void GitFetchTaut()
     {
-        gitCli.Execute("--git-dir", _tautRepoDir, "fetch", _remote, "+refs/heads/*:refs/heads/*");
+        gitCli.Execute(
+            "--git-dir",
+            _tautRepoDir,
+            "fetch",
+            _remoteName,
+            "+refs/heads/*:refs/heads/*"
+        );
 
-        logger.ZLogTrace($"Update '{_tautRepoDir}'");
+        logger.ZLogTrace($"Updated '{_tautRepoDir}'");
 
-        tautManager.Init(_hostRepoDir, _remote);
+        tautSetup.Init(_remoteName, _hostRepoDir, brandNewSetup: false);
     }
 }
