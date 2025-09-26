@@ -1,4 +1,5 @@
 using System.Text;
+using ZstdSharp;
 
 namespace Git.Taut;
 
@@ -215,5 +216,93 @@ class PatchTautenStream : Stream
     public override void Write(byte[] buffer, int offset, int count)
     {
         throw new NotSupportedException();
+    }
+}
+
+sealed class WrappedDecompressionStream(Stream stream, long length, bool leaveOpen = true) : Stream
+{
+    const int DecompressionBufferSize = 1024;
+    DecompressionStream _decStream = new(
+        stream,
+        bufferSize: DecompressionBufferSize,
+        checkEndOfStream: true,
+        leaveOpen
+    );
+    long _length = length;
+    long _totalRead;
+
+    public override bool CanRead => true;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => false;
+
+    public override long Length => _length;
+
+    public override long Position
+    {
+        get => _totalRead;
+        set => throw new NotSupportedException();
+    }
+
+    public override void Flush()
+    {
+        throw new NotSupportedException();
+    }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        var dataRead = _decStream.Read(buffer, offset, count);
+
+        _totalRead += dataRead;
+
+        if (_totalRead > _length)
+        {
+            throw new InvalidDataException(
+                $"Decompressed length ({_totalRead}) is greater than declared length ({_length})"
+            );
+        }
+
+        if (dataRead == 0 && _totalRead != _length)
+        {
+            throw new InvalidDataException(
+                $"Decompressed length ({_totalRead}) is not equal to declared length ({_length})"
+            );
+        }
+
+        return dataRead;
+    }
+
+    public override long Seek(long offset, SeekOrigin origin)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override void SetLength(long value)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
+    }
+
+    bool _isDisposed;
+
+    protected override void Dispose(bool disposing)
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+        _isDisposed = true;
+
+        if (disposing)
+        {
+            _decStream.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 }

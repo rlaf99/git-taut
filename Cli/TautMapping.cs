@@ -41,7 +41,7 @@ sealed class TautMapping(ILogger<TautMapping> logger) : IDisposable
 
         OpenDb();
 
-        logger.ZLogTrace($"Initialized {nameof(TautMapping)} '{DbDirectoryName}' at '{location}'");
+        logger.ZLogTrace($"Initialized {nameof(TautMapping)}");
     }
 
     void OpenDb()

@@ -79,9 +79,7 @@ partial class Aes256Cbc1
         _aes.Mode = UsedCipherMode;
         _aes.Padding = UsedPaddingMode;
 
-        logger.ZLogTrace(
-            $"Initialized {nameof(Aes256Cbc1)} mode '{Enum.GetName(UsedCipherMode)}' padding '{Enum.GetName(UsedPaddingMode)}'"
-        );
+        logger.ZLogTrace($"Initialized {nameof(Aes256Cbc1)}");
     }
 
     internal void EnsureInitialized()
@@ -511,7 +509,7 @@ partial class Aes256Cbc1
             }
 
             logger.ZLogTrace(
-                $"Compress encryptor input from {sourceInput.Length} to {compressedStream.Length}"
+                $"Compressed encryptor input from {sourceInput.Length} to {compressedStream.Length}"
             );
 
             compressedStream.Position = 0;

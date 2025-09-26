@@ -6,7 +6,7 @@ namespace Git.Taut;
 sealed class UserKeyHolder : IDisposable
 {
     const int KeyIterationCount = 64000;
-    const int KeyBytes = 32;
+    const int KeySize = 32;
 
     [AllowNull]
     byte[] _crudeKey;
@@ -19,14 +19,14 @@ sealed class UserKeyHolder : IDisposable
 
     internal void DeriveCrudeKey(ReadOnlySpan<byte> passwordData, ReadOnlySpan<byte> passwordSalt)
     {
-        CleanUp();
+        ClearOff();
 
         _crudeKey = Rfc2898DeriveBytes.Pbkdf2(
             passwordData,
             passwordSalt,
             KeyIterationCount,
             HashAlgorithmName.SHA256,
-            KeyBytes
+            KeySize
         );
     }
 
@@ -42,23 +42,24 @@ sealed class UserKeyHolder : IDisposable
             salt,
             iterationCount,
             HashAlgorithmName.SHA256,
-            KeyBytes
+            KeySize
         );
 
         return result;
     }
 
-    internal string DeriveCredentialKeyTrait(byte[] info)
+    internal string DeriveCredentialKeyTrait(byte[] infoData)
     {
         var resultData = new byte[16];
-        HKDF.Expand(HashAlgorithmName.SHA256, _crudeKey!, resultData, info);
+
+        HKDF.Expand(HashAlgorithmName.SHA256, CrudeKey, resultData, infoData);
 
         var result = Convert.ToHexStringLower(resultData);
 
         return result;
     }
 
-    void CleanUp()
+    void ClearOff()
     {
         if (_crudeKey is not null)
         {
@@ -70,6 +71,6 @@ sealed class UserKeyHolder : IDisposable
 
     public void Dispose()
     {
-        CleanUp();
+        ClearOff();
     }
 }

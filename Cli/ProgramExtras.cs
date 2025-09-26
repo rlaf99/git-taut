@@ -91,37 +91,17 @@ internal class ExtraCommands
             throw new OperationCanceledException();
         }
 
-        var tautPath = GitRepoHelper.GetTautDir(hostRepo.GetPath());
+        var tautRepoName = Path.GetRandomFileName();
+        var tempTautRepoName = GitRepoExtra.AddTautRepoNameTempPrefix(tautRepoName);
+        var tempTautRepoPath = GitRepoExtra.GetTautRepoPath(hostRepo.GetPath(), tempTautRepoName);
 
-        if (Directory.Exists(tautPath) == false)
-        {
-            Directory.CreateDirectory(tautPath);
+        gitCli.Run("clone", "--bare", "--origin", remoteName, remoteAddress, tempTautRepoPath);
 
-            gitCli.Run("--git-dir", tautPath, "init", "--bare");
-        }
+        tautSetup.Init(remoteName, hostRepo, tempTautRepoName, brandNewSetup: true);
 
-        var tautRepo = OpenTautRepo(tautPath);
+        tautManager.RegainHostRefs();
 
-        if (tautRepo.TryLookupRemote(remoteName, out _))
-        {
-            ConsoleApp.LogError($"Remote '{remoteName}' already exists in the taut repo.");
-            throw new OperationCanceledException();
-        }
-
-        tautRepo.NewRemote(remoteName, remoteUrl);
-
-        try
-        {
-            gitCli.Run("--git-dir", tautPath, "fetch", remoteName);
-        }
-        catch (GitCliException)
-        {
-            ConsoleApp.LogError($"Failed to fetch from '{remoteUrl}'");
-        }
-
-        hostRepo.NewRemote(remoteName, GitRepoHelper.AddTautRemoteHelperPrefix(remoteUrl));
-
-        tautSetup.Init(remoteName, hostRepo, tautRepo, brandNewSetup: true);
+        tautSetup.ApproveNewTautRepo(tempTautRepoName);
     }
 
     /// <summary>
@@ -140,7 +120,7 @@ internal class ExtraCommands
     )
     {
         var hostRepo = LocateHostRepo();
-        var tautPath = GitRepoHelper.GetTautDir(hostRepo.GetPath());
+        var tautPath = GitRepoExtra.GetTautHomePath(hostRepo.GetPath());
         var tautRepo = OpenTautRepo(tautPath);
 
         tautSetup.Init(remoteName, hostRepo, tautRepo, brandNewSetup: false);
@@ -261,7 +241,7 @@ internal class ExtraCommands
 
         var hostRepo = LocateHostRepo();
 
-        var tautRepoFullPath = GitRepoHelper.GetTautDir(hostRepo.GetPath());
+        var tautRepoFullPath = GitRepoExtra.GetTautHomePath(hostRepo.GetPath());
         var tautRepoRelPath = Path.GetRelativePath(currentDir, tautRepoFullPath);
 
         return OpenTautRepo(tautRepoRelPath);

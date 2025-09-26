@@ -184,11 +184,13 @@ class TautManager(
 
             if (sourceOidText == targetOidText)
             {
-                logger.ZLogTrace($"Regain {targetOidText} from same {objTypeName}");
+                logger.ZLogTrace($"Regained {targetOidText} from same {objTypeName}");
             }
             else
             {
-                logger.ZLogTrace($"Regain {targetOidText} from {objTypeName} {sourceOidText[..8]}");
+                logger.ZLogTrace(
+                    $"Regained {targetOidText} from {objTypeName} {sourceOidText[..8]}"
+                );
             }
         }
     }
@@ -278,14 +280,14 @@ class TautManager(
 
             if (tautOid.Equals(ref hostOid))
             {
-                var message = $"Regain {refName} {hostOidHex8} from same object";
+                var message = $"Regained {refName} {hostOidHex8} from same object";
 
                 TautRepo.SetRef(regainedRefName, hostOid, message);
                 logger.ZLogTrace($"{message}");
             }
             else
             {
-                var message = $"Regain {refName} {hostOidHex8} from {tautOidHex8}";
+                var message = $"Regained {refName} {hostOidHex8} from {tautOidHex8}";
 
                 TautRepo.SetRef(regainedRefName, hostOid, message);
                 logger.ZLogTrace($"{message}");
@@ -635,14 +637,14 @@ class TautManager(
 
             if (hostOid.Equals(ref tautenedOid))
             {
-                var message = $"Tauten {refName} {tautenedOidHex8} from same object";
+                var message = $"Tautened {refName} {tautenedOidHex8} from same object";
 
                 TautRepo.SetRef(tautenedRefName, tautenedOid, message);
                 logger.ZLogTrace($"{message}");
             }
             else
             {
-                var message = $"Tauten {refName} {tautenedOidHex8} from {hostOidHex8}";
+                var message = $"Tautened {refName} {tautenedOidHex8} from {hostOidHex8}";
 
                 TautRepo.SetRef(tautenedRefName, tautenedOid, message);
                 logger.ZLogTrace($"{message}");
