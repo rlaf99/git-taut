@@ -87,6 +87,8 @@ public class TauteningTests : IDisposable
 
         gitCli.Run("clone", "taut::repo0", "repo2");
 
+        var hostRepo = Lg2Repository.New("repo2");
+
         Directory.SetCurrentDirectory("repo2");
 
         string a_md = "a.md";
@@ -99,9 +101,10 @@ public class TauteningTests : IDisposable
 
         var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
-        tautSetup.Init("origin", ".git", brandNewSetup: false);
+        var tautRepoName = hostRepo.FindTautRepoName("origin");
+        tautSetup.InitExisting(hostRepo, "origin", tautRepoName);
 
-        var tautManager = _host.Services.GetRequiredService<Git.Taut.TautManager>();
+        var tautManager = _host.Services.GetRequiredService<TautManager>();
 
         var hostHeadCommit = tautManager.HostRepo.GetHeadCommit();
 
@@ -123,6 +126,8 @@ public class TauteningTests : IDisposable
 
         gitCli.Run("clone", "taut::repo0", "repo2");
 
+        var hostRepo = Lg2Repository.New("repo2");
+
         Directory.SetCurrentDirectory("repo2");
 
         string a_tt = "a.tt";
@@ -135,9 +140,10 @@ public class TauteningTests : IDisposable
 
         var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
-        tautSetup.Init("origin", ".git", brandNewSetup: false);
+        var tautRepoName = hostRepo.FindTautRepoName("origin");
+        tautSetup.InitExisting(hostRepo, "origin", tautRepoName);
 
-        var tautManager = _host.Services.GetRequiredService<Git.Taut.TautManager>();
+        var tautManager = _host.Services.GetRequiredService<TautManager>();
 
         var hostHeadCommit = tautManager.HostRepo.GetHeadCommit();
 

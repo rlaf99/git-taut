@@ -12,7 +12,9 @@ Further more, a key trait is derived from the url as well as the user name/passw
 
 ## Taut related settings in the repo config
 
-- `remote.{name}.tautRepoName`: name of the repository used by taut.
-- `remote.{name}.tautCredentialUrl`: url that identifies this remote in a git credential helper.
-- `remote.{name}.tautCredentialUserName`: optional user name from credential, used as salt for key derivation.
-- `remote.{name}.tautCredentialKeyTrait`: key trait derived from the user password, used to verify future password inputs.
+Taut places its settings under `taut` section, with the subsection `tautRepoName` which is the randomly generated for a taut repo.
+
+- `taut.{tautRepoName}.tautCredentialUrl`: url that identifies this taut repo in a git credential helper.
+- `taut.{tautRepoName}.tautCredentialUserName`: optional user name from credential, used as salt for key derivation.
+- `taut.{tautRepoName}.tautCredentialKeyTrait`: key trait derived from the user password, used to verify future password inputs.
+- `taut.{tautRepoName}.remote`: remote that is associated with this taut repo.

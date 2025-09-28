@@ -188,15 +188,49 @@ public static unsafe class Lg2ConfigExtensions
         Lg2Exception.ThrowIfNotOk(rc);
     }
 
-    public static Lg2ConfigIterator NewIterator(this Lg2Config config, string name)
+    public static Lg2ConfigIterator NewMultiVarIterator(
+        this Lg2Config config,
+        string name,
+        string? regExp = null
+    )
     {
         config.EnsureValid();
 
         using var u8Name = new Lg2Utf8String(name);
 
         git_config_iterator* ptr = null;
-        var rc = git_config_multivar_iterator_new(&ptr, config.Ptr, u8Name.Ptr, null);
-        Lg2Exception.ThrowIfNotOk(rc);
+        if (regExp is not null)
+        {
+            using var u8RegExp = new Lg2Utf8String(regExp);
+            var rc = git_config_multivar_iterator_new(&ptr, config.Ptr, u8Name.Ptr, u8RegExp.Ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+        else
+        {
+            var rc = git_config_multivar_iterator_new(&ptr, config.Ptr, u8Name.Ptr, null);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+
+        return new(ptr);
+    }
+
+    public static Lg2ConfigIterator NewIterator(this Lg2Config config, string? regExp = null)
+    {
+        config.EnsureValid();
+
+        git_config_iterator* ptr = null;
+
+        if (regExp is not null)
+        {
+            using var u8RegExp = new Lg2Utf8String(regExp);
+            var rc = git_config_iterator_glob_new(&ptr, config.Ptr, u8RegExp.Ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+        else
+        {
+            var rc = git_config_iterator_new(&ptr, config.Ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
 
         return new(ptr);
     }

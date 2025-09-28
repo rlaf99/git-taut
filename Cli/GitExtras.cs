@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Lg2.Sharpy;
 
 namespace Git.Taut;
@@ -65,18 +66,9 @@ static class GitRepoExtra
         return result;
     }
 
-    internal static string GetTautRepoPath(this Lg2Repository repo, string remoteName)
+    internal static string GetTautRepoPath(this Lg2Repository repo, string tautRepoName)
     {
         repo.EnsureValid();
-
-        using var config = repo.GetConfigSnapshot();
-
-        var tautRepoName = config.GetTautRepoName(remoteName);
-
-        if (tautRepoName is null)
-        {
-            throw new InvalidOperationException($"tautRepoName is null");
-        }
 
         var result = Path.Join(repo.GetPath(), TautHomeName, tautRepoName);
 
@@ -264,100 +256,76 @@ static class GitRepoExtra
     }
 }
 
-static class GitConfigExtra
+static partial class GitConfigExtra
 {
-    internal const string TautRepoName = "tautRepoName";
-    internal const string TautCredentialUrl = "tautCredentialUrl";
-    internal const string TautCredentialUserName = "tautCredentialUserName";
-    internal const string TautCredentialKeyTrait = "tautCredentialKeyTrait";
-
     internal const string Fetch_Prune = "fetch.prune";
 
-    internal static string FormatRemoteItemName(string remoteName, string itemName) =>
-        $"remote.{remoteName}.{itemName}";
+    const string TautRepoNameMatchPattern = $@"{TautConfig.SectionName}\.(.*)\.remote";
 
-    internal static bool TryGetTautCredentialUrl(
+    [GeneratedRegex(TautRepoNameMatchPattern)]
+    private static partial Regex TautRepoNameRegex();
+
+    internal static bool TryFindTautRepoName(
         this Lg2Config config,
         string remoteName,
-        out string value
-    ) => config.TryGetString(FormatRemoteItemName(remoteName, TautCredentialUrl), out value);
-
-    internal static string GetTautCredentialUrl(this Lg2Config config, string remoteName) =>
-        config.GetString(FormatRemoteItemName(remoteName, TautCredentialUrl));
-
-    internal static bool TryGetTautCredentialUserName(
-        this Lg2Config config,
-        string remoteName,
-        out string value
-    ) => config.TryGetString(FormatRemoteItemName(remoteName, TautCredentialUserName), out value);
-
-    internal static string GetTautCredentialUserName(this Lg2Config config, string remoteName) =>
-        config.GetString(FormatRemoteItemName(remoteName, TautCredentialUserName));
-
-    internal static bool TryGetTautCredentialKeyTrait(
-        this Lg2Config config,
-        string remoteName,
-        out string value
-    ) => config.TryGetString(FormatRemoteItemName(remoteName, TautCredentialKeyTrait), out value);
-
-    internal static string GetTautCredentialKeyTrait(this Lg2Config config, string remoteName) =>
-        config.GetString(FormatRemoteItemName(remoteName, TautCredentialKeyTrait));
-
-    internal static bool TryGetTautRepoName(
-        this Lg2Config config,
-        string remoteName,
-        out string value
-    ) => config.TryGetString(FormatRemoteItemName(remoteName, TautRepoName), out value);
-
-    internal static string GetTautRepoName(this Lg2Config config, string remoteName) =>
-        config.GetString(FormatRemoteItemName(remoteName, TautRepoName));
-
-    internal static void SetTautCredentialKeyTrait(
-        this Lg2Config config,
-        string remoteName,
-        string value
+        out string repoName
     )
     {
-        config.EnsureValid();
+        var cfgIter = config.NewIterator(TautRepoNameMatchPattern);
+        Regex regex = TautRepoNameRegex();
 
-        var configName = FormatRemoteItemName(remoteName, TautCredentialKeyTrait);
+        repoName = string.Empty;
+        bool found = false;
 
-        config.SetString(configName, value);
+        while (cfgIter.Next(out var entry))
+        {
+            var val = entry.GetValue();
+            if (val == remoteName)
+            {
+                var name = entry.GetName();
+                repoName = regex.Match(name).Groups[1].Value;
+
+                found = true;
+
+                break;
+            }
+        }
+
+        return found;
     }
 
-    internal static void SetTautCredentialUserName(
-        this Lg2Config config,
+    internal static bool TryFindTautRepoName(
+        this Lg2Repository repo,
         string remoteName,
-        string value
+        out string repoName
     )
     {
-        config.EnsureValid();
+        repo.EnsureValid();
 
-        var configName = FormatRemoteItemName(remoteName, TautCredentialUserName);
+        using var config = repo.GetConfigSnapshot();
 
-        config.SetString(configName, value);
+        return config.TryFindTautRepoName(remoteName, out repoName);
     }
 
-    internal static void SetTautCredentialUrl(
-        this Lg2Config config,
-        string remoteName,
-        string value
-    )
+    internal static string FindTautRepoName(this Lg2Config config, string remoteName)
     {
-        config.EnsureValid();
+        if (config.TryFindTautRepoName(remoteName, out var result))
+        {
+            return result;
+        }
 
-        var configName = FormatRemoteItemName(remoteName, TautCredentialUrl);
-
-        config.SetString(configName, value);
+        throw new InvalidOperationException(
+            $"Taut repo name is not found for remote '{remoteName}'"
+        );
     }
 
-    internal static void SetTautRepoName(this Lg2Config config, string remoteName, string value)
+    internal static string FindTautRepoName(this Lg2Repository repo, string remoteName)
     {
-        config.EnsureValid();
+        repo.EnsureValid();
 
-        var configName = FormatRemoteItemName(remoteName, TautRepoName);
+        using var config = repo.GetConfigSnapshot();
 
-        config.SetString(configName, value);
+        return config.FindTautRepoName(remoteName);
     }
 }
 

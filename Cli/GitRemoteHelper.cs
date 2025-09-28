@@ -117,7 +117,7 @@ partial class GitRemoteHelper
         return HandleGitCommandResult.Done;
     }
 
-    void RegainRefsThenListThem()
+    void RegainThenListRefs()
     {
         tautManager.RegainHostRefs();
 
@@ -129,7 +129,7 @@ partial class GitRemoteHelper
             tautManager.TautRepo.GetRefOid(regainedRefName, ref oid);
             var oidText = oid.ToHexDigits();
 
-            logger.ZLogTrace($"{nameof(RegainRefsThenListThem)}: {oidText} {refName}");
+            logger.ZLogTrace($"{nameof(RegainThenListRefs)}: {oidText} {refName}");
 
             Console.WriteLine($"{oidText} {refName}");
         }
@@ -139,23 +139,24 @@ partial class GitRemoteHelper
     {
         using var hostConfig = HostRepo.GetConfigSnapshot();
 
-        var hasTautRepoName = hostConfig.TryGetTautRepoName(_remoteName, out var tautRepoName);
+        var foundTautRepoName = hostConfig.TryFindTautRepoName(_remoteName, out var tautRepoName);
 
-        if (hasTautRepoName)
+        if (foundTautRepoName)
         {
-            GitFetchTaut(tautRepoName);
+            tautSetup.InitExisting(HostRepo, _remoteName, tautRepoName);
 
-            RegainRefsThenListThem();
+            RegainThenListRefs();
         }
         else
         {
-            _tautRepoName = Path.GetRandomFileName();
+            tautSetup.InitBrandNew(HostRepo, _remoteName, _remoteAddress);
 
-            var tautRepoTempName = GitRepoExtra.TautRepoNameTempPrefix + _tautRepoName;
+            RegainThenListRefs();
 
-            GitCloneTaut(tautRepoTempName);
-
-            RegainRefsThenListThem();
+            NotifyWorkWithGitDone += (_, _) =>
+            {
+                tautSetup.ApproveNewTautRepo();
+            };
         }
 
         Console.WriteLine();
@@ -215,19 +216,15 @@ partial class GitRemoteHelper
 
     HandleGitCommandResult HandleGitCmdListForPush(string input)
     {
-        using var config = HostRepo.GetConfigSnapshot();
+        using var hostConfig = HostRepo.GetConfigSnapshot();
 
-        var tautRepoName =
-            config.GetTautRepoName(_remoteName)
-            ?? throw new InvalidOperationException(
-                $"Failed to get '{GitConfigExtra.TautRepoName}' for remote '{_remoteName}' from config"
-            );
+        var tautRepoName = hostConfig.FindTautRepoName(RemoteName);
 
-        GitFetchTaut(tautRepoName);
+        tautSetup.InitExisting(HostRepo, RemoteName, tautRepoName);
 
         tautManager.TautenHostRefs();
 
-        RegainRefsThenListThem();
+        RegainThenListRefs();
 
         Console.WriteLine();
 
@@ -236,13 +233,14 @@ partial class GitRemoteHelper
 
     HandleGitCommandResult HandleGitCmdPush(string input)
     {
-        const string functionName = nameof(HandleGitCmdPush);
-
         void HandleBatch()
         {
+            using var config = HostRepo.GetConfigSnapshot();
+            var tautRepoName = config.FindTautRepoName(RemoteName);
+
             foreach (var pushCmd in _pushBatch)
             {
-                logger.ZLogTrace($"{functionName} '{pushCmd}'");
+                logger.ZLogTrace($"{nameof(HandleGitCmdPush)} '{pushCmd}'");
 
                 var refSpecText = pushCmd[cmdPush.Length..].TrimStart();
 
@@ -251,7 +249,7 @@ partial class GitRemoteHelper
                     throw new InvalidOperationException($"Invalid refspec {refSpecText}");
                 }
 
-                var tautRepoPath = HostRepo.GetTautRepoPath(_remoteName);
+                var tautRepoPath = HostRepo.GetTautRepoPath(tautRepoName);
 
                 var srcRefName = refSpec.GetSrc();
 
@@ -318,8 +316,12 @@ partial class GitRemoteHelper
     [AllowNull]
     string _remoteName;
 
+    string RemoteName => _remoteName!;
+
     [AllowNull]
     string _remoteAddress;
+
+    string RemoteAddress => RemoteAddress!;
 
     [AllowNull]
     Lg2Repository _hostRepo;
@@ -328,11 +330,6 @@ partial class GitRemoteHelper
 
     [AllowNull]
     string _tautHomePath;
-
-    [AllowNull]
-    string _tautRepoName;
-
-    string _currentCommand = string.Empty;
 
     /// <summary>
     /// Act as a Git remote helper.
@@ -376,7 +373,7 @@ partial class GitRemoteHelper
                 break;
             }
 
-            logger.ZLogTrace($"Received from git '{input}'");
+            logger.ZLogTrace($"Received git command '{input}'");
 
             _handleGitCommand ??= DispatchGitCommand;
 
@@ -413,43 +410,5 @@ partial class GitRemoteHelper
         _tautHomePath = GitRepoExtra.GetTautHomePath(gitDir);
 
         Directory.CreateDirectory(_tautHomePath);
-    }
-
-    void GitCloneTaut(string tautRepoName)
-    {
-        var tautRepoPath = Path.Join(_tautHomePath, tautRepoName);
-
-        gitCli.Execute("clone", "--bare", _remoteAddress, tautRepoPath);
-
-        logger.ZLogTrace($"Cloned '{_remoteName}' from '{_remoteAddress}' into '{tautRepoName}'");
-
-        using (var config = HostRepo.GetConfig())
-        {
-            config.SetTautRepoName(_remoteName, tautRepoName);
-        }
-
-        tautSetup.Init(_remoteName, HostRepo, tautRepoName, brandNewSetup: true);
-
-        NotifyWorkWithGitDone += (_, _) =>
-        {
-            tautSetup.ApproveNewTautRepo(tautRepoName);
-        };
-    }
-
-    void GitFetchTaut(string tautRepoName)
-    {
-        var tautRepoPath = Path.Join(_tautHomePath, tautRepoName);
-
-        gitCli.Execute(
-            "--git-dir",
-            tautRepoPath,
-            "fetch",
-            _remoteName,
-            "+refs/heads/*:refs/heads/*"
-        );
-
-        logger.ZLogTrace($"Fetched '{_remoteName}' from '{_remoteAddress}' into '{tautRepoName}'");
-
-        tautSetup.Init(_remoteName, HostRepo, tautRepoName, brandNewSetup: false);
     }
 }

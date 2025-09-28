@@ -1,4 +1,3 @@
-using System.Text;
 using ConsoleAppFramework;
 using Git.Taut;
 using Lg2.Sharpy;
@@ -91,17 +90,11 @@ internal class ExtraCommands
             throw new OperationCanceledException();
         }
 
-        var tautRepoName = Path.GetRandomFileName();
-        var tempTautRepoName = GitRepoExtra.AddTautRepoNameTempPrefix(tautRepoName);
-        var tempTautRepoPath = GitRepoExtra.GetTautRepoPath(hostRepo.GetPath(), tempTautRepoName);
-
-        gitCli.Run("clone", "--bare", "--origin", remoteName, remoteAddress, tempTautRepoPath);
-
-        tautSetup.Init(remoteName, hostRepo, tempTautRepoName, brandNewSetup: true);
+        tautSetup.InitBrandNew(hostRepo, remoteName, remoteUrl);
 
         tautManager.RegainHostRefs();
 
-        tautSetup.ApproveNewTautRepo(tempTautRepoName);
+        tautSetup.ApproveNewTautRepo();
     }
 
     /// <summary>
@@ -120,10 +113,11 @@ internal class ExtraCommands
     )
     {
         var hostRepo = LocateHostRepo();
-        var tautPath = GitRepoExtra.GetTautHomePath(hostRepo.GetPath());
-        var tautRepo = OpenTautRepo(tautPath);
 
-        tautSetup.Init(remoteName, hostRepo, tautRepo, brandNewSetup: false);
+        using var config = hostRepo.GetConfigSnapshot();
+        var tautRepoName = config.FindTautRepoName(remoteName);
+
+        tautSetup.InitExisting(hostRepo, remoteName, tautRepoName);
 
         if (File.Exists(filePath))
         {
@@ -155,7 +149,7 @@ internal class ExtraCommands
 
             ConsoleApp.Log($"Target object id: {targetOid.ToHexDigits()}");
 
-            var tautOdb = tautRepo.GetOdb();
+            var tautOdb = tautSetup.TautRepo.GetOdb();
 
             using (var stream = tautOdb.ReadAsStream(targetOid))
             {
