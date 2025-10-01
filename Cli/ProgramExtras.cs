@@ -21,10 +21,14 @@ internal class ExtraCommands
     }
 
     /// <summary>
-    ///  Invoke git commands on the taut repo.
+    ///  Invoke git commands on a taut repository.
     /// </summary>
     [Command("--git")]
-    public void Git([FromServices] GitCli gitCli, [Argument] params string[] args)
+    public void Git(
+        [FromServices] GitCli gitCli,
+        string? remoteName = "origin",
+        [Argument] params string[] args
+    )
     {
         using var tautRepo = LocateTautRepo();
 
@@ -40,15 +44,20 @@ internal class ExtraCommands
     }
 
     /// <summary>
-    /// Initialize a taut repo from a remote.
+    /// Initialize a new remote for taut.
     /// </summary>
-    [Command("--init")]
-    public void Init(
+    /// <param name="remoteAddress">The address of the new remote.</param>
+    /// <param name="remoteName">The name of the new remote.</param>
+    /// <param name="linkTo">Either the name of a taut, or the name of a remote that resolves to a taut.
+    ///  The corresponding taut's credential and repository are shared with the new remote.</param>
+    [Command("--add")]
+    public void Add(
         [FromServices] GitCli gitCli,
         [FromServices] TautSetup tautSetup,
         [FromServices] TautManager tautManager,
         [Argument] string remoteAddress,
-        string remoteName
+        string remoteName,
+        string? linkTo = null
     )
     {
         string remoteUrl;
@@ -90,40 +99,61 @@ internal class ExtraCommands
             throw new OperationCanceledException();
         }
 
-        tautSetup.InitBrandNew(hostRepo, remoteName, remoteUrl);
+        string? tautRepoNameToLink = null;
+        if (linkTo is not null)
+        {
+            if (
+                TautConfig.TryLoadByTautRepoName(hostRepo, linkTo, out TautConfig? tautConfig)
+                || TautConfig.TryLoadByRemoteName(hostRepo, linkTo, out tautConfig)
+            )
+            {
+                tautRepoNameToLink = tautConfig.TautRepoName;
+            }
+            else
+            {
+                ConsoleApp.LogError(
+                    $"Cannot load {nameof(TautConfig)} with '{linkTo}' either by taut repository name or by remote name"
+                );
+
+                throw new OperationCanceledException();
+            }
+        }
+
+        tautSetup.GearUpBrandNew(hostRepo, remoteName, remoteUrl, tautRepoNameToLink);
 
         tautManager.RegainHostRefs();
 
-        tautSetup.ApproveNewTautRepo();
+        tautSetup.WrapUpBrandNew();
     }
 
     /// <summary>
-    /// Consult the index and reveal tautened information about a file in a remote.
+    /// Consult the index and reveal the information about a path in a taut.
     /// </summary>
     ///
-    /// <param name="filePath">The file to reveal.</param>
+    /// <param name="path">The path to reveal.</param>
+    /// <param name="remote">The name of a remote that resolves to a taut.</parma>
     [Command("--reveal")]
     public void Reveal(
         [FromServices] TautSetup tautSetup,
         [FromServices] TautManager tautManager,
         [FromServices] TautMapping tautMapping,
         [FromServices] Aes256Cbc1 cipher,
-        [Argument] string filePath,
-        string remoteName = "origin"
+        [Argument] string path,
+        string remote = "origin"
     )
     {
         var hostRepo = LocateHostRepo();
 
         using var config = hostRepo.GetConfigSnapshot();
-        var tautRepoName = config.FindTautRepoName(remoteName);
+        var tautRepoName = config.FindTautRepoName(remote);
 
-        tautSetup.InitExisting(hostRepo, remoteName, tautRepoName);
+        tautSetup.GearUpExisting(hostRepo, remote, tautRepoName);
 
-        if (File.Exists(filePath))
+        if (File.Exists(path))
         {
-            if (hostRepo.TryGetRelativePathToWorkDir(filePath, out var relPath) == false)
+            if (hostRepo.TryGetRelativePathToWorkDir(path, out var relPath) == false)
             {
-                ConsoleApp.LogError($"'{filePath}' not inside the workdir");
+                ConsoleApp.LogError($"'{path}' not inside the workdir");
 
                 throw new OperationCanceledException();
             }
@@ -176,7 +206,7 @@ internal class ExtraCommands
         }
         else
         {
-            ConsoleApp.LogError($"Not a valid path: '{filePath}'");
+            ConsoleApp.LogError($"Not a valid path: '{path}'");
         }
     }
 

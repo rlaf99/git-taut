@@ -15,10 +15,6 @@ class TautManager(
 )
 {
     [AllowNull]
-    string _remoteName;
-    internal string RemoteName => _remoteName!;
-
-    [AllowNull]
     Lg2Repository _tautRepo;
     internal Lg2Repository TautRepo => _tautRepo!;
 
@@ -54,13 +50,12 @@ class TautManager(
 
     bool _initialized;
 
-    internal void Init(string remoteName, Lg2Repository hostRepo, Lg2Repository tautRepo)
+    internal void Init(Lg2Repository hostRepo, Lg2Repository tautRepo)
     {
         ThrowHelper.InvalidOperationIfAlreadyInitalized(_initialized);
 
         _initialized = true;
 
-        _remoteName = remoteName;
         _hostRepo = hostRepo;
         _tautRepo = tautRepo;
 

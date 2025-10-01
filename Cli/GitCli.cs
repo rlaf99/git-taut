@@ -83,8 +83,7 @@ class GitCli(ILogger<GitCli> logger)
 
         static void ErrorDataReceiver(object sender, DataReceivedEventArgs args)
         {
-            if (args.Data is not null)
-                Console.Error.WriteLine(args.Data);
+            Console.Error.WriteLine(args.Data);
         }
 
         // process.OutputDataReceived += OutputDataReceiver; // ignore the output

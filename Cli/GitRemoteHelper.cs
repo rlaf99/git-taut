@@ -143,19 +143,19 @@ partial class GitRemoteHelper
 
         if (foundTautRepoName)
         {
-            tautSetup.InitExisting(HostRepo, _remoteName, tautRepoName);
+            tautSetup.GearUpExisting(HostRepo, _remoteName, tautRepoName);
 
             RegainThenListRefs();
         }
         else
         {
-            tautSetup.InitBrandNew(HostRepo, _remoteName, _remoteAddress);
+            var cleanup = tautSetup.GearUpBrandNew(HostRepo, _remoteName, _remoteAddress);
 
             RegainThenListRefs();
 
             NotifyWorkWithGitDone += (_, _) =>
             {
-                tautSetup.ApproveNewTautRepo();
+                cleanup.RunSynchronously();
             };
         }
 
@@ -220,7 +220,7 @@ partial class GitRemoteHelper
 
         var tautRepoName = hostConfig.FindTautRepoName(RemoteName);
 
-        tautSetup.InitExisting(HostRepo, RemoteName, tautRepoName);
+        tautSetup.GearUpExisting(HostRepo, RemoteName, tautRepoName);
 
         tautManager.TautenHostRefs();
 

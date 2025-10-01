@@ -15,7 +15,7 @@ static class GitRepoExtra
     );
     internal const string DescriptionFile = "description";
     internal const string TautRemoteHelperPrefix = "taut::";
-    internal const string TautCredentialSchemePrefix = "taut+";
+    internal const string TautCredentialUrlScheme = "taut+file";
 
     internal static string UseForwardSlash(string somePath)
     {
@@ -183,76 +183,44 @@ static class GitRepoExtra
         return TautRepoNameTempPrefix + input;
     }
 
-    internal static string RemoveTautRepoNameTempPrefix(string input)
+    internal static string RemoveTautRepoNameTempPrefix(string input, bool shouldExist = true)
     {
         if (input.StartsWith(TautRepoNameTempPrefix) == false)
         {
-            throw new ArgumentException(
-                $"'{input}' is not prefixed with '{TautRepoNameTempPrefix}'"
-            );
+            if (shouldExist)
+            {
+                throw new ArgumentException(
+                    $"'{input}' is not prefixed with '{TautRepoNameTempPrefix}'"
+                );
+            }
+            else
+            {
+                return input;
+            }
         }
 
         return input[TautRepoNameTempPrefix.Length..];
     }
 
-    internal static Uri ConvertToCredentialUri(Uri uri)
+    internal static string ConvertPathToTautCredentialUrl(string somePath)
     {
-        if (uri.Scheme.StartsWith(TautCredentialSchemePrefix))
+        if (somePath.StartsWith(TautCredentialUrlScheme))
         {
             throw new ArgumentException(
-                $"{uri.Scheme} is already prefixed with {TautCredentialSchemePrefix}"
+                $"'{somePath}' already starts with '{TautCredentialUrlScheme}'"
             );
         }
 
-        if (uri.IsFile)
+        UriBuilder uriBuilder = new()
         {
-            var uriBuilder = new UriBuilder(uri)
-            {
-                Scheme = TautCredentialSchemePrefix + uri.Scheme,
-                Host = "localhost",
-            };
-            uri = uriBuilder.Uri;
-        }
-        else
-        {
-            var uriBuilder = new UriBuilder(uri)
-            {
-                Scheme = TautCredentialSchemePrefix + uri.Scheme,
-            };
-            uri = uriBuilder.Uri;
-        }
+            Scheme = TautCredentialUrlScheme,
+            Host = "localhost",
+            Path = somePath,
+        };
 
-        return uri;
-    }
+        var result = uriBuilder.Uri.AbsoluteUri;
 
-    internal static Uri ConvertHostUrlToCredentialUri(string url)
-    {
-        if (url.StartsWith(TautRemoteHelperPrefix) == false)
-        {
-            throw new ArgumentException($"Not started with {TautRemoteHelperPrefix}");
-        }
-
-        var uri = new Uri(url[TautRemoteHelperPrefix.Length..]);
-
-        if (uri.IsFile)
-        {
-            var uriBuilder = new UriBuilder(uri)
-            {
-                Scheme = TautCredentialSchemePrefix + uri.Scheme,
-                Host = "localhost",
-            };
-            uri = uriBuilder.Uri;
-        }
-        else
-        {
-            var uriBuilder = new UriBuilder(uri)
-            {
-                Scheme = TautCredentialSchemePrefix + uri.Scheme,
-            };
-            uri = uriBuilder.Uri;
-        }
-
-        return uri;
+        return result;
     }
 }
 

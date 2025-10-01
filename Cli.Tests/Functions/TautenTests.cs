@@ -102,7 +102,7 @@ public class TauteningTests : IDisposable
         var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
         var tautRepoName = hostRepo.FindTautRepoName("origin");
-        tautSetup.InitExisting(hostRepo, "origin", tautRepoName);
+        tautSetup.GearUpExisting(hostRepo, "origin", tautRepoName);
 
         var tautManager = _host.Services.GetRequiredService<TautManager>();
 
@@ -141,7 +141,7 @@ public class TauteningTests : IDisposable
         var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
         var tautRepoName = hostRepo.FindTautRepoName("origin");
-        tautSetup.InitExisting(hostRepo, "origin", tautRepoName);
+        tautSetup.GearUpExisting(hostRepo, "origin", tautRepoName);
 
         var tautManager = _host.Services.GetRequiredService<TautManager>();
 

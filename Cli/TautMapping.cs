@@ -19,7 +19,6 @@ sealed class TautMapping(ILogger<TautMapping> logger) : IDisposable
     [AllowNull]
     LightningDatabase _regainedDb;
 
-    const string DbDirectoryName = "taut";
     const string Host2TautDbName = "tautened";
     const string Taut2HostDbName = "regained";
 
@@ -36,7 +35,7 @@ sealed class TautMapping(ILogger<TautMapping> logger) : IDisposable
 
         _initialized = true;
 
-        _dbPath = Path.Join(location, DbDirectoryName);
+        _dbPath = Path.Join(location, nameof(TautMapping));
         Directory.CreateDirectory(_dbPath);
 
         OpenDb();
