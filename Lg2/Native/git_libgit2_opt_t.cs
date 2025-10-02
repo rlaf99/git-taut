@@ -47,5 +47,6 @@ namespace Lg2.Native
         GIT_OPT_GET_SERVER_TIMEOUT,
         GIT_OPT_SET_USER_AGENT_PRODUCT,
         GIT_OPT_GET_USER_AGENT_PRODUCT,
+        GIT_OPT_ADD_SSL_X509_CERT,
     }
 }

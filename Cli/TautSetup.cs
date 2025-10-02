@@ -340,7 +340,13 @@ class TautSetup(
         }
     }
 
-    void CloseTautRepo()
+    internal void CloseHostRepo()
+    {
+        _hostRepo?.Dispose();
+        _hostRepo = null;
+    }
+
+    internal void CloseTautRepo()
     {
         _tautRepo?.Dispose();
         _tautRepo = null;

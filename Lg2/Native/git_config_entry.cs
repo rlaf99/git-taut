@@ -18,8 +18,5 @@ namespace Lg2.Native
         public uint include_depth;
 
         public git_config_level_t level;
-
-        [NativeTypeName("void (*)(struct git_config_entry *) __attribute__((cdecl))")]
-        public delegate* unmanaged[Cdecl]<git_config_entry*, void> free;
     }
 }

@@ -179,7 +179,7 @@ internal class ExtraCommands
 
             ConsoleApp.Log($"Target object id: {targetOid.ToHexDigits()}");
 
-            var tautOdb = tautSetup.TautRepo.GetOdb();
+            using var tautOdb = tautSetup.TautRepo.GetOdb();
 
             using (var stream = tautOdb.ReadAsStream(targetOid))
             {
@@ -211,7 +211,7 @@ internal class ExtraCommands
     }
 
     /// <summary>
-    /// Rescan the taut repo and rebuild the object mapping store.
+    /// Rescan the taut repository and rebuild the taut mapping database.
     /// </summary>
     [Command("--rescan")]
     public void Rescan([FromServices] TautManager tautManager)
@@ -226,8 +226,7 @@ internal class ExtraCommands
 
     Lg2Repository LocateHostRepo()
     {
-        var gitDir = KnownEnvironVars.GetGitDir();
-        if (gitDir is not null)
+        if (KnownEnvironVars.TryGetGitDir(out var gitDir))
         {
             return Lg2Repository.New(gitDir);
         }
@@ -269,11 +268,6 @@ internal class ExtraCommands
         var tautRepoRelPath = Path.GetRelativePath(currentDir, tautRepoFullPath);
 
         return OpenTautRepo(tautRepoRelPath);
-    }
-
-    UserKeyHolder ReadUserKeyHolder()
-    {
-        throw new NotImplementedException();
     }
 }
 

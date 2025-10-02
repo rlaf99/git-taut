@@ -26,8 +26,8 @@ public class TauteningTests : IDisposable
 
     public void Dispose()
     {
-        var kvStore = _host.Services.GetRequiredService<TautMapping>();
-        kvStore.Dispose();
+        var tautMapping = _host.Services.GetRequiredService<TautMapping>();
+        tautMapping.Dispose();
 
         _scene.PreserveContentWhenFailed(_output);
         _scene.Dispose();
@@ -115,6 +115,9 @@ public class TauteningTests : IDisposable
         Lg2Oid resultOid = new();
         Assert.True(kvStore.TryGetTautened(hostHeadCommit, ref resultOid));
         Assert.True(hostHeadCommit.GetOidPlainRef().Equals(resultOid));
+
+        tautSetup.CloseTautRepo();
+        tautSetup.CloseHostRepo();
     }
 
     [Fact]
@@ -157,5 +160,8 @@ public class TauteningTests : IDisposable
 
         var tautenedCommit = tautManager.TautRepo.LookupCommit(resultOid);
         tautManager.RegainCommit(tautenedCommit);
+
+        tautSetup.CloseTautRepo();
+        tautSetup.CloseHostRepo();
     }
 }

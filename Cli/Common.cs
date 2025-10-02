@@ -11,15 +11,44 @@ static class KnownEnvironVars
 {
     internal const string GitDir = "GIT_DIR";
 
+    internal const string GitInstallRoot = "GIT_INSTALL_ROOT";
+
     internal const string GitTautTrace = "GIT_TAUT_TRACE";
 
     internal const string GitAlternateObjectDirectories = "GIT_ALTERNATE_OBJECT_DIRECTORIES";
 
-    internal static string? GetGitDir()
+    internal static bool TryGetGitDir(out string gitDir)
     {
-        var result = Environment.GetEnvironmentVariable(GitDir);
+        var value = Environment.GetEnvironmentVariable(GitDir);
+        if (value is null)
+        {
+            gitDir = string.Empty;
+            return false;
+        }
+        else
+        {
+            gitDir = value;
+            return true;
+        }
+    }
 
-        return result;
+    internal static string GetGitBinaryPath()
+    {
+        var installRoot = Environment.GetEnvironmentVariable(GitInstallRoot);
+        if (installRoot is null)
+        {
+            throw new InvalidOperationException($"Invalid environment variable {GitInstallRoot}");
+        }
+
+        var binDir = Path.Join(installRoot, "bin");
+        var gitBin = Path.Join(binDir, "git");
+
+        if (OperatingSystem.IsWindows())
+        {
+            gitBin += ".exe";
+        }
+
+        return gitBin;
     }
 }
 

@@ -45,5 +45,8 @@ namespace Lg2.Native
 
         [NativeTypeName("git_url_resolve_cb")]
         public delegate* unmanaged[Cdecl]<git_buf*, sbyte*, int, void*, int> resolve_url;
+
+        [NativeTypeName("int (*)(const char *, const git_oid *, const git_oid *, git_refspec *, void *) __attribute__((cdecl))")]
+        public delegate* unmanaged[Cdecl]<sbyte*, git_oid*, git_oid*, git_refspec*, void*, int> update_refs;
     }
 }

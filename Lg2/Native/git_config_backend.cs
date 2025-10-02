@@ -13,8 +13,8 @@ namespace Lg2.Native
         [NativeTypeName("int (*)(struct git_config_backend *, git_config_level_t, const git_repository *) __attribute__((cdecl))")]
         public delegate* unmanaged[Cdecl]<git_config_backend*, git_config_level_t, git_repository*, int> open;
 
-        [NativeTypeName("int (*)(struct git_config_backend *, const char *, git_config_entry **) __attribute__((cdecl))")]
-        public delegate* unmanaged[Cdecl]<git_config_backend*, sbyte*, git_config_entry**, int> get;
+        [NativeTypeName("int (*)(struct git_config_backend *, const char *, git_config_backend_entry **) __attribute__((cdecl))")]
+        public delegate* unmanaged[Cdecl]<git_config_backend*, sbyte*, git_config_backend_entry**, int> get;
 
         [NativeTypeName("int (*)(struct git_config_backend *, const char *, const char *) __attribute__((cdecl))")]
         public delegate* unmanaged[Cdecl]<git_config_backend*, sbyte*, sbyte*, int> set;

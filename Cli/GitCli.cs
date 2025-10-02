@@ -51,7 +51,9 @@ class GitCli(ILogger<GitCli> logger)
 
     internal void Run(params string[] args)
     {
-        var startInfo = new ProcessStartInfo("git") { Arguments = string.Join(" ", args) };
+        var cmdArgs = string.Join(" ", args);
+
+        var startInfo = new ProcessStartInfo("git") { Arguments = cmdArgs };
 
         logger.ZLogTrace($"Run git with {args.Length} arguments '{startInfo.Arguments}'");
 
@@ -63,11 +65,15 @@ class GitCli(ILogger<GitCli> logger)
         EnsureExitCode(process.ExitCode);
     }
 
+    internal void Execute(params string[] args) => Execute([], args);
+
     internal void Execute(List<string> inputLines, params string[] args)
     {
+        var cmdArgs = string.Join(" ", args);
+
         var startInfo = new ProcessStartInfo("git")
         {
-            Arguments = string.Join(" ", args),
+            Arguments = cmdArgs,
             CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardInput = true,
@@ -106,11 +112,6 @@ class GitCli(ILogger<GitCli> logger)
         EnsureExitCode(process.ExitCode);
     }
 
-    internal void Execute(params string[] args)
-    {
-        Execute([], args);
-    }
-
     internal void Execute(
         Action<StreamWriter>? inputProvider,
         Action<string>? dataReceiver,
@@ -118,9 +119,11 @@ class GitCli(ILogger<GitCli> logger)
         params string[] args
     )
     {
+        var cmdArgs = string.Join(" ", args);
+
         var startInfo = new ProcessStartInfo("git")
         {
-            Arguments = string.Join(" ", args),
+            Arguments = cmdArgs,
             CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardInput = true,
@@ -130,7 +133,7 @@ class GitCli(ILogger<GitCli> logger)
 
         SetEnvironmentAlternativeObjectDirectories(startInfo);
 
-        logger.ZLogTrace($"Executing git with {args.Length} arguments '{startInfo.Arguments}'");
+        logger.ZLogTrace($"Execute git with {args.Length} arguments '{startInfo.Arguments}'");
 
         List<string> result = [];
 
@@ -170,63 +173,6 @@ class GitCli(ILogger<GitCli> logger)
         process.WaitForExit();
 
         EnsureExitCode(process.ExitCode);
-    }
-
-    internal List<string> ExecuteForOutput2(List<string> inputLines, params string[] args)
-    {
-        var startInfo = new ProcessStartInfo("git")
-        {
-            Arguments = string.Join(" ", args),
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-
-        SetEnvironmentAlternativeObjectDirectories(startInfo);
-
-        logger.ZLogTrace($"Run git with {args.Length} arguments '{startInfo.Arguments}'");
-
-        List<string> result = [];
-
-        using var process = new Process() { StartInfo = startInfo };
-
-        void OutputDataReceiver(object sender, DataReceivedEventArgs args)
-        {
-            if (args.Data is not null)
-            {
-                result.Add(args.Data);
-            }
-        }
-
-        static void ErrorDataReceiver(object sender, DataReceivedEventArgs args)
-        {
-            if (args.Data is not null)
-            {
-                Console.Error.WriteLine(args.Data);
-            }
-        }
-
-        process.OutputDataReceived += OutputDataReceiver;
-        process.ErrorDataReceived += ErrorDataReceiver;
-
-        process.Start();
-
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-
-        foreach (var line in inputLines)
-        {
-            process.StandardInput.WriteLine(line);
-        }
-        process.StandardInput.Close();
-
-        process.WaitForExit();
-
-        EnsureExitCode(process.ExitCode);
-
-        return result;
     }
 
     internal List<string> ExecuteForOutput(List<string> inputLines, params string[] args)

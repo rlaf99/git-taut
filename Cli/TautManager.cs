@@ -656,10 +656,11 @@ class TautManager(
 
     void TautenFilesInDiff(Lg2Commit hostCommit, Lg2AttrOptions hostAttrOpts)
     {
+        using var tautRepoOdb = TautRepo.GetOdb();
+
         var hostParentCommit = hostCommit.GetParent(0);
         var hostParentTree = hostParentCommit.GetTree();
         var hostTree = hostCommit.GetTree();
-        var tautRepoOdb = TautRepo.GetOdb();
 
         Lg2DiffOptions diffOptions = new()
         {

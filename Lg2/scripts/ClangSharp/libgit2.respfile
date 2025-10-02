@@ -15,7 +15,7 @@ unix-types
 
 --libraryPath
 # libgit2 dll that comes with LibGit2Sharp.NativeBinaries 2.0.323
-git2-3f4182d 
+git2-0060d9c 
 
 
 --language
