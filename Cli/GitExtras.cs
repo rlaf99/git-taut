@@ -295,6 +295,67 @@ static partial class GitConfigExtra
 
         return config.FindTautRepoName(remoteName);
     }
+
+    internal static void PrintAllTaut(this Lg2Config config)
+    {
+        var tautPrefix = "taut";
+
+        string GetSubSection(string itemName)
+        {
+            var part1 = itemName[(tautPrefix.Length + 1)..];
+            var variableStart = part1.LastIndexOf('.');
+            var part2 = part1[..variableStart];
+
+            return part2;
+        }
+
+        HashSet<string> tautRepoNames = [];
+
+        {
+            var pattern = $@"{tautPrefix}\..*";
+            using var cfgIter = config.NewIterator(pattern);
+
+            while (cfgIter.Next(out var entry))
+            {
+                var name = entry.GetName();
+
+                var tautRepoName = GetSubSection(name);
+
+                tautRepoNames.Add(tautRepoName);
+            }
+        }
+
+        foreach (var tautRepoName in tautRepoNames)
+        {
+            Console.Write($"{tautRepoName}");
+
+            {
+                var pattern = $@"{tautPrefix}\.{tautRepoName}\.linkTo";
+                using var cfgIter = config.NewIterator(pattern);
+
+                while (cfgIter.Next(out var entry))
+                {
+                    var val = entry.GetValue();
+
+                    Console.Write($" @{val}");
+                }
+            }
+
+            {
+                var pattern = $@"{tautPrefix}\.{tautRepoName}\.remote";
+                using var cfgIter = config.NewIterator(pattern);
+
+                while (cfgIter.Next(out var entry))
+                {
+                    var val = entry.GetValue();
+
+                    Console.Write($" {val}");
+                }
+            }
+
+            Console.WriteLine();
+        }
+    }
 }
 
 static class GitAttrExtra

@@ -6,13 +6,13 @@ using ZLogger;
 
 namespace Git.Taut;
 
-class TautSetup(
+sealed class TautSetup(
     ILogger<TautSetup> logger,
     TautManager tautManager,
     TautMapping tautMapping,
     Aes256Cbc1 tautCipher,
     GitCli gitCli
-)
+) : IDisposable
 {
     const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
 
@@ -367,5 +367,20 @@ class TautSetup(
         }
 
         logger.ZLogTrace($"Exit {nameof(WrapUpBrandNew)}");
+    }
+
+    bool _disposed;
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+        _disposed = true;
+
+        tautMapping.Dispose();
+        CloseTautRepo();
+        CloseHostRepo();
     }
 }

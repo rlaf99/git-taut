@@ -26,20 +26,39 @@ internal class ExtraCommands
     [Command("--git")]
     public void Git(
         [FromServices] GitCli gitCli,
-        string? remoteName = "origin",
-        [Argument] params string[] args
+        [FromServices] TautSetup tautSetup,
+        [Argument] string[] args,
+        string remoteName = "origin"
     )
     {
-        using var tautRepo = LocateTautRepo();
+        var hostRepo = LocateHostRepo();
 
-        string[] gitArgs = ["--git-dir", tautRepo.GetPath(), .. args];
-        try
+        using var config = hostRepo.GetConfigSnapshot();
+        var tautRepoName = config.FindTautRepoName(remoteName);
+        tautSetup.GearUpExisting(hostRepo, remoteName, tautRepoName);
+
+        using (tautSetup)
         {
-            gitCli.Run(gitArgs);
+            string[] gitArgs = ["--git-dir", tautSetup.TautRepo.GetPath(), .. args];
+            try
+            {
+                gitCli.Run(gitArgs);
+            }
+            catch (Exception)
+            {
+                ConsoleApp.LogError($"Failed to run `{string.Join(" ", gitArgs)}`");
+            }
         }
-        catch (Exception)
+    }
+
+    [Command("--list")]
+    public void List()
+    {
+        var hostRepo = LocateHostRepo();
+
+        using (var config = hostRepo.GetConfigSnapshot())
         {
-            ConsoleApp.LogError($"Failed to run `{string.Join(" ", gitArgs)}`");
+            config.PrintAllTaut();
         }
     }
 
