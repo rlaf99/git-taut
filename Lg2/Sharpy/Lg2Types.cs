@@ -46,20 +46,25 @@ public sealed class Lg2Global : IDisposable
 {
     public static readonly string Version = Encoding.UTF8.GetString(LIBGIT2_VERSION);
 
-    bool initialized = false;
+    bool _initialized = false;
 
     public Lg2Global() { }
 
     public void Init()
     {
+        if (_initialized)
+        {
+            throw new InvalidOperationException($"Already initialized");
+        }
+        _initialized = true;
+
         var rc = git_libgit2_init();
         Lg2Exception.ThrowIfNotOk(rc);
-        initialized = true;
     }
 
     public void Dispose()
     {
-        if (initialized)
+        if (_initialized)
         {
             var rc = git_libgit2_shutdown();
             _ = rc; // ignore it for now

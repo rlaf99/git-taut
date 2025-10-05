@@ -6,7 +6,7 @@ namespace Git.Taut;
 static class GitRepoExtra
 {
     internal const string TautHomeName = "taut";
-    internal const string TautRepoNameTempPrefix = "__";
+    internal const string TautBaseNameTempPrefix = "__";
     internal const string ObjectsDir = "Objects";
     internal static readonly string ObjectsInfoDir = Path.Join(ObjectsDir, "info");
     internal static readonly string ObjectsInfoAlternatesFile = Path.Join(
@@ -46,9 +46,9 @@ static class GitRepoExtra
         return result;
     }
 
-    internal static string GetTautRepoPath(string repoPath, string tautRepoName)
+    internal static string GetTautBasePath(string repoPath, string tautBaseName)
     {
-        var result = Path.Join(repoPath, TautHomeName, tautRepoName);
+        var result = Path.Join(repoPath, TautHomeName, tautBaseName);
 
         result = UseForwardSlash(result);
 
@@ -66,11 +66,11 @@ static class GitRepoExtra
         return result;
     }
 
-    internal static string GetTautRepoPath(this Lg2Repository repo, string tautRepoName)
+    internal static string GetTautBasePath(this Lg2Repository repo, string tautBaseName)
     {
         repo.EnsureValid();
 
-        var result = Path.Join(repo.GetPath(), TautHomeName, tautRepoName);
+        var result = Path.Join(repo.GetPath(), TautHomeName, tautBaseName);
 
         result = UseForwardSlash(result);
 
@@ -171,26 +171,26 @@ static class GitRepoExtra
         return input[TautRemoteHelperPrefix.Length..];
     }
 
-    internal static string AddTautRepoNameTempPrefix(string input)
+    internal static string AddTautBaseNameTempPrefix(string input)
     {
-        if (input.StartsWith(TautRepoNameTempPrefix))
+        if (input.StartsWith(TautBaseNameTempPrefix))
         {
             throw new ArgumentException(
-                $"'{input}' is already prefixed with '{TautRepoNameTempPrefix}'"
+                $"'{input}' is already prefixed with '{TautBaseNameTempPrefix}'"
             );
         }
 
-        return TautRepoNameTempPrefix + input;
+        return TautBaseNameTempPrefix + input;
     }
 
-    internal static string RemoveTautRepoNameTempPrefix(string input, bool shouldExist = true)
+    internal static string RemoveTautBaseNameTempPrefix(string input, bool shouldExist = true)
     {
-        if (input.StartsWith(TautRepoNameTempPrefix) == false)
+        if (input.StartsWith(TautBaseNameTempPrefix) == false)
         {
             if (shouldExist)
             {
                 throw new ArgumentException(
-                    $"'{input}' is not prefixed with '{TautRepoNameTempPrefix}'"
+                    $"'{input}' is not prefixed with '{TautBaseNameTempPrefix}'"
                 );
             }
             else
@@ -199,7 +199,7 @@ static class GitRepoExtra
             }
         }
 
-        return input[TautRepoNameTempPrefix.Length..];
+        return input[TautBaseNameTempPrefix.Length..];
     }
 
     internal static string ConvertPathToTautCredentialUrl(string somePath)
@@ -228,19 +228,19 @@ static partial class GitConfigExtra
 {
     internal const string Fetch_Prune = "fetch.prune";
 
-    const string TautRepoNameMatchPattern = $@"{TautConfig.SectionName}\.(.*)\.remote";
+    const string TautBaseNameMatchPattern = $@"{TautConfig.SectionName}\.(.*)\.remote";
 
-    [GeneratedRegex(TautRepoNameMatchPattern)]
-    private static partial Regex TautRepoNameRegex();
+    [GeneratedRegex(TautBaseNameMatchPattern)]
+    private static partial Regex TautBaseNameRegex();
 
-    internal static bool TryFindTautRepoName(
+    internal static bool TryFindTautBaseName(
         this Lg2Config config,
         string remoteName,
         out string repoName
     )
     {
-        var cfgIter = config.NewIterator(TautRepoNameMatchPattern);
-        Regex regex = TautRepoNameRegex();
+        var cfgIter = config.NewIterator(TautBaseNameMatchPattern);
+        Regex regex = TautBaseNameRegex();
 
         repoName = string.Empty;
         bool found = false;
@@ -262,7 +262,7 @@ static partial class GitConfigExtra
         return found;
     }
 
-    internal static bool TryFindTautRepoName(
+    internal static bool TryFindTautBaseName(
         this Lg2Repository repo,
         string remoteName,
         out string repoName
@@ -272,12 +272,12 @@ static partial class GitConfigExtra
 
         using var config = repo.GetConfigSnapshot();
 
-        return config.TryFindTautRepoName(remoteName, out repoName);
+        return config.TryFindTautBaseName(remoteName, out repoName);
     }
 
-    internal static string FindTautRepoName(this Lg2Config config, string remoteName)
+    internal static string FindTautBaseName(this Lg2Config config, string remoteName)
     {
-        if (config.TryFindTautRepoName(remoteName, out var result))
+        if (config.TryFindTautBaseName(remoteName, out var result))
         {
             return result;
         }
@@ -287,13 +287,13 @@ static partial class GitConfigExtra
         );
     }
 
-    internal static string FindTautRepoName(this Lg2Repository repo, string remoteName)
+    internal static string FindTautBaseName(this Lg2Repository repo, string remoteName)
     {
         repo.EnsureValid();
 
         using var config = repo.GetConfigSnapshot();
 
-        return config.FindTautRepoName(remoteName);
+        return config.FindTautBaseName(remoteName);
     }
 
     internal static void PrintAllTaut(this Lg2Config config)
@@ -309,7 +309,7 @@ static partial class GitConfigExtra
             return part2;
         }
 
-        HashSet<string> tautRepoNames = [];
+        HashSet<string> tautBaseNames = [];
 
         {
             var pattern = $@"{tautPrefix}\..*";
@@ -319,18 +319,18 @@ static partial class GitConfigExtra
             {
                 var name = entry.GetName();
 
-                var tautRepoName = GetSubSection(name);
+                var tautBaseName = GetSubSection(name);
 
-                tautRepoNames.Add(tautRepoName);
+                tautBaseNames.Add(tautBaseName);
             }
         }
 
-        foreach (var tautRepoName in tautRepoNames)
+        foreach (var tautBaseName in tautBaseNames)
         {
-            Console.Write($"{tautRepoName}");
+            Console.Write($"{tautBaseName}");
 
             {
-                var pattern = $@"{tautPrefix}\.{tautRepoName}\.linkTo";
+                var pattern = $@"{tautPrefix}\.{tautBaseName}\.linkTo";
                 using var cfgIter = config.NewIterator(pattern);
 
                 while (cfgIter.Next(out var entry))
@@ -342,7 +342,7 @@ static partial class GitConfigExtra
             }
 
             {
-                var pattern = $@"{tautPrefix}\.{tautRepoName}\.remote";
+                var pattern = $@"{tautPrefix}\.{tautBaseName}\.remote";
                 using var cfgIter = config.NewIterator(pattern);
 
                 while (cfgIter.Next(out var entry))

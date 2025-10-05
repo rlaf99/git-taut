@@ -32,7 +32,7 @@ public sealed class HostBuilderFixture : IDisposable
 
         var builder = Host.CreateEmptyApplicationBuilder(settings);
 
-        ProgramSupport.AddServices(builder.Services);
+        ProgramSupport.AddServices(builder);
 
         if (configLogging is not null)
         {

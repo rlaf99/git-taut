@@ -64,7 +64,7 @@ sealed class TautSetup(
         Lg2Repository hostRepo,
         string remoteName,
         string remoteAddress,
-        string? tautRepoNameToLink = null
+        string? tautBaseNameToLink = null
     )
     {
         EnsureNotGearedUp();
@@ -72,7 +72,7 @@ sealed class TautSetup(
         _hostRepo = hostRepo;
         _remoteName = remoteName;
 
-        _tautCfg = new(Path.GetRandomFileName(), tautRepoNameToLink);
+        _tautCfg = new(Path.GetRandomFileName(), tautBaseNameToLink);
 
         EnsureHostOidType();
 
@@ -87,14 +87,14 @@ sealed class TautSetup(
         return result;
     }
 
-    internal void GearUpExisting(Lg2Repository hostRepo, string remoteName, string tautRepoName)
+    internal void GearUpExisting(Lg2Repository hostRepo, string remoteName, string tautBaseName)
     {
         EnsureNotGearedUp();
 
         _hostRepo = hostRepo;
         _remoteName = remoteName;
 
-        _tautCfg = new(tautRepoName);
+        _tautCfg = new(tautBaseName);
 
         EnsureHostOidType();
 
@@ -118,7 +118,7 @@ sealed class TautSetup(
     {
         TautCfg.RemoteNames.Add(RemoteName);
 
-        var tautRepoPath = HostRepo.GetTautRepoPath(TautCfg.TautRepoName);
+        var tautBasePath = HostRepo.GetTautBasePath(TautCfg.TautBaseName);
 
         List<string> argList =
         [
@@ -138,22 +138,22 @@ sealed class TautSetup(
                 TautCfg.LinkTo.Load(config);
             }
 
-            var tautRepoPathToLink = HostRepo.GetTautRepoPath(TautCfg.LinkTo.TautRepoName);
+            var tautBasePathToLink = HostRepo.GetTautBasePath(TautCfg.LinkTo.TautBaseName);
 
             argList.Add("--reference");
-            argList.Add(tautRepoPathToLink);
+            argList.Add(tautBasePathToLink);
 
-            logger.ZLogTrace($"{TautCfg.TautRepoName} is linked to {TautCfg.LinkTo.TautRepoName}");
+            logger.ZLogTrace($"{TautCfg.TautBaseName} is linked to {TautCfg.LinkTo.TautBaseName}");
         }
 
         argList.Add(remoteAddress);
-        argList.Add(tautRepoPath);
+        argList.Add(tautBasePath);
 
         gitCli.Execute(argList.ToArray());
 
-        logger.ZLogTrace($"Cloned '{RemoteName}' from '{remoteAddress}' into '{tautRepoPath}'");
+        logger.ZLogTrace($"Cloned '{RemoteName}' from '{remoteAddress}' into '{tautBasePath}'");
 
-        _tautRepo = Lg2Repository.New(tautRepoPath);
+        _tautRepo = Lg2Repository.New(tautBasePath);
 
         TautSetDescription();
         TautSetFetchConfig();
@@ -232,8 +232,8 @@ sealed class TautSetup(
             return;
         }
 
-        var tautRepoPath = HostRepo.GetTautRepoPath(TautCfg.TautRepoName);
-        var gitCredUrl = GitRepoExtra.ConvertPathToTautCredentialUrl(tautRepoPath);
+        var tautBasePath = HostRepo.GetTautBasePath(TautCfg.TautBaseName);
+        var gitCredUrl = GitRepoExtra.ConvertPathToTautCredentialUrl(tautBasePath);
 
         TautCfg.CredentialUrl = gitCredUrl;
 
@@ -270,18 +270,18 @@ sealed class TautSetup(
             TautCfg.Load(config);
         }
 
-        var tautRepoPath = HostRepo.GetTautRepoPath(TautCfg.TautRepoName);
-        _tautRepo = Lg2Repository.New(tautRepoPath);
+        var tautBasePath = HostRepo.GetTautBasePath(TautCfg.TautBaseName);
+        _tautRepo = Lg2Repository.New(tautBasePath);
 
         gitCli.Execute(
             "--git-dir",
-            tautRepoPath,
+            tautBasePath,
             "fetch",
             RemoteName,
             "+refs/heads/*:refs/heads/*"
         );
 
-        logger.ZLogTrace($"Fetched '{RemoteName}' for '{TautCfg.TautRepoName}'");
+        logger.ZLogTrace($"Fetched '{RemoteName}' for '{TautCfg.TautBaseName}'");
 
         var tautRemote = _tautRepo.LookupRemote(RemoteName);
         var tautRemoteUrl = tautRemote.GetUrl();
