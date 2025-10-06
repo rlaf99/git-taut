@@ -76,6 +76,7 @@ thirdparty/libgit2/include/git2/indexer.h
 thirdparty/libgit2/include/git2/credential.h
 thirdparty/libgit2/include/git2/attr.h
 thirdparty/libgit2/include/git2/status.h
+thirdparty/libgit2/include/git2/branch.h
 thirdparty/libgit2/include/git2/sys/credential.h
 thirdparty/libgit2/include/git2/sys/config.h
 

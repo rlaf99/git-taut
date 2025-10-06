@@ -936,6 +936,60 @@ namespace Lg2.Native
         public static extern int git_blob_dup(git_blob** @out, git_blob* source);
 
         [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_create(git_reference** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* branch_name, [NativeTypeName("const git_commit *")] git_commit* target, int force);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_create_from_annotated(git_reference** ref_out, git_repository* repo, [NativeTypeName("const char *")] sbyte* branch_name, [NativeTypeName("const git_annotated_commit *")] git_annotated_commit* target, int force);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_delete(git_reference* branch);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_iterator_new(git_branch_iterator** @out, git_repository* repo, git_branch_t list_flags);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_next(git_reference** @out, git_branch_t* out_type, git_branch_iterator* iter);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_branch_iterator_free(git_branch_iterator* iter);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_move(git_reference** @out, git_reference* branch, [NativeTypeName("const char *")] sbyte* new_branch_name, int force);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_lookup(git_reference** @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* branch_name, git_branch_t branch_type);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_name([NativeTypeName("const char **")] sbyte** @out, [NativeTypeName("const git_reference *")] git_reference* @ref);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_upstream(git_reference** @out, [NativeTypeName("const git_reference *")] git_reference* branch);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_set_upstream(git_reference* branch, [NativeTypeName("const char *")] sbyte* branch_name);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_upstream_name(git_buf* @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* refname);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_is_head([NativeTypeName("const git_reference *")] git_reference* branch);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_is_checked_out([NativeTypeName("const git_reference *")] git_reference* branch);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_remote_name(git_buf* @out, git_repository* repo, [NativeTypeName("const char *")] sbyte* refname);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_upstream_remote(git_buf* buf, git_repository* repo, [NativeTypeName("const char *")] sbyte* refname);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_upstream_merge(git_buf* buf, git_repository* repo, [NativeTypeName("const char *")] sbyte* refname);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_branch_name_is_valid(int* valid, [NativeTypeName("const char *")] sbyte* name);
+
+        [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_index_open(git_index** index_out, [NativeTypeName("const char *")] sbyte* index_path);
 
         [DllImport("git2-0060d9c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

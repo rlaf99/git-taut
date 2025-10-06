@@ -138,11 +138,11 @@ partial class GitRemoteHelper
     {
         using var hostConfig = HostRepo.GetConfigSnapshot();
 
-        var foundTautBaseName = hostConfig.TryFindTautBaseName(_remoteName, out var tautBaseName);
+        var foundTautCampName = hostConfig.TryFindTautCampName(_remoteName, out var tautCampName);
 
-        if (foundTautBaseName)
+        if (foundTautCampName)
         {
-            tautSetup.GearUpExisting(HostRepo, _remoteName, tautBaseName);
+            tautSetup.GearUpExisting(HostRepo, _remoteName, tautCampName);
 
             RegainThenListRefs();
         }
@@ -217,9 +217,9 @@ partial class GitRemoteHelper
     {
         using var hostConfig = HostRepo.GetConfigSnapshot();
 
-        var tautBaseName = hostConfig.FindTautBaseName(RemoteName);
+        var tautCampName = hostConfig.FindTautCampName(RemoteName);
 
-        tautSetup.GearUpExisting(HostRepo, RemoteName, tautBaseName);
+        tautSetup.GearUpExisting(HostRepo, RemoteName, tautCampName);
 
         tautManager.TautenHostRefs();
 
@@ -235,7 +235,7 @@ partial class GitRemoteHelper
         void HandleBatch()
         {
             using var config = HostRepo.GetConfigSnapshot();
-            var tautBaseName = config.FindTautBaseName(RemoteName);
+            var tautCampName = config.FindTautCampName(RemoteName);
 
             foreach (var pushCmd in _pushBatch)
             {
@@ -248,7 +248,7 @@ partial class GitRemoteHelper
                     throw new InvalidOperationException($"Invalid refspec {refSpecText}");
                 }
 
-                var tautBasePath = HostRepo.GetTautBasePath(tautBaseName);
+                var tautCampPath = HostRepo.GetTautCampPath(tautCampName);
 
                 var srcRefName = refSpec.GetSrc();
 
@@ -260,7 +260,7 @@ partial class GitRemoteHelper
                 {
                     gitCli.Execute(
                         "--git-dir",
-                        tautBasePath,
+                        tautCampPath,
                         "push",
                         "--dry-run",
                         _remoteName,
@@ -271,7 +271,7 @@ partial class GitRemoteHelper
                 {
                     gitCli.Execute(
                         "--git-dir",
-                        tautBasePath,
+                        tautCampPath,
                         "push",
                         _remoteName,
                         refSpecTextToUse

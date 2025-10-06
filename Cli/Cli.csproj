@@ -7,6 +7,7 @@
     <AssemblyName>git-taut</AssemblyName>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Version>0.0.1</Version>
   </PropertyGroup>
 
   <ItemGroup>

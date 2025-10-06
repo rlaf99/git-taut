@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.git_error_code;
@@ -6,7 +5,7 @@ using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
 
-public unsafe class Lg2Reference
+public unsafe partial class Lg2Reference
     : NativeSafePointer<Lg2Reference, git_reference>,
         INativeRelease<git_reference>
 {
@@ -56,7 +55,7 @@ public unsafe class Lg2Reference
     }
 }
 
-public static unsafe class Lg2ReferenceExtensions
+public static unsafe partial class Lg2ReferenceExtensions
 {
     public static Lg2RefType GetRefType(this Lg2Reference reference)
     {
@@ -109,36 +108,36 @@ public static unsafe class Lg2ReferenceExtensions
     {
         reference.EnsureValid();
 
-        var result = git_reference_is_branch(reference.Ptr);
+        var rc = git_reference_is_branch(reference.Ptr);
 
-        return result != 0;
+        return rc != 0;
     }
 
     public static bool IsRemote(this Lg2Reference reference)
     {
         reference.EnsureValid();
 
-        var result = git_reference_is_remote(reference.Ptr);
+        var rc = git_reference_is_remote(reference.Ptr);
 
-        return result != 0;
+        return rc != 0;
     }
 
     public static bool IsTag(this Lg2Reference reference)
     {
         reference.EnsureValid();
 
-        var result = git_reference_is_tag(reference.Ptr);
+        var rc = git_reference_is_tag(reference.Ptr);
 
-        return result != 0;
+        return rc != 0;
     }
 
     public static bool IsNote(this Lg2Reference reference)
     {
         reference.EnsureValid();
 
-        var result = git_reference_is_note(reference.Ptr);
+        var rc = git_reference_is_note(reference.Ptr);
 
-        return result != 0;
+        return rc != 0;
     }
 }
 

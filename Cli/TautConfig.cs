@@ -7,7 +7,7 @@ class TautConfig
 {
     internal const string SectionName = "taut";
 
-    internal string TautBaseName { get; }
+    internal string CampName { get; } // Sub-section name
 
     internal TautConfig? LinkTo { get; }
 
@@ -19,25 +19,25 @@ class TautConfig
 
     internal List<string> RemoteNames { get; } = [];
 
-    internal TautConfig(string tautBaseName, string? tautBaseNameToLink = null)
+    internal TautConfig(string tautCampName, string? tautCampNameToLink = null)
     {
-        ArgumentException.ThrowIfNullOrEmpty(tautBaseName);
+        ArgumentException.ThrowIfNullOrEmpty(tautCampName);
 
-        TautBaseName = tautBaseName;
+        CampName = tautCampName;
 
-        if (tautBaseNameToLink is not null)
+        if (tautCampNameToLink is not null)
         {
-            LinkTo = new(tautBaseNameToLink, null);
+            LinkTo = new(tautCampNameToLink, null);
         }
     }
 
-    string FormatTautItemName(string itemName) => $"taut.{TautBaseName}.{itemName}";
+    string FormatTautItemName(string itemName) => $"taut.{CampName}.{itemName}";
 
     internal void EnsureValues()
     {
-        if (string.IsNullOrEmpty(TautBaseName))
+        if (string.IsNullOrEmpty(CampName))
         {
-            throw new InvalidOperationException($"{nameof(TautBaseName)} is empty");
+            throw new InvalidOperationException($"{nameof(CampName)} is empty");
         }
 
         if (string.IsNullOrEmpty(CredentialUrl))
@@ -68,7 +68,7 @@ class TautConfig
             throw new InvalidOperationException($"{nameof(LinkTo)} is null");
         }
 
-        config.SetString(FormatTautItemName(nameof(LinkTo)), LinkTo.TautBaseName);
+        config.SetString(FormatTautItemName(nameof(LinkTo)), LinkTo.CampName);
     }
 
     internal void SaveCredentialPair(Lg2Config config)
@@ -130,25 +130,13 @@ class TautConfig
         CredentialKeyTrait = config.GetString(FormatTautItemName(nameof(CredentialKeyTrait)));
     }
 
-    internal static bool TryLoadByTautBaseName(
-        Lg2Repository repo,
-        string tautBaseName,
-        [NotNullWhen(true)] out TautConfig? result
-    )
-    {
-        using (var config = repo.GetConfigSnapshot())
-        {
-            return TryLoadByTautBaseName(config, tautBaseName, out result);
-        }
-    }
-
-    internal static bool TryLoadByTautBaseName(
+    internal static bool TryLoadByTautCampName(
         Lg2Config config,
-        string tautBaseName,
+        string tautCampName,
         [NotNullWhen(true)] out TautConfig? result
     )
     {
-        TautConfig tautConfig = new(tautBaseName);
+        TautConfig tautConfig = new(tautCampName);
         try
         {
             tautConfig.Load(config);
@@ -166,31 +154,19 @@ class TautConfig
     }
 
     internal static bool TryLoadByRemoteName(
-        Lg2Repository repo,
-        string remoteName,
-        [NotNullWhen(true)] out TautConfig? result
-    )
-    {
-        using (var config = repo.GetConfigSnapshot())
-        {
-            return TryLoadByRemoteName(config, remoteName, out result);
-        }
-    }
-
-    internal static bool TryLoadByRemoteName(
         Lg2Config config,
         string remoteName,
         [NotNullWhen(true)] out TautConfig? result
     )
     {
-        if (config.TryFindTautBaseName(remoteName, out var tautBaseName) == false)
+        if (config.TryFindTautCampName(remoteName, out var tautCampName) == false)
         {
             result = null;
 
             return false;
         }
 
-        TautConfig tautConfig = new(tautBaseName);
+        TautConfig tautConfig = new(tautCampName);
         try
         {
             tautConfig.Load(config);

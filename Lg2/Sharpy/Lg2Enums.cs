@@ -289,3 +289,10 @@ public enum Lg2IndexStage
     LG2_INDEX_STAGE_OURS = git_index_stage_t.GIT_INDEX_STAGE_OURS,
     LG2_INDEX_STAGE_THEIRS = git_index_stage_t.GIT_INDEX_STAGE_THEIRS,
 }
+
+public enum Lg2BranchType
+{
+    LG2_BRANCH_LOCAL = git_branch_t.GIT_BRANCH_LOCAL,
+    LG2_BRANCH_REMOTE = git_branch_t.GIT_BRANCH_REMOTE,
+    LG2_BRANCH_ALL = git_branch_t.GIT_BRANCH_ALL,
+}
