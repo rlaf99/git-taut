@@ -1,0 +1,5 @@
+<Project>
+    <Target Name="CopyLibgit2" AfterTargets="Build">
+        <Copy SourceFiles="$(MSBuildThisFileDirectory)install\$(Configuration)\bin\libgit2.dll" DestinationFolder="$(OutDir)"></Copy>
+    </Target>
+</Project>

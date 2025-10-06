@@ -1,6 +1,6 @@
 ﻿using Lg2.Sharpy;
 using Microsoft.Extensions.Hosting;
-using ProgramSupport;
+using ProgramExtras;
 
 using var lg2Global = new Lg2Global();
 
@@ -17,10 +17,10 @@ catch (Exception ex)
 HostApplicationBuilderSettings hostBuilderSettings = new();
 var hostBuilder = Host.CreateEmptyApplicationBuilder(hostBuilderSettings);
 
-hostBuilder.AddConfiguration();
-hostBuilder.AddServices();
-hostBuilder.AddCommandActions();
-hostBuilder.AddLogging();
+hostBuilder.AddGitTautConfiguration();
+hostBuilder.AddGitTautServices();
+hostBuilder.AddGitTautCommandActions();
+hostBuilder.AddGitTautLogging();
 
 var host = hostBuilder.Build();
 

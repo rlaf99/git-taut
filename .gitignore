@@ -1,3 +1,7 @@
+
+thirdparty/libgit2build/libgit2
+thirdparty/libgit2build/build
+thirdparty/libgit2build/install
 .vscode/
 .scratch/
 

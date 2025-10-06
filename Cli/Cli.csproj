@@ -27,7 +27,10 @@
     <ProjectReference Include="..\Lg2\Lg2.csproj" />
   </ItemGroup>
 
-    <ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="$(MSBuildProjectName).Tests" />
   </ItemGroup>
+
+  <Import Project="../thirdparty/libgit2build/libgit2.targets"></Import>
+
 </Project>

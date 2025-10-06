@@ -1,0 +1,56 @@
+diff --git a/include/git2/apply.h b/include/git2/apply.h
+index 7ab939d..b686bf6 100644
+--- a/include/git2/apply.h
++++ b/include/git2/apply.h
+@@ -11,6 +11,7 @@
+ #include "types.h"
+ #include "oid.h"
+ #include "diff.h"
++#include "patch.h"
+ 
+ /**
+  * @file git2/apply.h
+@@ -181,6 +182,15 @@ GIT_EXTERN(int) git_apply(
+ 	git_apply_location_t location,
+ 	const git_apply_options *options);
+ 
++ GIT_EXTERN(int) git_apply_patch(
++	git_buf *out,
++	char **filename,
++	unsigned int *mode,
++	const char *source,
++	size_t source_len,
++	git_patch *patch,
++	const git_apply_options *opts);
++
+ /** @} */
+ GIT_END_DECL
+ #endif
+diff --git a/src/libgit2/apply.c b/src/libgit2/apply.c
+index 07e502d..b260814 100644
+--- a/src/libgit2/apply.c
++++ b/src/libgit2/apply.c
+@@ -22,6 +22,7 @@
+ #include "repository.h"
+ #include "hashmap_str.h"
+ #include "apply.h"
++#include "buf.h"
+ 
+ typedef struct {
+ 	/* The lines that we allocate ourself are allocated out of the pool.
+@@ -894,3 +895,15 @@ done:
+ 
+ 	return error;
+ }
++
++ int git_apply_patch(
++	git_buf *out,
++	char **filename,
++	unsigned int *mode,
++	const char *source,
++	size_t source_len,
++	git_patch *patch,
++	const git_apply_options *opts)
++{
++	GIT_BUF_WRAP_PRIVATE(out, git_apply__patch, filename, mode, source, source_len, patch, opts);
++}

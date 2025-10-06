@@ -44,4 +44,5 @@
     <ProjectReference Include="..\Cli\Cli.csproj" />
   </ItemGroup>
 
+  <Import Project="../thirdparty/libgit2build/libgit2.targets"></Import>
 </Project>

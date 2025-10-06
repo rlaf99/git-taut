@@ -9,25 +9,25 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 using ZLogger;
 
-namespace ProgramSupport;
+namespace ProgramExtras;
 
 static class HostApplicationBuilderExtensions
 {
-    internal static void AddCommandActions(this HostApplicationBuilder hostBuilder)
+    internal static void AddGitTautCommandActions(this HostApplicationBuilder hostBuilder)
     {
         hostBuilder.Services.AddSingleton<GitRemoteHelper>();
         hostBuilder.Services.AddSingleton<CampCommandActions>();
         hostBuilder.Services.AddSingleton<OtherCommandActions>();
     }
 
-    internal static void AddConfiguration(this HostApplicationBuilder hostBuilder)
+    internal static void AddGitTautConfiguration(this HostApplicationBuilder hostBuilder)
     {
         var config = hostBuilder.Configuration;
 
         config.AddEnvironmentVariables();
     }
 
-    internal static void AddServices(this HostApplicationBuilder hostBuilder)
+    internal static void AddGitTautServices(this HostApplicationBuilder hostBuilder)
     {
         var services = hostBuilder.Services;
 
@@ -39,7 +39,7 @@ static class HostApplicationBuilderExtensions
         services.AddSingleton<RecyclableMemoryStreamManager>();
     }
 
-    internal static void AddLogging(this HostApplicationBuilder hostBuilder)
+    internal static void AddGitTautLogging(this HostApplicationBuilder hostBuilder)
     {
         var logging = hostBuilder.Logging;
         var config = hostBuilder.Configuration;
@@ -280,7 +280,7 @@ class CampCommandActions(
     {
         var hostRepo = LocateHostRepo();
         var tautCampName = ResolveTargetOption(parseResult, hostRepo, followHead: false);
-        
+
         throw new NotImplementedException();
         // using (var tautRepo = LocateTautRepo())
         // {

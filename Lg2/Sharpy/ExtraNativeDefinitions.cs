@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace Lg2.Native
 {
+#if false
     public static unsafe partial class LibGit2Exports
     {
         [DllImport(
@@ -19,6 +20,7 @@ namespace Lg2.Native
             [NativeTypeName("const git_apply_options *")] git_apply_options* opts
         );
     }
+#endif
 
     /// <summary>
     /// C# does not support octal literal syntax, thus the values of git_filemode_t are specified as decimal here.
