@@ -7,7 +7,8 @@ class TautConfig
 {
     internal const string SectionName = "taut";
 
-    internal string CampName { get; } // Sub-section name
+    // used as sub-section name
+    internal string CampName { get; }
 
     internal TautConfig? LinkTo { get; }
 
@@ -17,7 +18,9 @@ class TautConfig
 
     internal string CredentialKeyTrait { get; set; } = string.Empty;
 
-    internal List<string> RemoteNames { get; } = [];
+    internal List<string> RemoteNames { get; private set; } = [];
+
+    internal List<string> ReverseLinks { get; private set; } = [];
 
     internal TautConfig(string tautCampName, string? tautCampNameToLink = null)
     {
@@ -128,6 +131,63 @@ class TautConfig
         }
 
         CredentialKeyTrait = config.GetString(FormatTautItemName(nameof(CredentialKeyTrait)));
+    }
+
+    internal void RemoveRemoteFromConfig(Lg2Config config, string remoteName)
+    {
+        if (RemoteNames.Remove(remoteName) == false)
+        {
+            throw new ArgumentException($"{remoteName} not found", nameof(remoteName));
+        }
+
+        throw new NotImplementedException();
+    }
+
+    internal void ResolveRemotes(Lg2Config config)
+    {
+        var tautPrefix = "taut";
+
+        {
+            var pattern = $@"{tautPrefix}\.{CampName}\.remote";
+            using var cfgIter = config.NewIterator(pattern);
+
+            while (cfgIter.Next(out var entry))
+            {
+                var val = entry.GetValue();
+
+                RemoteNames.Add(val);
+            }
+        }
+    }
+
+    internal void ResolveReverseLinks(Lg2Config config)
+    {
+        var tautPrefix = "taut";
+
+        string ExtractSubSection(string itemName)
+        {
+            var part1 = itemName[(tautPrefix.Length + 1)..];
+            var variableStart = part1.LastIndexOf('.');
+            var part2 = part1[..variableStart];
+
+            return part2;
+        }
+
+        {
+            var pattern = $@"{tautPrefix}\.(.*)\.linkto";
+            using var cfgIter = config.NewIterator(pattern);
+
+            while (cfgIter.Next(out var entry))
+            {
+                var val = entry.GetValue();
+                if (val == CampName)
+                {
+                    var name = entry.GetName();
+                    var tautCampName = ExtractSubSection(name);
+                    ReverseLinks.Add(tautCampName);
+                }
+            }
+        }
     }
 
     internal static bool TryLoadByTautCampName(

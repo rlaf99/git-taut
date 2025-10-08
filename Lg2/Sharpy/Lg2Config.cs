@@ -234,6 +234,27 @@ public static unsafe class Lg2ConfigExtensions
 
         return new(ptr);
     }
+
+    public static void DeleteEntry(this Lg2Config config, string name)
+    {
+        config.EnsureValid();
+
+        using var u8Name = new Lg2Utf8String(name);
+
+        var rc = git_config_delete_entry(config.Ptr, u8Name.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+    }
+
+    public static void DeleteMultiVar(this Lg2Config config, string name, string regexp)
+    {
+        config.EnsureValid();
+
+        using var u8Name = new Lg2Utf8String(name);
+        using var u8Regexp = new Lg2Utf8String(regexp);
+
+        var rc = git_config_delete_multivar(config.Ptr, u8Name.Ptr, u8Regexp.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+    }
 }
 
 public static unsafe class Lg2ConfigIteratorExtensions

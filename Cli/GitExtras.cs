@@ -296,11 +296,11 @@ static partial class GitConfigExtra
         return config.FindTautCampName(remoteName);
     }
 
-    internal static void PrintAllTaut(this Lg2Config config)
+    internal static void PrintTautCamps(this Lg2Config config, string? targetCampName = null)
     {
         var tautPrefix = "taut";
 
-        string GetSubSection(string itemName)
+        string ExtractSubSection(string itemName)
         {
             var part1 = itemName[(tautPrefix.Length + 1)..];
             var variableStart = part1.LastIndexOf('.');
@@ -319,9 +319,12 @@ static partial class GitConfigExtra
             {
                 var name = entry.GetName();
 
-                var tautCampName = GetSubSection(name);
+                var tautCampName = ExtractSubSection(name);
 
-                tautCampNames.Add(tautCampName);
+                if (targetCampName is null || targetCampName == tautCampName)
+                {
+                    tautCampNames.Add(tautCampName);
+                }
             }
         }
 

@@ -1,5 +1,13 @@
 <Project>
     <Target Name="CopyLibgit2" AfterTargets="Build">
-        <Copy SourceFiles="$(MSBuildThisFileDirectory)install\$(Configuration)\bin\libgit2.dll" DestinationFolder="$(OutDir)"></Copy>
+        <Copy
+            SourceFiles="$(MSBuildThisFileDirectory)install\$(Configuration)\bin\git2.dll"
+            DestinationFolder="$(OutDir)"
+            Condition="'$([MSBuild]::IsOsPlatform(Windows))'" />
+        <Copy
+            SourceFiles="$(MSBuildThisFileDirectory)install\$(Configuration)\lib\libgit2.dylib"
+            DestinationFolder=" $(OutDir)"
+            Condition="'$([MSBuild]::IsOsPlatform(OSX))' And '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)'=='Arm64'"
+        />
     </Target>
 </Project>

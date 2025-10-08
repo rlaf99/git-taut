@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Configuration;
@@ -99,9 +100,9 @@ class CampCommandActions(
 
         var hostRepo = LocateHostRepo();
 
-        var tautCampName = ResolveTargetOption(parseResult, hostRepo, followHead: true);
+        var result = ResolveTargetOption(parseResult, hostRepo, followHead: true);
 
-        tautSetup.GearUpExisting(hostRepo, remoteName: null, tautCampName);
+        tautSetup.GearUpExisting(hostRepo, remoteName: null, result.TautCampName);
 
         using (tautSetup)
         {
@@ -121,7 +122,24 @@ class CampCommandActions(
     {
         var remoteName = parseResult.GetRequiredValue(ProgramCommandLine.RemoteNameArgument);
         var remoteAddress = parseResult.GetRequiredValue(ProgramCommandLine.RemoteAddressArgument);
-        var linkTo = parseResult.GetValue(ProgramCommandLine.CampTargetOption);
+
+        var linkExisting = parseResult.GetValue(ProgramCommandLine.LinkExistingOption);
+
+        var hostRepo = LocateHostRepo();
+
+        string? tautCampName = null;
+        if (parseResult.GetValue(ProgramCommandLine.CampTargetOption) is not null)
+        {
+            var result = ResolveTargetOption(parseResult, hostRepo, followHead: false);
+            tautCampName = result.TautCampName;
+        }
+
+        if (linkExisting && tautCampName is null)
+        {
+            throw new InvalidOperationException(
+                $"{ProgramCommandLine.LinkExistingOption} is used, but no {ProgramCommandLine.CampTargetOption.HelpName} is speficied"
+            );
+        }
 
         string remoteUrl;
 
@@ -154,36 +172,13 @@ class CampCommandActions(
             throw new OperationCanceledException();
         }
 
-        var hostRepo = LocateHostRepo();
-
         if (hostRepo.TryLookupRemote(remoteName, out _))
         {
             Console.Error.WriteLine($"Remote '{remoteName}' already exists in the host repo.");
             throw new OperationCanceledException();
         }
 
-        string? tautCampNameToLink = null;
-        if (linkTo is not null)
-        {
-            using var config = hostRepo.GetConfigSnapshot();
-            if (
-                TautConfig.TryLoadByTautCampName(config, linkTo, out TautConfig? tautConfig)
-                || TautConfig.TryLoadByRemoteName(config, linkTo, out tautConfig)
-            )
-            {
-                tautCampNameToLink = tautConfig.CampName;
-            }
-            else
-            {
-                Console.Error.WriteLine(
-                    $"Cannot load {nameof(TautConfig)} with '{linkTo}' either by taut repository name or by remote name"
-                );
-
-                throw new OperationCanceledException();
-            }
-        }
-
-        tautSetup.GearUpBrandNew(hostRepo, remoteName, remoteUrl, tautCampNameToLink);
+        tautSetup.GearUpBrandNew(hostRepo, remoteName, remoteUrl, tautCampName);
 
         tautManager.RegainHostRefs();
 
@@ -194,15 +189,58 @@ class CampCommandActions(
     {
         var hostRepo = LocateHostRepo();
 
+        string? tautCampName = null;
+
+        if (parseResult.GetValue(ProgramCommandLine.CampTargetOption) is not null)
+        {
+            var result = ResolveTargetOption(parseResult, hostRepo, followHead: false);
+            tautCampName = result.TautCampName;
+        }
+
         using (var config = hostRepo.GetConfigSnapshot())
         {
-            config.PrintAllTaut();
+            config.PrintTautCamps(tautCampName);
         }
     }
 
     internal void Remove(ParseResult parseResult)
     {
-        throw new NotImplementedException();
+        var hostRepo = LocateHostRepo();
+
+        var resolvedTarget = ResolveTargetOption(parseResult, hostRepo, followHead: false);
+        var tautCampName = resolvedTarget.TautCampName;
+
+        using (var config = hostRepo.GetConfig())
+        {
+            if (TautConfig.TryLoadByTautCampName(config, tautCampName, out var tautCfg) == false)
+            {
+                throw new InvalidOperationException($"Failed to load '{tautCampName}");
+            }
+
+            tautCfg.ResolveReverseLinks(config);
+
+            if (tautCfg.ReverseLinks.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Taut camp '{tautCampName}' is linked by others (e.g., '{tautCfg.ReverseLinks[0]})'"
+                );
+            }
+
+            tautCfg.ResolveRemotes(config);
+
+            if (resolvedTarget.TargetIsRemote)
+            {
+                tautCfg.RemoveRemoteFromConfig(config, resolvedTarget.RemoteName!);
+            }
+
+            // if (resolvedTarget.TargetIsRemote && tautCfg)
+
+            throw new NotImplementedException();
+
+            // remove config
+            // remove repo
+            // remove remote
+        }
     }
 
     internal void Reveal(ParseResult parseResult)
@@ -211,9 +249,9 @@ class CampCommandActions(
 
         var hostRepo = LocateHostRepo();
 
-        var tautCampName = ResolveTargetOption(parseResult, hostRepo, followHead: true);
+        var result = ResolveTargetOption(parseResult, hostRepo, followHead: true);
 
-        tautSetup.GearUpExisting(hostRepo, null, tautCampName);
+        tautSetup.GearUpExisting(hostRepo, null, result.TautCampName);
 
         if (File.Exists(path))
         {
@@ -290,38 +328,67 @@ class CampCommandActions(
         // tautManager.RebuildKvStore();
     }
 
-    string ResolveTargetOption(ParseResult parseResult, Lg2Repository hostRepo, bool followHead)
+    record ResolveTargetOptionResult(
+        string TautCampName,
+        string? RemoteName,
+        bool TargetIsRemote,
+        bool CampIsFromHead
+    );
+
+    ResolveTargetOptionResult ResolveTargetOption(
+        ParseResult parseResult,
+        Lg2Repository hostRepo,
+        bool followHead
+    )
     {
         var targetName = parseResult.GetValue(ProgramCommandLine.CampTargetOption);
         if (targetName is not null)
         {
-            if (TryResolveTargetOptionFromConfig(hostRepo, targetName, out var tautCampName))
+            using var config = hostRepo.GetConfigSnapshot();
+
+            TautConfig? tautConfig;
+
+            if (TautConfig.TryLoadByTautCampName(config, targetName, out tautConfig))
             {
-                return tautCampName;
-            }
-            else
-            {
-                throw new OperationCanceledException(
-                    $"Invalid value '{targetName}' specified by {ProgramCommandLine.CampTargetOption.Name}"
+                return new(
+                    TautCampName: tautConfig.CampName,
+                    RemoteName: null,
+                    TargetIsRemote: false,
+                    CampIsFromHead: false
                 );
             }
+
+            if (TautConfig.TryLoadByRemoteName(config, targetName, out tautConfig))
+            {
+                return new(
+                    TautCampName: tautConfig.CampName,
+                    RemoteName: targetName,
+                    TargetIsRemote: true,
+                    CampIsFromHead: false
+                );
+            }
+
+            throw new InvalidOperationException(
+                $"Invalid value '{targetName}' specified by {ProgramCommandLine.CampTargetOption.Name}"
+            );
         }
         else if (followHead)
         {
             if (TryResolveTautCampNameFromHead(hostRepo, out var tautCampName))
             {
-                return tautCampName;
-            }
-            else
-            {
-                throw new OperationCanceledException(
-                    $"Cannot resolve taut camp name specified by HEAD"
+                return new(
+                    TautCampName: tautCampName,
+                    RemoteName: null,
+                    TargetIsRemote: false,
+                    CampIsFromHead: true
                 );
             }
+
+            throw new InvalidOperationException($"Cannot resolve taut camp name specified by HEAD");
         }
         else
         {
-            throw new OperationCanceledException(
+            throw new InvalidOperationException(
                 $"{ProgramCommandLine.CampTargetOption.Name} is not specified"
             );
         }
@@ -354,31 +421,6 @@ class CampCommandActions(
 
         tautCampName = null;
         return false;
-    }
-
-    bool TryResolveTargetOptionFromConfig(
-        Lg2Repository hostRepo,
-        string targetName,
-        [NotNullWhen(true)] out string? tautCampName
-    )
-    {
-        using var config = hostRepo.GetConfigSnapshot();
-
-        if (
-            TautConfig.TryLoadByTautCampName(config, targetName, out var tautConfig)
-            || TautConfig.TryLoadByRemoteName(config, targetName, out tautConfig)
-        )
-        {
-            tautCampName = tautConfig.CampName;
-
-            return true;
-        }
-        else
-        {
-            tautCampName = null;
-
-            return false;
-        }
     }
 
     Lg2Repository LocateHostRepo()
