@@ -138,11 +138,15 @@ partial class GitRemoteHelper
     {
         using var hostConfig = HostRepo.GetConfigSnapshot();
 
-        var foundTautCampName = hostConfig.TryFindTautCampName(_remoteName, out var tautCampName);
+        var foundSiteName = TautSiteConfig.TryFindSiteName(
+            hostConfig,
+            _remoteName,
+            out var tautSiteName
+        );
 
-        if (foundTautCampName)
+        if (foundSiteName)
         {
-            tautSetup.GearUpExisting(HostRepo, _remoteName, tautCampName);
+            tautSetup.GearUpExisting(HostRepo, _remoteName, tautSiteName);
 
             RegainThenListRefs();
         }
@@ -217,9 +221,9 @@ partial class GitRemoteHelper
     {
         using var hostConfig = HostRepo.GetConfigSnapshot();
 
-        var tautCampName = hostConfig.FindTautCampName(RemoteName);
+        var tautSiteName = TautSiteConfig.FindSiteName(hostConfig, RemoteName);
 
-        tautSetup.GearUpExisting(HostRepo, RemoteName, tautCampName);
+        tautSetup.GearUpExisting(HostRepo, RemoteName, tautSiteName);
 
         tautManager.TautenHostRefs();
 
@@ -235,7 +239,7 @@ partial class GitRemoteHelper
         void HandleBatch()
         {
             using var config = HostRepo.GetConfigSnapshot();
-            var tautCampName = config.FindTautCampName(RemoteName);
+            var tautSiteName = TautSiteConfig.FindSiteName(config, RemoteName);
 
             foreach (var pushCmd in _pushBatch)
             {
@@ -248,7 +252,7 @@ partial class GitRemoteHelper
                     throw new InvalidOperationException($"Invalid refspec {refSpecText}");
                 }
 
-                var tautCampPath = HostRepo.GetTautCampPath(tautCampName);
+                var tautSitePath = HostRepo.GetTautSitePath(tautSiteName);
 
                 var srcRefName = refSpec.GetSrc();
 
@@ -260,7 +264,7 @@ partial class GitRemoteHelper
                 {
                     gitCli.Execute(
                         "--git-dir",
-                        tautCampPath,
+                        tautSitePath,
                         "push",
                         "--dry-run",
                         _remoteName,
@@ -271,7 +275,7 @@ partial class GitRemoteHelper
                 {
                     gitCli.Execute(
                         "--git-dir",
-                        tautCampPath,
+                        tautSitePath,
                         "push",
                         _remoteName,
                         refSpecTextToUse
@@ -400,7 +404,7 @@ partial class GitRemoteHelper
 
         logger.ZLogTrace($"Host repo locates at '{gitDir}'");
 
-        _tautHomePath = GitRepoExtra.GetTautHomePath(gitDir);
+        _tautHomePath = GitRepoExtras.GetTautHomePath(gitDir);
 
         Directory.CreateDirectory(_tautHomePath);
     }

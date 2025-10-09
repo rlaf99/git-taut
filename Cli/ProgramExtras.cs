@@ -102,7 +102,7 @@ class CampCommandActions(
 
         var result = ResolveTargetOption(parseResult, hostRepo, followHead: true);
 
-        tautSetup.GearUpExisting(hostRepo, remoteName: null, result.TautCampName);
+        tautSetup.GearUpExisting(hostRepo, remoteName: null, result.TautSiteName);
 
         using (tautSetup)
         {
@@ -127,14 +127,14 @@ class CampCommandActions(
 
         var hostRepo = LocateHostRepo();
 
-        string? tautCampName = null;
+        string? tautSiteName = null;
         if (parseResult.GetValue(ProgramCommandLine.CampTargetOption) is not null)
         {
             var result = ResolveTargetOption(parseResult, hostRepo, followHead: false);
-            tautCampName = result.TautCampName;
+            tautSiteName = result.TautSiteName;
         }
 
-        if (linkExisting && tautCampName is null)
+        if (linkExisting && tautSiteName is null)
         {
             throw new InvalidOperationException(
                 $"{ProgramCommandLine.LinkExistingOption} is used, but no {ProgramCommandLine.CampTargetOption.HelpName} is speficied"
@@ -178,7 +178,7 @@ class CampCommandActions(
             throw new OperationCanceledException();
         }
 
-        tautSetup.GearUpBrandNew(hostRepo, remoteName, remoteUrl, tautCampName);
+        tautSetup.GearUpBrandNew(hostRepo, remoteName, remoteUrl, tautSiteName);
 
         tautManager.RegainHostRefs();
 
@@ -189,17 +189,17 @@ class CampCommandActions(
     {
         var hostRepo = LocateHostRepo();
 
-        string? tautCampName = null;
+        string? tautSiteName = null;
 
         if (parseResult.GetValue(ProgramCommandLine.CampTargetOption) is not null)
         {
             var result = ResolveTargetOption(parseResult, hostRepo, followHead: false);
-            tautCampName = result.TautCampName;
+            tautSiteName = result.TautSiteName;
         }
 
         using (var config = hostRepo.GetConfigSnapshot())
         {
-            config.PrintTautCamps(tautCampName);
+            TautSiteConfig.PrintCamps(config, tautSiteName);
         }
     }
 
@@ -208,13 +208,13 @@ class CampCommandActions(
         var hostRepo = LocateHostRepo();
 
         var resolvedTarget = ResolveTargetOption(parseResult, hostRepo, followHead: false);
-        var tautCampName = resolvedTarget.TautCampName;
+        var tautSiteName = resolvedTarget.TautSiteName;
 
         using (var config = hostRepo.GetConfig())
         {
-            if (TautConfig.TryLoadByTautCampName(config, tautCampName, out var tautCfg) == false)
+            if (TautSiteConfig.TryLoadBySiteName(config, tautSiteName, out var tautCfg) == false)
             {
-                throw new InvalidOperationException($"Failed to load '{tautCampName}");
+                throw new InvalidOperationException($"Failed to load '{tautSiteName}");
             }
 
             tautCfg.ResolveReverseLinks(config);
@@ -222,7 +222,7 @@ class CampCommandActions(
             if (tautCfg.ReverseLinks.Count > 0)
             {
                 throw new InvalidOperationException(
-                    $"Taut camp '{tautCampName}' is linked by others (e.g., '{tautCfg.ReverseLinks[0]})'"
+                    $"Taut site '{tautSiteName}' is linked by others (e.g., '{tautCfg.ReverseLinks[0]})'"
                 );
             }
 
@@ -233,13 +233,18 @@ class CampCommandActions(
                 tautCfg.RemoveRemoteFromConfig(config, resolvedTarget.RemoteName!);
             }
 
-            // if (resolvedTarget.TargetIsRemote && tautCfg)
+            if (tautCfg.RemoteNames.Count != 0)
+            {
+                throw new InvalidOperationException(
+                    $"There are other remotes using taut site '{tautCfg.SiteName}'"
+                );
+            }
 
-            throw new NotImplementedException();
+            tautCfg.RemoveAllFromConfig(config);
 
-            // remove config
-            // remove repo
-            // remove remote
+            var tautSitePath = hostRepo.GetTautSitePath(tautCfg.SiteName);
+
+            GitRepoExtras.DeleteGitDir(tautSitePath);
         }
     }
 
@@ -251,7 +256,7 @@ class CampCommandActions(
 
         var result = ResolveTargetOption(parseResult, hostRepo, followHead: true);
 
-        tautSetup.GearUpExisting(hostRepo, null, result.TautCampName);
+        tautSetup.GearUpExisting(hostRepo, null, result.TautSiteName);
 
         if (File.Exists(path))
         {
@@ -317,7 +322,7 @@ class CampCommandActions(
     internal void Rescan(ParseResult parseResult)
     {
         var hostRepo = LocateHostRepo();
-        var tautCampName = ResolveTargetOption(parseResult, hostRepo, followHead: false);
+        var tautSiteName = ResolveTargetOption(parseResult, hostRepo, followHead: false);
 
         throw new NotImplementedException();
         // using (var tautRepo = LocateTautRepo())
@@ -329,7 +334,7 @@ class CampCommandActions(
     }
 
     record ResolveTargetOptionResult(
-        string TautCampName,
+        string TautSiteName,
         string? RemoteName,
         bool TargetIsRemote,
         bool CampIsFromHead
@@ -346,22 +351,22 @@ class CampCommandActions(
         {
             using var config = hostRepo.GetConfigSnapshot();
 
-            TautConfig? tautConfig;
+            TautSiteConfig? tautConfig;
 
-            if (TautConfig.TryLoadByTautCampName(config, targetName, out tautConfig))
+            if (TautSiteConfig.TryLoadBySiteName(config, targetName, out tautConfig))
             {
                 return new(
-                    TautCampName: tautConfig.CampName,
+                    TautSiteName: tautConfig.SiteName,
                     RemoteName: null,
                     TargetIsRemote: false,
                     CampIsFromHead: false
                 );
             }
 
-            if (TautConfig.TryLoadByRemoteName(config, targetName, out tautConfig))
+            if (TautSiteConfig.TryLoadByRemoteName(config, targetName, out tautConfig))
             {
                 return new(
-                    TautCampName: tautConfig.CampName,
+                    TautSiteName: tautConfig.SiteName,
                     RemoteName: targetName,
                     TargetIsRemote: true,
                     CampIsFromHead: false
@@ -374,17 +379,17 @@ class CampCommandActions(
         }
         else if (followHead)
         {
-            if (TryResolveTautCampNameFromHead(hostRepo, out var tautCampName))
+            if (TryResolveTautSiteNameFromHead(hostRepo, out var tautSiteName))
             {
                 return new(
-                    TautCampName: tautCampName,
+                    TautSiteName: tautSiteName,
                     RemoteName: null,
                     TargetIsRemote: false,
                     CampIsFromHead: true
                 );
             }
 
-            throw new InvalidOperationException($"Cannot resolve taut camp name specified by HEAD");
+            throw new InvalidOperationException($"Cannot resolve taut site name specified by HEAD");
         }
         else
         {
@@ -394,15 +399,15 @@ class CampCommandActions(
         }
     }
 
-    bool TryResolveTautCampNameFromHead(
+    bool TryResolveTautSiteNameFromHead(
         Lg2Repository hostRepo,
-        [NotNullWhen(true)] out string? tautCampName
+        [NotNullWhen(true)] out string? tautSiteName
     )
     {
         var repoHead = hostRepo.GetHead();
         if (repoHead.IsBranch() == false)
         {
-            tautCampName = null;
+            tautSiteName = null;
             return false;
         }
 
@@ -411,15 +416,15 @@ class CampCommandActions(
 
         using (var config = hostRepo.GetConfigSnapshot())
         {
-            if (TautConfig.TryLoadByRemoteName(config, remoteName, out var tautConfig))
+            if (TautSiteConfig.TryLoadByRemoteName(config, remoteName, out var tautConfig))
             {
-                tautCampName = tautConfig.CampName;
+                tautSiteName = tautConfig.SiteName;
 
                 return true;
             }
         }
 
-        tautCampName = null;
+        tautSiteName = null;
         return false;
     }
 
@@ -433,7 +438,9 @@ class CampCommandActions(
         var currentDir = Directory.GetCurrentDirectory();
         if (Lg2Repository.TryDiscover(currentDir, out var hostRepo) == false)
         {
-            Console.Error.WriteLine($"Failed to locate host repo: not inside a git repository");
+            Console.Error.WriteLine(
+                $"Failed to locate host repository: not inside a git repository"
+            );
 
             throw new OperationCanceledException();
         }
@@ -463,7 +470,7 @@ class CampCommandActions(
 
         var hostRepo = LocateHostRepo();
 
-        var tautRepoFullPath = GitRepoExtra.GetTautHomePath(hostRepo.GetPath());
+        var tautRepoFullPath = GitRepoExtras.GetTautHomePath(hostRepo.GetPath());
         var tautRepoRelPath = Path.GetRelativePath(currentDir, tautRepoFullPath);
 
         return OpenTautRepo(tautRepoRelPath);
@@ -498,7 +505,7 @@ class ProgramCommandLine(IHost host)
     internal static Option<string> CampTargetOption = new("--target")
     {
         Description =
-            "Specify a taut camp either by its name or by the name of an associated remote",
+            "Specify a taut site either by its name or by the name of an associated remote",
         Recursive = true,
     };
 
@@ -516,7 +523,7 @@ class ProgramCommandLine(IHost host)
     internal static Option<bool> LinkExistingOption = new("--link-existing")
     {
         Description =
-            $"Whether to setup a a link to exisitng taut camp specified by {CampTargetOption.Name}",
+            $"Whether to setup a a link to exisitng taut site specified by {CampTargetOption.Name}",
     };
 
     internal static Argument<string> PathArgument = new("path")
@@ -536,16 +543,16 @@ class ProgramCommandLine(IHost host)
     {
         RootCommand rootCommand = new("git-taut command lines");
 
-        var campCommand = CreateCommandCamp();
+        var siteCommand = CreateCommandSite();
 
-        campCommand.Subcommands.Add(CreateCommandCampRun());
-        campCommand.Subcommands.Add(CreateCommandCampAdd());
-        campCommand.Subcommands.Add(CreateCommandCampList());
-        campCommand.Subcommands.Add(CreateCommandCampRemove());
-        campCommand.Subcommands.Add(CreateCommandCampReveal());
-        campCommand.Subcommands.Add(CreateCommandCampRescan());
+        siteCommand.Subcommands.Add(CreateCommandSiteRun());
+        siteCommand.Subcommands.Add(CreateCommandSiteAdd());
+        siteCommand.Subcommands.Add(CreateCommandSiteList());
+        siteCommand.Subcommands.Add(CreateCommandSiteRemove());
+        siteCommand.Subcommands.Add(CreateCommandSiteReveal());
+        siteCommand.Subcommands.Add(CreateCommandSiteRescan());
 
-        rootCommand.Subcommands.Add(campCommand);
+        rootCommand.Subcommands.Add(siteCommand);
         rootCommand.Subcommands.Add(CreateCommandRemoteHelper());
         rootCommand.Subcommands.Add(CreateCommandShowInternal());
 
@@ -590,16 +597,16 @@ class ProgramCommandLine(IHost host)
         return command;
     }
 
-    Command CreateCommandCamp()
+    Command CreateCommandSite()
     {
-        Command command = new("camp", "Taut camp related commands") { CampTargetOption };
+        Command command = new("site", "Taut site related commands") { CampTargetOption };
 
         return command;
     }
 
-    Command CreateCommandCampRun()
+    Command CreateCommandSiteRun()
     {
-        Command command = new("run", "Invoke a git command on the taut camp")
+        Command command = new("run", "Invoke a git command on the taut site")
         {
             CommandNameArgument,
             CommandArgsArgument,
@@ -615,9 +622,9 @@ class ProgramCommandLine(IHost host)
         return command;
     }
 
-    Command CreateCommandCampAdd()
+    Command CreateCommandSiteAdd()
     {
-        Command command = new("add", "Initialize a new taut camp for a remote")
+        Command command = new("add", "Initialize a new taut site for a remote")
         {
             RemoteNameArgument,
             RemoteAddressArgument,
@@ -634,9 +641,9 @@ class ProgramCommandLine(IHost host)
         return command;
     }
 
-    Command CreateCommandCampList()
+    Command CreateCommandSiteList()
     {
-        Command command = new("list", "List about taut camps");
+        Command command = new("list", "List about taut sites");
 
         var actions = host.Services.GetRequiredService<CampCommandActions>();
 
@@ -648,9 +655,9 @@ class ProgramCommandLine(IHost host)
         return command;
     }
 
-    Command CreateCommandCampRemove()
+    Command CreateCommandSiteRemove()
     {
-        Command command = new("remove", "Remove a taut camp");
+        Command command = new("remove", "Remove a taut site");
 
         var actions = host.Services.GetRequiredService<CampCommandActions>();
 
@@ -662,9 +669,9 @@ class ProgramCommandLine(IHost host)
         return command;
     }
 
-    Command CreateCommandCampReveal()
+    Command CreateCommandSiteReveal()
     {
-        Command command = new("reveal", "Reveal the information about a path in the taut camp")
+        Command command = new("reveal", "Reveal the information about a path in the taut site")
         {
             PathArgument,
         };
@@ -679,9 +686,9 @@ class ProgramCommandLine(IHost host)
         return command;
     }
 
-    Command CreateCommandCampRescan()
+    Command CreateCommandSiteRescan()
     {
-        Command command = new("rescan", "Rescan and rebuild the mapping for the taut camp");
+        Command command = new("rescan", "Rescan and rebuild the mapping for the taut site");
 
         var actions = host.Services.GetRequiredService<CampCommandActions>();
 

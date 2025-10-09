@@ -38,9 +38,9 @@ sealed class TautSetup(
     internal string KeyValueStoreLocation => _tautRepo.GetObjectInfoDirPath();
 
     [AllowNull]
-    TautConfig? _tautCfg;
+    TautSiteConfig? _siteConfig;
 
-    TautConfig TautCfg => _tautCfg!;
+    TautSiteConfig SiteConfig => _siteConfig!;
 
     bool _gearedUp;
 
@@ -64,7 +64,7 @@ sealed class TautSetup(
         Lg2Repository hostRepo,
         string remoteName,
         string remoteAddress,
-        string? tautCampNameToLink = null
+        string? tautSiteNameToLink = null
     )
     {
         EnsureNotGearedUp();
@@ -72,7 +72,7 @@ sealed class TautSetup(
         _hostRepo = hostRepo;
         _remoteName = remoteName;
 
-        _tautCfg = new(Path.GetRandomFileName(), tautCampNameToLink);
+        _siteConfig = new(Path.GetRandomFileName(), tautSiteNameToLink);
 
         EnsureHostOidType();
 
@@ -87,14 +87,14 @@ sealed class TautSetup(
         return result;
     }
 
-    internal void GearUpExisting(Lg2Repository hostRepo, string? remoteName, string tautCampName)
+    internal void GearUpExisting(Lg2Repository hostRepo, string? remoteName, string tautSiteName)
     {
         EnsureNotGearedUp();
 
         _hostRepo = hostRepo;
         _remoteName = remoteName;
 
-        _tautCfg = new(tautCampName);
+        _siteConfig = new(tautSiteName);
 
         EnsureHostOidType();
 
@@ -116,9 +116,9 @@ sealed class TautSetup(
 
     void EnsureBrandNewSetup(string remoteAddress)
     {
-        TautCfg.RemoteNames.Add(RemoteName);
+        SiteConfig.RemoteNames.Add(RemoteName);
 
-        var tautCampPath = HostRepo.GetTautCampPath(TautCfg.CampName);
+        var tautSitePath = HostRepo.GetTautSitePath(SiteConfig.SiteName);
 
         List<string> argList =
         [
@@ -131,29 +131,29 @@ sealed class TautSetup(
             HostRepo.GetPath(),
         ];
 
-        if (TautCfg.LinkTo is not null)
+        if (SiteConfig.LinkTo is not null)
         {
             using (var config = HostRepo.GetConfig())
             {
-                TautCfg.LinkTo.Load(config);
+                SiteConfig.LinkTo.Load(config);
             }
 
-            var tautCampPathToLink = HostRepo.GetTautCampPath(TautCfg.LinkTo.CampName);
+            var tautSitePathToLink = HostRepo.GetTautSitePath(SiteConfig.LinkTo.SiteName);
 
             argList.Add("--reference");
-            argList.Add(tautCampPathToLink);
+            argList.Add(tautSitePathToLink);
 
-            logger.ZLogTrace($"{TautCfg.CampName} is linked to {TautCfg.LinkTo.CampName}");
+            logger.ZLogTrace($"{SiteConfig.SiteName} is linked to {SiteConfig.LinkTo.SiteName}");
         }
 
         argList.Add(remoteAddress);
-        argList.Add(tautCampPath);
+        argList.Add(tautSitePath);
 
         gitCli.Execute(argList.ToArray());
 
-        logger.ZLogTrace($"Cloned '{RemoteName}' from '{remoteAddress}' into '{tautCampPath}'");
+        logger.ZLogTrace($"Cloned '{RemoteName}' from '{remoteAddress}' into '{tautSitePath}'");
 
-        _tautRepo = Lg2Repository.New(tautCampPath);
+        _tautRepo = Lg2Repository.New(tautSitePath);
 
         TautSetDescription();
         TautSetFetchConfig();
@@ -164,7 +164,7 @@ sealed class TautSetup(
 
     void TautSetDescription()
     {
-        var descriptionFile = GitRepoExtra.GetDescriptionFile(_tautRepo);
+        var descriptionFile = GitRepoExtras.GetDescriptionFile(_tautRepo);
 
         File.Delete(descriptionFile);
 
@@ -180,14 +180,14 @@ sealed class TautSetup(
     // Not used, as `--reference repo` is used when cloning.
     void TautAddHostObjects()
     {
-        var tautRepoObjectsDir = GitRepoExtra.GetObjectDirPath(_tautRepo);
-        var tautRepoObjectsInfoAlternatesFile = GitRepoExtra.GetObjectsInfoAlternatesFilePath(
+        var tautRepoObjectsDir = GitRepoExtras.GetObjectDirPath(_tautRepo);
+        var tautRepoObjectsInfoAlternatesFile = GitRepoExtras.GetObjectsInfoAlternatesFilePath(
             _tautRepo
         );
-        var hostRepoObjectsDir = GitRepoExtra.GetObjectDirPath(_hostRepo);
+        var hostRepoObjectsDir = GitRepoExtras.GetObjectDirPath(_hostRepo);
 
         var relativePath = Path.GetRelativePath(tautRepoObjectsDir, hostRepoObjectsDir);
-        relativePath = GitRepoExtra.UseForwardSlash(relativePath);
+        relativePath = GitRepoExtras.UseForwardSlash(relativePath);
 
         using (var writer = File.AppendText(tautRepoObjectsInfoAlternatesFile))
         {
@@ -201,7 +201,7 @@ sealed class TautSetup(
     void TautSetFetchConfig()
     {
         using var config = _tautRepo.GetConfig();
-        config.SetString(GitConfigExtra.Fetch_Prune, "true");
+        config.SetString(GitConfigExtras.Fetch_Prune, "true");
     }
 
     void UpdateRemoteUrls()
@@ -214,7 +214,7 @@ sealed class TautSetup(
             // normalize the remote's file path
             TautRepo.SetRemoteUrl(RemoteName, remoteUri.AbsolutePath);
 
-            var hostRemoteUrl = GitRepoExtra.AddTautRemoteHelperPrefix(remoteUri.AbsoluteUri);
+            var hostRemoteUrl = GitRepoExtras.AddTautRemoteHelperPrefix(remoteUri.AbsoluteUri);
             _hostRepo.SetRemoteUrl(RemoteName, hostRemoteUrl);
         }
     }
@@ -223,21 +223,21 @@ sealed class TautSetup(
     {
         using var hostConfig = HostRepo.GetConfig();
 
-        TautCfg.SaveRemotes(hostConfig);
+        SiteConfig.SaveRemotes(hostConfig);
 
-        if (TautCfg.LinkTo is not null)
+        if (SiteConfig.LinkTo is not null)
         {
-            CheckCredentialKeyTrait(TautCfg.LinkTo);
+            CheckCredentialKeyTrait(SiteConfig.LinkTo);
 
             return;
         }
 
-        var tautCampPath = HostRepo.GetTautCampPath(TautCfg.CampName);
-        var gitCredUrl = GitRepoExtra.ConvertPathToTautCredentialUrl(tautCampPath);
+        var tautSitePath = HostRepo.GetTautSitePath(SiteConfig.SiteName);
+        var gitCredUrl = GitRepoExtras.ConvertPathToTautCredentialUrl(tautSitePath);
 
-        TautCfg.CredentialUrl = gitCredUrl;
+        SiteConfig.CredentialUrl = gitCredUrl;
 
-        TautCfg.SaveCredentialUrl(hostConfig);
+        SiteConfig.SaveCredentialUrl(hostConfig);
 
         using (var gitCred = new GitCredential(gitCli, gitCredUrl))
         {
@@ -247,7 +247,7 @@ sealed class TautSetup(
 
             if (string.IsNullOrEmpty(gitCred.UserName) == false)
             {
-                TautCfg.CredentialUserName = gitCred.UserName;
+                SiteConfig.CredentialUserName = gitCred.UserName;
 
                 passwordSalt = Encoding.UTF8.GetBytes(gitCred.UserName);
             }
@@ -257,7 +257,7 @@ sealed class TautSetup(
             var infoData = Encoding.ASCII.GetBytes(gitCredUrl);
             var keyTrait = _keyHolder.DeriveCredentialKeyTrait(infoData);
 
-            TautCfg.CredentialKeyTrait = keyTrait;
+            SiteConfig.CredentialKeyTrait = keyTrait;
 
             gitCred.Approve();
         }
@@ -267,23 +267,23 @@ sealed class TautSetup(
     {
         using (var config = HostRepo.GetConfig())
         {
-            TautCfg.Load(config);
+            SiteConfig.Load(config);
         }
 
-        var tautCampPath = HostRepo.GetTautCampPath(TautCfg.CampName);
-        _tautRepo = Lg2Repository.New(tautCampPath);
+        var tautSitePath = HostRepo.GetTautSitePath(SiteConfig.SiteName);
+        _tautRepo = Lg2Repository.New(tautSitePath);
 
         if (_remoteName is not null)
         {
             gitCli.Execute(
                 "--git-dir",
-                tautCampPath,
+                tautSitePath,
                 "fetch",
                 RemoteName,
                 "+refs/heads/*:refs/heads/*"
             );
 
-            logger.ZLogTrace($"Fetched '{RemoteName}' for '{TautCfg.CampName}'");
+            logger.ZLogTrace($"Fetched '{RemoteName}' for '{SiteConfig.SiteName}'");
 
             var tautRemote = _tautRepo.LookupRemote(RemoteName);
             var tautRemoteUrl = tautRemote.GetUrl();
@@ -291,7 +291,7 @@ sealed class TautSetup(
 
             var hostRemote = _hostRepo.LookupRemote(RemoteName);
             var hostRemoteUrl = hostRemote.GetUrl();
-            hostRemoteUrl = GitRepoExtra.RemoveTautRemoteHelperPrefix(hostRemoteUrl);
+            hostRemoteUrl = GitRepoExtras.RemoveTautRemoteHelperPrefix(hostRemoteUrl);
             var hostRemoteUri = new Uri(hostRemoteUrl);
 
             if (hostRemoteUri.IsFile)
@@ -307,10 +307,10 @@ sealed class TautSetup(
             }
         }
 
-        CheckCredentialKeyTrait(TautCfg);
+        CheckCredentialKeyTrait(SiteConfig);
     }
 
-    void CheckCredentialKeyTrait(TautConfig tautConfig)
+    void CheckCredentialKeyTrait(TautSiteConfig tautConfig)
     {
         tautConfig.EnsureValues();
 
@@ -359,13 +359,13 @@ sealed class TautSetup(
     {
         using (var config = HostRepo.GetConfig())
         {
-            if (TautCfg.LinkTo is not null)
+            if (SiteConfig.LinkTo is not null)
             {
-                TautCfg.SaveLinkTo(config);
+                SiteConfig.SaveLinkTo(config);
             }
             else
             {
-                TautCfg.SaveCredentialPair(config);
+                SiteConfig.SaveCredentialPair(config);
             }
         }
 

@@ -3,10 +3,9 @@ using Lg2.Sharpy;
 
 namespace Git.Taut;
 
-static class GitRepoExtra
+static class GitRepoExtras
 {
     internal const string TautHomeName = "taut";
-    internal const string TautCampNameTempPrefix = "__";
     internal const string ObjectsDir = "Objects";
     internal static readonly string ObjectsInfoDir = Path.Join(ObjectsDir, "info");
     internal static readonly string ObjectsInfoAlternatesFile = Path.Join(
@@ -46,9 +45,9 @@ static class GitRepoExtra
         return result;
     }
 
-    internal static string GetTautCampPath(string repoPath, string tautCampName)
+    internal static string GetTautSitePath(string repoPath, string tautSiteName)
     {
-        var result = Path.Join(repoPath, TautHomeName, tautCampName);
+        var result = Path.Join(repoPath, TautHomeName, tautSiteName);
 
         result = UseForwardSlash(result);
 
@@ -66,11 +65,11 @@ static class GitRepoExtra
         return result;
     }
 
-    internal static string GetTautCampPath(this Lg2Repository repo, string tautCampName)
+    internal static string GetTautSitePath(this Lg2Repository repo, string tautSiteName)
     {
         repo.EnsureValid();
 
-        var result = Path.Join(repo.GetPath(), TautHomeName, tautCampName);
+        var result = Path.Join(repo.GetPath(), TautHomeName, tautSiteName);
 
         result = UseForwardSlash(result);
 
@@ -171,37 +170,6 @@ static class GitRepoExtra
         return input[TautRemoteHelperPrefix.Length..];
     }
 
-    internal static string AddTautCapNameTempPrefix(string input)
-    {
-        if (input.StartsWith(TautCampNameTempPrefix))
-        {
-            throw new ArgumentException(
-                $"'{input}' is already prefixed with '{TautCampNameTempPrefix}'"
-            );
-        }
-
-        return TautCampNameTempPrefix + input;
-    }
-
-    internal static string RemoveTautCampNameTempPrefix(string input, bool shouldExist = true)
-    {
-        if (input.StartsWith(TautCampNameTempPrefix) == false)
-        {
-            if (shouldExist)
-            {
-                throw new ArgumentException(
-                    $"'{input}' is not prefixed with '{TautCampNameTempPrefix}'"
-                );
-            }
-            else
-            {
-                return input;
-            }
-        }
-
-        return input[TautCampNameTempPrefix.Length..];
-    }
-
     internal static string ConvertPathToTautCredentialUrl(string somePath)
     {
         if (somePath.StartsWith(TautCredentialUrlScheme))
@@ -222,146 +190,29 @@ static class GitRepoExtra
 
         return result;
     }
+
+    internal static void DeleteGitDir(string dirPath)
+    {
+        foreach (var file in Directory.GetFiles(dirPath))
+        {
+            FileInfo info = new(file);
+            info.Attributes &= ~FileAttributes.ReadOnly;
+            info.Delete();
+        }
+        foreach (var subDirPath in Directory.GetDirectories(dirPath))
+        {
+            DeleteGitDir(subDirPath);
+        }
+        Directory.Delete(dirPath);
+    }
 }
 
-static partial class GitConfigExtra
+static partial class GitConfigExtras
 {
     internal const string Fetch_Prune = "fetch.prune";
-
-    const string TautCampNameMatchPattern = $@"{TautConfig.SectionName}\.(.*)\.remote";
-
-    [GeneratedRegex(TautCampNameMatchPattern)]
-    private static partial Regex TautCampNameRegex();
-
-    internal static bool TryFindTautCampName(
-        this Lg2Config config,
-        string remoteName,
-        out string repoName
-    )
-    {
-        var cfgIter = config.NewIterator(TautCampNameMatchPattern);
-        Regex regex = TautCampNameRegex();
-
-        repoName = string.Empty;
-        bool found = false;
-
-        while (cfgIter.Next(out var entry))
-        {
-            var val = entry.GetValue();
-            if (val == remoteName)
-            {
-                var name = entry.GetName();
-                repoName = regex.Match(name).Groups[1].Value;
-
-                found = true;
-
-                break;
-            }
-        }
-
-        return found;
-    }
-
-    internal static bool TryFindTautCampName(
-        this Lg2Repository repo,
-        string remoteName,
-        out string repoName
-    )
-    {
-        repo.EnsureValid();
-
-        using var config = repo.GetConfigSnapshot();
-
-        return config.TryFindTautCampName(remoteName, out repoName);
-    }
-
-    internal static string FindTautCampName(this Lg2Config config, string remoteName)
-    {
-        if (config.TryFindTautCampName(remoteName, out var result))
-        {
-            return result;
-        }
-
-        throw new InvalidOperationException(
-            $"Taut repo name is not found for remote '{remoteName}'"
-        );
-    }
-
-    internal static string FindTautCampName(this Lg2Repository repo, string remoteName)
-    {
-        repo.EnsureValid();
-
-        using var config = repo.GetConfigSnapshot();
-
-        return config.FindTautCampName(remoteName);
-    }
-
-    internal static void PrintTautCamps(this Lg2Config config, string? targetCampName = null)
-    {
-        var tautPrefix = "taut";
-
-        string ExtractSubSection(string itemName)
-        {
-            var part1 = itemName[(tautPrefix.Length + 1)..];
-            var variableStart = part1.LastIndexOf('.');
-            var part2 = part1[..variableStart];
-
-            return part2;
-        }
-
-        HashSet<string> tautCampNames = [];
-
-        {
-            var pattern = $@"{tautPrefix}\..*";
-            using var cfgIter = config.NewIterator(pattern);
-
-            while (cfgIter.Next(out var entry))
-            {
-                var name = entry.GetName();
-
-                var tautCampName = ExtractSubSection(name);
-
-                if (targetCampName is null || targetCampName == tautCampName)
-                {
-                    tautCampNames.Add(tautCampName);
-                }
-            }
-        }
-
-        foreach (var tautCampName in tautCampNames)
-        {
-            Console.Write($"{tautCampName}");
-
-            {
-                var pattern = $@"{tautPrefix}\.{tautCampName}\.linkTo";
-                using var cfgIter = config.NewIterator(pattern);
-
-                while (cfgIter.Next(out var entry))
-                {
-                    var val = entry.GetValue();
-
-                    Console.Write($" @{val}");
-                }
-            }
-
-            {
-                var pattern = $@"{tautPrefix}\.{tautCampName}\.remote";
-                using var cfgIter = config.NewIterator(pattern);
-
-                while (cfgIter.Next(out var entry))
-                {
-                    var val = entry.GetValue();
-
-                    Console.Write($" {val}");
-                }
-            }
-
-            Console.WriteLine();
-        }
-    }
 }
 
-static class GitAttrExtra
+static class GitAttrExtras
 {
     internal const string TautAttrName = "taut";
 
