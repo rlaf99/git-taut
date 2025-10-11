@@ -1,7 +1,7 @@
 using System.Text;
 using Git.Taut;
 
-namespace Cli.Tests;
+namespace Cli.Tests.CommonParts;
 
 public sealed partial class Base32Tests : IDisposable
 {

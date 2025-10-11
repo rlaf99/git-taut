@@ -404,7 +404,7 @@ partial class GitRemoteHelper
 
         logger.ZLogTrace($"Host repo locates at '{gitDir}'");
 
-        _tautHomePath = GitRepoExtras.GetTautHomePath(gitDir);
+        _tautHomePath = GitRepoHelpers.GetTautHomePath(gitDir);
 
         Directory.CreateDirectory(_tautHomePath);
     }

@@ -1,6 +1,7 @@
-﻿using Lg2.Sharpy;
+﻿using System.CommandLine;
+using Lg2.Sharpy;
 using Microsoft.Extensions.Hosting;
-using ProgramExtras;
+using ProgramHelpers;
 
 using var lg2Global = new Lg2Global();
 
@@ -14,21 +15,23 @@ catch (Exception ex)
     Environment.Exit(1);
 }
 
-HostApplicationBuilderSettings hostBuilderSettings = new();
-var hostBuilder = Host.CreateEmptyApplicationBuilder(hostBuilderSettings);
+var hostAppBuilder = Host.CreateEmptyApplicationBuilder(null);
 
-hostBuilder.AddGitTautConfiguration();
-hostBuilder.AddGitTautServices();
-hostBuilder.AddGitTautCommandActions();
-hostBuilder.AddGitTautLogging();
+hostAppBuilder.AddGitTautConfiguration();
+hostAppBuilder.AddGitTautServices();
+hostAppBuilder.AddGitTautCommandActions();
+hostAppBuilder.AddGitTautLogging();
 
-var host = hostBuilder.Build();
+var host = hostAppBuilder.Build();
 
-ProgramCommandLine progCommands = new(host);
-return progCommands.Parse(args);
+ProgramCommandLine progCli = new(host);
 
-#if false
-ConsoleApp.Version = "alpha-0.0.1";
+ParserConfiguration parserConfiguration = new() { ResponseFileTokenReplacer = null };
+var parseResult = progCli.Parse(args, parserConfiguration);
 
-ConsoleApp.Timeout = TimeSpan.FromMicroseconds(800);
-#endif
+InvocationConfiguration invocationConfiguration = new()
+{
+    ProcessTerminationTimeout = TimeSpan.FromMilliseconds(800),
+};
+
+return await parseResult.InvokeAsync(invocationConfiguration);

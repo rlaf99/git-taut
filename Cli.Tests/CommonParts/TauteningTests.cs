@@ -1,10 +1,10 @@
-using Cli.Tests.Support;
+using Cli.Tests.TestSupport;
 using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace Cli.Tests.Functions;
+namespace Cli.Tests.CommonParts;
 
 [Collection("GitTautPaths")]
 public class TauteningTests : IDisposable
@@ -101,7 +101,8 @@ public class TauteningTests : IDisposable
 
         var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
-        var tautRepoName = hostRepo.FindTautCampName("origin");
+        using var config = hostRepo.GetConfigSnapshot();
+        var tautRepoName = TautSiteConfig.FindSiteName(config, "origin");
         tautSetup.GearUpExisting(hostRepo, "origin", tautRepoName);
 
         var tautManager = _host.Services.GetRequiredService<TautManager>();
@@ -140,7 +141,8 @@ public class TauteningTests : IDisposable
 
         var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
-        var tautRepoName = hostRepo.FindTautCampName("origin");
+        using var config = hostRepo.GetConfigSnapshot();
+        var tautRepoName = TautSiteConfig.FindSiteName(config, "origin");
         tautSetup.GearUpExisting(hostRepo, "origin", tautRepoName);
 
         var tautManager = _host.Services.GetRequiredService<TautManager>();

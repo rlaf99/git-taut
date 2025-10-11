@@ -1,8 +1,7 @@
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
-using Xunit.v3;
 
-namespace Cli.Tests.Support;
+namespace Cli.Tests.TestSupport;
 
 public class CliTestsOptions
 {
@@ -99,60 +98,5 @@ class Testbed
             WipeOutDirectory(dir);
         }
         Directory.Delete(dirPath);
-    }
-}
-
-class TestScene : IDisposable
-{
-    const string NameSuffix = "_S";
-
-    readonly TempPath _path;
-
-    public string DirPath => _path.Value;
-
-    public TestScene()
-    {
-        _path = Testbed.CreateDirectory(NameSuffix);
-    }
-
-    public bool ShouldPreserve { get; set; }
-
-    public void PreserveContentWhenFailed(ITestOutputHelper? output)
-    {
-        var state = TestContext.Current.TestState;
-        if (state?.Result == TestResult.Failed)
-        {
-            ShouldPreserve = true;
-
-            if (output is not null)
-            {
-                var caseName = TestContext.Current.TestCase?.TestCaseDisplayName;
-                output.WriteLine($"Preserve'{DirPath}' for failed case {caseName}.");
-            }
-        }
-    }
-
-    bool _disposed;
-
-    public void Dispose()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-        _disposed = true;
-
-        if (ShouldPreserve == false)
-        {
-            var workingDir = Directory.GetCurrentDirectory();
-            var cleanupDir = Path.GetFullPath(_path.Value);
-
-            if (workingDir.StartsWith(cleanupDir))
-            {
-                Directory.SetCurrentDirectory(Testbed.GetPath());
-            }
-
-            _path.Clear();
-        }
     }
 }

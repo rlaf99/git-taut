@@ -1,4 +1,4 @@
-namespace Cli.Tests.Support;
+namespace Cli.Tests.TestSupport;
 
 public class GitTautPathsFixture : IDisposable
 {

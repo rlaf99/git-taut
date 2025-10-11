@@ -3,7 +3,7 @@ using Lg2.Sharpy;
 
 namespace Git.Taut;
 
-static class GitRepoExtras
+static class GitRepoHelpers
 {
     internal const string TautHomeName = "taut";
     internal const string ObjectsDir = "Objects";
@@ -207,12 +207,12 @@ static class GitRepoExtras
     }
 }
 
-static partial class GitConfigExtras
+static partial class GitConfigHelpers
 {
     internal const string Fetch_Prune = "fetch.prune";
 }
 
-static class GitAttrExtras
+static class GitAttrHelpers
 {
     internal const string TautAttrName = "taut";
 

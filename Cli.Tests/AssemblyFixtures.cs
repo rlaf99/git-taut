@@ -1,7 +1,7 @@
 using Lg2.Sharpy;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using ProgramExtras;
+using ProgramHelpers;
 using ZLogger;
 
 [assembly: AssemblyFixture(typeof(Cli.Tests.Lg2GlobalFixture))]
@@ -29,11 +29,10 @@ public sealed class HostBuilderFixture : IDisposable
 {
     public IHost BuildHost(Action<ILoggingBuilder>? configLogging = null)
     {
-        var settings = new HostApplicationBuilderSettings();
-
-        var builder = Host.CreateEmptyApplicationBuilder(settings);
+        var builder = Host.CreateEmptyApplicationBuilder(null);
 
         builder.AddGitTautServices();
+        builder.AddGitTautCommandActions();
 
         if (configLogging is not null)
         {

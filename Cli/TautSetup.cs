@@ -164,7 +164,7 @@ sealed class TautSetup(
 
     void TautSetDescription()
     {
-        var descriptionFile = GitRepoExtras.GetDescriptionFile(_tautRepo);
+        var descriptionFile = GitRepoHelpers.GetDescriptionFile(_tautRepo);
 
         File.Delete(descriptionFile);
 
@@ -180,14 +180,14 @@ sealed class TautSetup(
     // Not used, as `--reference repo` is used when cloning.
     void TautAddHostObjects()
     {
-        var tautRepoObjectsDir = GitRepoExtras.GetObjectDirPath(_tautRepo);
-        var tautRepoObjectsInfoAlternatesFile = GitRepoExtras.GetObjectsInfoAlternatesFilePath(
+        var tautRepoObjectsDir = GitRepoHelpers.GetObjectDirPath(_tautRepo);
+        var tautRepoObjectsInfoAlternatesFile = GitRepoHelpers.GetObjectsInfoAlternatesFilePath(
             _tautRepo
         );
-        var hostRepoObjectsDir = GitRepoExtras.GetObjectDirPath(_hostRepo);
+        var hostRepoObjectsDir = GitRepoHelpers.GetObjectDirPath(_hostRepo);
 
         var relativePath = Path.GetRelativePath(tautRepoObjectsDir, hostRepoObjectsDir);
-        relativePath = GitRepoExtras.UseForwardSlash(relativePath);
+        relativePath = GitRepoHelpers.UseForwardSlash(relativePath);
 
         using (var writer = File.AppendText(tautRepoObjectsInfoAlternatesFile))
         {
@@ -201,7 +201,7 @@ sealed class TautSetup(
     void TautSetFetchConfig()
     {
         using var config = _tautRepo.GetConfig();
-        config.SetString(GitConfigExtras.Fetch_Prune, "true");
+        config.SetString(GitConfigHelpers.Fetch_Prune, "true");
     }
 
     void UpdateRemoteUrls()
@@ -214,7 +214,7 @@ sealed class TautSetup(
             // normalize the remote's file path
             TautRepo.SetRemoteUrl(RemoteName, remoteUri.AbsolutePath);
 
-            var hostRemoteUrl = GitRepoExtras.AddTautRemoteHelperPrefix(remoteUri.AbsoluteUri);
+            var hostRemoteUrl = GitRepoHelpers.AddTautRemoteHelperPrefix(remoteUri.AbsoluteUri);
             _hostRepo.SetRemoteUrl(RemoteName, hostRemoteUrl);
         }
     }
@@ -233,7 +233,7 @@ sealed class TautSetup(
         }
 
         var tautSitePath = HostRepo.GetTautSitePath(SiteConfig.SiteName);
-        var gitCredUrl = GitRepoExtras.ConvertPathToTautCredentialUrl(tautSitePath);
+        var gitCredUrl = GitRepoHelpers.ConvertPathToTautCredentialUrl(tautSitePath);
 
         SiteConfig.CredentialUrl = gitCredUrl;
 
@@ -291,7 +291,7 @@ sealed class TautSetup(
 
             var hostRemote = _hostRepo.LookupRemote(RemoteName);
             var hostRemoteUrl = hostRemote.GetUrl();
-            hostRemoteUrl = GitRepoExtras.RemoveTautRemoteHelperPrefix(hostRemoteUrl);
+            hostRemoteUrl = GitRepoHelpers.RemoveTautRemoteHelperPrefix(hostRemoteUrl);
             var hostRemoteUri = new Uri(hostRemoteUrl);
 
             if (hostRemoteUri.IsFile)

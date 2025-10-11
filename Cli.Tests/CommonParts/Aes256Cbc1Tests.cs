@@ -5,7 +5,7 @@ using Git.Taut;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace Cli.Tests;
+namespace Cli.Tests.CommonParts;
 
 public sealed partial class Aes256Cbc1Tests : IDisposable
 {

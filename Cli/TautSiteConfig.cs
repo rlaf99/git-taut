@@ -255,11 +255,9 @@ class TautSiteConfig
 
     internal static void PrintCamps(Lg2Config config, string? targetSiteName = null)
     {
-        var tautPrefix = "taut";
-
         string ExtractSubSection(string itemName)
         {
-            var part1 = itemName[(tautPrefix.Length + 1)..];
+            var part1 = itemName[(SectionName.Length + 1)..];
             var variableStart = part1.LastIndexOf('.');
             var part2 = part1[..variableStart];
 
@@ -269,7 +267,7 @@ class TautSiteConfig
         HashSet<string> siteNames = [];
 
         {
-            var pattern = $@"{tautPrefix}\..*";
+            var pattern = $@"{SectionName}\..*";
             using var cfgIter = config.NewIterator(pattern);
 
             while (cfgIter.Next(out var entry))
@@ -290,7 +288,7 @@ class TautSiteConfig
             Console.Write($"{tautSiteName}");
 
             {
-                var pattern = $@"{tautPrefix}\.{tautSiteName}\.linkTo";
+                var pattern = $@"{SectionName}\.{tautSiteName}\.linkTo";
                 using var cfgIter = config.NewIterator(pattern);
 
                 while (cfgIter.Next(out var entry))
@@ -302,7 +300,7 @@ class TautSiteConfig
             }
 
             {
-                var pattern = $@"{tautPrefix}\.{tautSiteName}\.remote";
+                var pattern = $@"{SectionName}\.{tautSiteName}\.remote";
                 using var cfgIter = config.NewIterator(pattern);
 
                 while (cfgIter.Next(out var entry))

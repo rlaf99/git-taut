@@ -1,6 +1,6 @@
 using System.CommandLine;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Configuration;
@@ -10,14 +10,14 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 using ZLogger;
 
-namespace ProgramExtras;
+namespace ProgramHelpers;
 
 static class HostApplicationBuilderExtensions
 {
     internal static void AddGitTautCommandActions(this HostApplicationBuilder hostBuilder)
     {
         hostBuilder.Services.AddSingleton<GitRemoteHelper>();
-        hostBuilder.Services.AddSingleton<CampCommandActions>();
+        hostBuilder.Services.AddSingleton<SiteCommandActions>();
         hostBuilder.Services.AddSingleton<OtherCommandActions>();
     }
 
@@ -43,7 +43,6 @@ static class HostApplicationBuilderExtensions
     internal static void AddGitTautLogging(this HostApplicationBuilder hostBuilder)
     {
         var logging = hostBuilder.Logging;
-        var config = hostBuilder.Configuration;
 
         logging.ClearProviders();
 
@@ -73,7 +72,7 @@ static class HostApplicationBuilderExtensions
             options.FullMode = BackgroundBufferFullMode.Block;
         });
 
-        if (config.GetGitTautTrace())
+        if (hostBuilder.Configuration.GetGitTautTrace())
         {
             logging.SetMinimumLevel(LogLevel.Trace);
         }
@@ -84,8 +83,8 @@ static class HostApplicationBuilderExtensions
     }
 }
 
-class CampCommandActions(
-    // ILogger<CampCommandActions> logger,
+class SiteCommandActions(
+    ILogger<SiteCommandActions> logger,
     GitCli gitCli,
     TautSetup tautSetup,
     TautManager tautManager,
@@ -95,6 +94,8 @@ class CampCommandActions(
 {
     internal void Run(ParseResult parseResult)
     {
+        logger.ZLogTrace($"Start invoking action {nameof(Run)}");
+
         var cmdName = parseResult.GetRequiredValue(ProgramCommandLine.CommandNameArgument);
         var cmdArgs = parseResult.GetValue(ProgramCommandLine.CommandArgsArgument) ?? [];
 
@@ -116,10 +117,14 @@ class CampCommandActions(
                 Console.Error.WriteLine($"Failed to run `{string.Join(" ", gitArgs)}`");
             }
         }
+
+        logger.ZLogTrace($"Done invoking action {nameof(Run)}");
     }
 
     internal void Add(ParseResult parseResult)
     {
+        logger.ZLogTrace($"Start invoking action {nameof(Add)}");
+
         var remoteName = parseResult.GetRequiredValue(ProgramCommandLine.RemoteNameArgument);
         var remoteAddress = parseResult.GetRequiredValue(ProgramCommandLine.RemoteAddressArgument);
 
@@ -183,6 +188,29 @@ class CampCommandActions(
         tautManager.RegainHostRefs();
 
         tautSetup.WrapUpBrandNew();
+
+        logger.ZLogTrace($"Done invoking action {nameof(Add)}");
+    }
+
+    internal Task<int> ListAsync(ParseResult parseResult, CancellationToken cancelToken)
+    {
+        logger.ZLogTrace($"Start invoking action {nameof(List)}");
+
+        try
+        {
+            List(parseResult);
+        }
+        catch (InvalidOperationException ex)
+        {
+            var error = parseResult.InvocationConfiguration.Error;
+            error.WriteLine(ex.Message);
+
+            return Task.FromResult(1);
+        }
+
+        logger.ZLogTrace($"Done invoking action {nameof(List)}");
+
+        return Task.FromResult(0);
     }
 
     internal void List(ParseResult parseResult)
@@ -205,6 +233,8 @@ class CampCommandActions(
 
     internal void Remove(ParseResult parseResult)
     {
+        logger.ZLogTrace($"Start invoking action {nameof(Remove)}");
+
         var hostRepo = LocateHostRepo();
 
         var resolvedTarget = ResolveTargetOption(parseResult, hostRepo, followHead: false);
@@ -244,12 +274,16 @@ class CampCommandActions(
 
             var tautSitePath = hostRepo.GetTautSitePath(tautCfg.SiteName);
 
-            GitRepoExtras.DeleteGitDir(tautSitePath);
+            GitRepoHelpers.DeleteGitDir(tautSitePath);
         }
+
+        logger.ZLogTrace($"Done invoking action {nameof(Remove)}");
     }
 
     internal void Reveal(ParseResult parseResult)
     {
+        logger.ZLogTrace($"Start invoking action {nameof(Reveal)}");
+
         var path = parseResult.GetRequiredValue(ProgramCommandLine.PathArgument);
 
         var hostRepo = LocateHostRepo();
@@ -317,10 +351,14 @@ class CampCommandActions(
         {
             Console.Error.WriteLine($"Not a valid path: '{path}'");
         }
+
+        logger.ZLogTrace($"Done invoking action {nameof(Reveal)}");
     }
 
     internal void Rescan(ParseResult parseResult)
     {
+        logger.ZLogTrace($"Start invoking action {nameof(Rescan)}");
+
         var hostRepo = LocateHostRepo();
         var tautSiteName = ResolveTargetOption(parseResult, hostRepo, followHead: false);
 
@@ -331,6 +369,8 @@ class CampCommandActions(
         // }
 
         // tautManager.RebuildKvStore();
+
+        logger.ZLogTrace($"Done invoking action {nameof(Rescan)}");
     }
 
     record ResolveTargetOptionResult(
@@ -374,7 +414,7 @@ class CampCommandActions(
             }
 
             throw new InvalidOperationException(
-                $"Invalid value '{targetName}' specified by {ProgramCommandLine.CampTargetOption.Name}"
+                $"The value '{targetName}' specified by {ProgramCommandLine.CampTargetOption.Name} is invalid"
             );
         }
         else if (followHead)
@@ -438,11 +478,7 @@ class CampCommandActions(
         var currentDir = Directory.GetCurrentDirectory();
         if (Lg2Repository.TryDiscover(currentDir, out var hostRepo) == false)
         {
-            Console.Error.WriteLine(
-                $"Failed to locate host repository: not inside a git repository"
-            );
-
-            throw new OperationCanceledException();
+            throw new InvalidOperationException($"Not inside a git repository");
         }
 
         return hostRepo;
@@ -470,23 +506,27 @@ class CampCommandActions(
 
         var hostRepo = LocateHostRepo();
 
-        var tautRepoFullPath = GitRepoExtras.GetTautHomePath(hostRepo.GetPath());
+        var tautRepoFullPath = GitRepoHelpers.GetTautHomePath(hostRepo.GetPath());
         var tautRepoRelPath = Path.GetRelativePath(currentDir, tautRepoFullPath);
 
         return OpenTautRepo(tautRepoRelPath);
     }
 }
 
-class OtherCommandActions()
+class OtherCommandActions(ILogger<OtherCommandActions> logger)
 {
     internal void ShowInternal(ParseResult parseResult)
     {
+        logger.ZLogTrace($"Start invoking action {nameof(ShowInternal)}");
+
         var lg2Version = Lg2Global.Version;
         Console.WriteLine($"Libgit2 version: {lg2Version}");
         Console.WriteLine($"Cipher schema: {nameof(Aes256Cbc1)}");
         Console.WriteLine(
             $"  Maximum plain text length: {Aes256Cbc1.PLAIN_TEXT_MAX_SIZE} Bytes ({Aes256Cbc1.PLAIN_TEXT_MAX_SIZE / 1024 / 1024} MB)"
         );
+
+        logger.ZLogTrace($"Done invoking action {nameof(ShowInternal)}");
     }
 }
 
@@ -531,12 +571,12 @@ class ProgramCommandLine(IHost host)
         Description = "Specify the path",
     };
 
-    internal int Parse(string[] args)
+    internal ParseResult Parse(string[] args, ParserConfiguration? parserConfiguration = null)
     {
         var rootCommand = BuildCommands();
-        var parseResult = rootCommand.Parse(args);
+        var parseResult = rootCommand.Parse(args, parserConfiguration);
 
-        return parseResult.Invoke();
+        return parseResult;
     }
 
     RootCommand BuildCommands()
@@ -612,7 +652,7 @@ class ProgramCommandLine(IHost host)
             CommandArgsArgument,
         };
 
-        var actions = host.Services.GetRequiredService<CampCommandActions>();
+        var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
         command.SetAction(parseResult =>
         {
@@ -631,7 +671,7 @@ class ProgramCommandLine(IHost host)
             LinkExistingOption,
         };
 
-        var actions = host.Services.GetRequiredService<CampCommandActions>();
+        var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
         command.SetAction(parseResult =>
         {
@@ -645,12 +685,9 @@ class ProgramCommandLine(IHost host)
     {
         Command command = new("list", "List about taut sites");
 
-        var actions = host.Services.GetRequiredService<CampCommandActions>();
+        var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
-        command.SetAction(parseResult =>
-        {
-            actions.List(parseResult);
-        });
+        command.SetAction(actions.ListAsync);
 
         return command;
     }
@@ -659,7 +696,7 @@ class ProgramCommandLine(IHost host)
     {
         Command command = new("remove", "Remove a taut site");
 
-        var actions = host.Services.GetRequiredService<CampCommandActions>();
+        var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
         command.SetAction(parseResult =>
         {
@@ -676,7 +713,7 @@ class ProgramCommandLine(IHost host)
             PathArgument,
         };
 
-        var actions = host.Services.GetRequiredService<CampCommandActions>();
+        var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
         command.SetAction(parseResult =>
         {
@@ -690,7 +727,7 @@ class ProgramCommandLine(IHost host)
     {
         Command command = new("rescan", "Rescan and rebuild the mapping for the taut site");
 
-        var actions = host.Services.GetRequiredService<CampCommandActions>();
+        var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
         command.SetAction(parseResult =>
         {

@@ -1,9 +1,9 @@
-using Cli.Tests.Support;
+using Cli.Tests.TestSupport;
 using Git.Taut;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace Cli.Tests.Commands;
+namespace Cli.Tests.CommandLine;
 
 [Collection("GitTautPaths")]
 public sealed class CloneTests : IDisposable
