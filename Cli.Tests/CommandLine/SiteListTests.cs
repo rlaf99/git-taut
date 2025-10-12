@@ -43,8 +43,9 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.NotEqual(0, exitCode);
 
-        var errorText = "Not inside a git repository" + Environment.NewLine;
-        Assert.Equal(errorText, _invCfg.Error.ToString());
+        var errorString = "Not inside a git repository" + Environment.NewLine;
+        var errorOutput = _invCfg.Error.ToString();
+        Assert.Equal(errorString, errorOutput);
     }
 
     [Fact]
@@ -69,20 +70,11 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.NotEqual(0, exitCode);
 
-        var errorText =
+        var errorString =
             $"The value '{invalidTarget}' specified by {ProgramCommandLine.SiteTargetOption.Name} is invalid"
             + Environment.NewLine;
 
-        Assert.Equal(errorText, _invCfg.Error.ToString());
-    }
-
-    [Fact]
-    public void TestName()
-    {
-        // Given
-
-        // When
-
-        // Then
+        var errorOutput = _invCfg.Error.ToString();
+        Assert.Equal(errorString, errorOutput);
     }
 }

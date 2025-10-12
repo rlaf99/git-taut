@@ -114,13 +114,13 @@ public unsafe class Lg2DiffDeltaOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_di
 
     public Lg2DiffFileOwnedRef<TOwner> GetOldFile()
     {
-        var owner = EnsureOwner();
+        var owner = ObtainOwner();
         return new(owner, &Ptr->old_file);
     }
 
     public Lg2DiffFileOwnedRef<TOwner> GetNewFile()
     {
-        var owner = EnsureOwner();
+        var owner = ObtainOwner();
         return new(owner, &Ptr->new_file);
     }
 }

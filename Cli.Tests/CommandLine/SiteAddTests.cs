@@ -30,77 +30,159 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
     }
 
     [Fact]
-    public void AddRepo9()
+    public void AddRepo1()
     {
         _scene.SetupRepo0(_host);
         _scene.SetupRepo1(_host);
         _scene.SetupRepo2(_host);
-        _scene.SetupRepo9(_host);
 
-        var repo2Path = Path.Join(_scene.DirPath, "repo2");
+        const string repo1 = "repo1";
+        const string repo2 = "repo2";
+
+        var repo2Path = Path.Join(_scene.DirPath, repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
 
-        const string repo9 = "repo9";
-
-        string[] cliArgs = ["site", "add", repo9, Path.Join("..", repo9)];
+        string[] cliArgs = ["site", "add", repo1, Path.Join("..", repo1)];
         var parseResult = progCli.Parse(cliArgs);
-
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
 
         using var hostRepo = Lg2Repository.New(".");
         using var hostConfig = hostRepo.GetConfigSnapshot();
 
-        Assert.True(TautSiteConfig.TryLoadByRemoteName(hostConfig, repo9, out var repo9SiteConfig));
-        repo9SiteConfig.ResolveRemotes(hostConfig);
-        Assert.Contains(repo9, repo9SiteConfig.Remotes);
+        Assert.True(TautSiteConfig.TryLoadByRemoteName(hostConfig, repo1, out var repo1SiteConfig));
+        repo1SiteConfig.ResolveRemotes(hostConfig);
+        Assert.Contains(repo1, repo1SiteConfig.Remotes);
     }
 
     [Fact]
-    public void AddRepo9LinkRepo0_InvalidTarget()
+    public void AddRepo1_RemoteNameExited()
     {
         _scene.SetupRepo0(_host);
         _scene.SetupRepo1(_host);
         _scene.SetupRepo2(_host);
-        _scene.SetupRepo9(_host);
 
-        var repo2Path = Path.Join(_scene.DirPath, "repo2");
+        const string repo0 = "repo0";
+        const string repo1 = "repo1";
+        const string repo2 = "repo2";
+
+        var repo2Path = Path.Join(_scene.DirPath, repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
 
-        const string repo9 = "repo9";
-
-        string[] cliArgs = ["site", "add", repo9, Path.Join("..", repo9), "--link-existing"];
+        var remoteNameToUse = repo0;
+        string[] cliArgs = ["site", "add", remoteNameToUse, Path.Join("..", repo1)];
         var parseResult = progCli.Parse(cliArgs);
-
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(1, exitCode);
 
-        var errorText =
-            $"No {ProgramCommandLine.SiteTargetOption.Name} is speficied when {ProgramCommandLine.LinkExistingOption.Name} is used"
+        var errorString =
+            $"Remote '{remoteNameToUse}' already exists in the host repository"
             + Environment.NewLine;
 
-        Assert.Equal(errorText, _invCfg.Error.ToString());
+        Assert.Equal(errorString, _invCfg.Error.ToString());
     }
 
     [Fact]
-    public void AddRepo9LinkRepo0()
+    public void AddRepo1_LinkRepo0_TargetNotExists()
     {
         _scene.SetupRepo0(_host);
         _scene.SetupRepo1(_host);
         _scene.SetupRepo2(_host);
-        _scene.SetupRepo9(_host);
 
-        var repo2Path = Path.Join(_scene.DirPath, "repo2");
+        const string repo1 = "repo1";
+        const string repo2 = "repo2";
+
+        var repo2Path = Path.Join(_scene.DirPath, repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
 
+        string[] cliArgs = ["site", "add", repo1, Path.Join("..", repo1), "--link-existing"];
+        var parseResult = progCli.Parse(cliArgs);
+        var exitCode = parseResult.Invoke(_invCfg);
+        Assert.Equal(1, exitCode);
+
+        var errorString =
+            $"No {ProgramCommandLine.SiteTargetOption.Name} is speficied when {ProgramCommandLine.LinkExistingOption.Name} is used"
+            + Environment.NewLine;
+
+        Assert.Equal(errorString, _invCfg.Error.ToString());
+    }
+
+    [Fact]
+    public void AddRepo1_LinkRepo0_TargetLinkedToOther()
+    {
+        _scene.SetupRepo0(_host);
+        _scene.SetupRepo1(_host);
+        _scene.SetupRepo2(_host);
+
         const string repo0 = "repo0";
-        const string repo9 = "repo9";
+        const string repo1 = "repo1";
+        const string repo2 = "repo2";
+
+        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        Directory.SetCurrentDirectory(repo2Path);
+
+        ProgramCommandLine progCli = new(_host);
+
+        {
+            string[] targetOpt = ["--target", repo0];
+            string[] cliArgs =
+            [
+                "site",
+                .. targetOpt,
+                "add",
+                repo1,
+                Path.Join("..", repo1),
+                "--link-existing",
+            ];
+            var parseResult = progCli.Parse(cliArgs);
+
+            var exitCode = parseResult.Invoke(_invCfg);
+            Assert.Equal(0, exitCode);
+        }
+
+        {
+            string[] targetOpt = ["--target", repo1];
+            string[] cliArgs =
+            [
+                "site",
+                .. targetOpt,
+                "add",
+                repo1 + "_again",
+                Path.Join("..", repo1),
+                "--link-existing",
+            ];
+            var parseResult = progCli.Parse(cliArgs);
+
+            var exitCode = parseResult.Invoke(_invCfg);
+            Assert.Equal(1, exitCode);
+
+            var errorPattern = $"Cannot link to a site '.*' that already links to other site";
+
+            Assert.Matches(errorPattern, _invCfg.Error.ToString());
+        }
+    }
+
+    [Fact]
+    public void AddRepo1_LinkRepo0()
+    {
+        _scene.SetupRepo0(_host);
+        _scene.SetupRepo1(_host);
+        _scene.SetupRepo2(_host);
+
+        const string repo0 = "repo0";
+        const string repo1 = "repo1";
+        const string repo2 = "repo2";
+
+        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        Directory.SetCurrentDirectory(repo2Path);
+
+        ProgramCommandLine progCli = new(_host);
 
         string[] targetOpt = ["--target", repo0];
 
@@ -109,8 +191,8 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
             "site",
             .. targetOpt,
             "add",
-            repo9,
-            Path.Join("..", repo9),
+            repo1,
+            Path.Join("..", repo1),
             "--link-existing",
         ];
 
@@ -124,8 +206,8 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
         using var hostRepo = Lg2Repository.New(".");
         using var hostConfig = hostRepo.GetConfigSnapshot();
 
-        var repo0SiteName = TautSiteConfig.FindSiteName(hostConfig, repo0);
-        var repo9SiteName = TautSiteConfig.FindSiteName(hostConfig, repo9);
+        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo0);
+        var repo9SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo1);
         var repo9SiteConfig = TautSiteConfig.LoadNew(hostConfig, repo9SiteName);
 
         Assert.NotNull(repo9SiteConfig.LinkTo);

@@ -138,7 +138,7 @@ partial class GitRemoteHelper
     {
         using var hostConfig = HostRepo.GetConfigSnapshot();
 
-        var foundSiteName = TautSiteConfig.TryFindSiteName(
+        var foundSiteName = TautSiteConfig.TryFindSiteNameForRemote(
             hostConfig,
             _remoteName,
             out var tautSiteName
@@ -221,7 +221,7 @@ partial class GitRemoteHelper
     {
         using var hostConfig = HostRepo.GetConfigSnapshot();
 
-        var tautSiteName = TautSiteConfig.FindSiteName(hostConfig, RemoteName);
+        var tautSiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, RemoteName);
 
         tautSetup.GearUpExisting(HostRepo, RemoteName, tautSiteName);
 
@@ -239,7 +239,7 @@ partial class GitRemoteHelper
         void HandleBatch()
         {
             using var config = HostRepo.GetConfigSnapshot();
-            var tautSiteName = TautSiteConfig.FindSiteName(config, RemoteName);
+            var tautSiteName = TautSiteConfig.FindSiteNameForRemote(config, RemoteName);
 
             foreach (var pushCmd in _pushBatch)
             {

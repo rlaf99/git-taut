@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using Git.Taut;
 using Lg2.Sharpy;
@@ -129,23 +128,41 @@ class SiteCommandActions(
         logger.ZLogTrace($"Done invoking action {nameof(Run)}");
     }
 
-    internal Task<int> AddAsync(ParseResult parseResult, CancellationToken cancelToken)
+    internal Task<int> AddAsync(ParseResult parseResult, CancellationToken cancellation)
     {
         logger.ZLogTrace($"Start invoking action {nameof(Add)}");
 
+        var task = PerformAction(parseResult, cancellation, Add);
+
+        logger.ZLogTrace($"Done invoking action {nameof(Add)}");
+
+        return task;
+    }
+
+    internal Task<int> PerformAction(
+        ParseResult parseResult,
+        CancellationToken cancellation,
+        Action<ParseResult> action
+    )
+    {
+        var error = parseResult.InvocationConfiguration.Error;
+
         try
         {
-            Add(parseResult);
+            action(parseResult);
         }
         catch (InvalidOperationException ex)
         {
-            var error = parseResult.InvocationConfiguration.Error;
             error.WriteLine(ex.Message);
 
             return Task.FromResult(1);
         }
+        catch (Lg2Exception ex)
+        {
+            error.WriteLine(ex.Message);
 
-        logger.ZLogTrace($"Done invoking action {nameof(Add)}");
+            return Task.FromResult(1);
+        }
 
         return Task.FromResult(0);
     }
@@ -159,86 +176,58 @@ class SiteCommandActions(
 
         var hostRepo = LocateHostRepo();
 
-        string? tautSiteName = null;
+        if (hostRepo.TryLookupRemote(remoteName, out _))
+        {
+            throw new InvalidOperationException(
+                $"Remote '{remoteName}' already exists in the host repository"
+            );
+        }
+
+        string? targetSite = null;
         if (parseResult.GetValue(ProgramCommandLine.SiteTargetOption) is not null)
         {
             var result = ResolveTargetOption(parseResult, hostRepo, followHead: false);
-            tautSiteName = result.SiteName;
+            targetSite = result.SiteName;
         }
 
-        if (linkExisting && tautSiteName is null)
+        if (linkExisting && targetSite is null)
         {
             throw new InvalidOperationException(
                 $"No {ProgramCommandLine.SiteTargetOption.Name} is speficied when {ProgramCommandLine.LinkExistingOption.Name} is used"
             );
         }
 
-        string remoteUrl;
-
-        if (Directory.Exists(remoteAddress))
+        if (linkExisting && targetSite is not null)
         {
-            try
+            using var config = hostRepo.GetConfigSnapshot();
+            var targetSiteConfig = TautSiteConfig.LoadNew(config, targetSite);
+
+            if (targetSiteConfig.LinkTo is not null)
             {
-                using var repo = Lg2Repository.New(
-                    remoteAddress,
-                    Lg2RepositoryOpenFlags.LG2_REPOSITORY_OPEN_NO_SEARCH
+                throw new InvalidOperationException(
+                    $"Cannot link to a site '{targetSite}' that already links to other site"
                 );
-
-                remoteUrl = repo.GetPath();
-            }
-            catch (Lg2Exception)
-            {
-                Console.Error.WriteLine($"Failed to open '{remoteAddress}' as a local git repo");
-
-                throw new OperationCanceledException();
             }
         }
-        else if (remoteAddress.Contains(':'))
-        {
-            remoteUrl = remoteAddress;
-        }
-        else
-        {
-            Console.Error.WriteLine($"Unrecoginized repo path '{remoteAddress}'");
 
-            throw new OperationCanceledException();
-        }
+        string remoteUrl = ResolveLocalUrl(remoteAddress);
 
-        if (hostRepo.TryLookupRemote(remoteName, out _))
-        {
-            Console.Error.WriteLine($"Remote '{remoteName}' already exists in the host repo.");
-            throw new OperationCanceledException();
-        }
+        tautSetup.GearUpBrandNew(hostRepo, remoteName, remoteUrl, targetSite);
 
-        tautSetup.GearUpBrandNew(hostRepo, remoteName, remoteUrl, tautSiteName);
+        tautManager.RegainHostRefs();
 
-        using (tautSetup)
-        {
-            tautManager.RegainHostRefs();
-
-            tautSetup.WrapUpBrandNew();
-        }
+        tautSetup.WrapUpBrandNew();
     }
 
-    internal Task<int> ListAsync(ParseResult parseResult, CancellationToken cancelToken)
+    internal Task<int> ListAsync(ParseResult parseResult, CancellationToken cancellation)
     {
         logger.ZLogTrace($"Start invoking action {nameof(List)}");
 
-        try
-        {
-            List(parseResult);
-        }
-        catch (InvalidOperationException ex)
-        {
-            var error = parseResult.InvocationConfiguration.Error;
-            error.WriteLine(ex.Message);
-
-            return Task.FromResult(1);
-        }
+        var task = PerformAction(parseResult, cancellation, List);
 
         logger.ZLogTrace($"Done invoking action {nameof(List)}");
 
-        return Task.FromResult(0);
+        return task;
     }
 
     internal void List(ParseResult parseResult)
@@ -419,30 +408,31 @@ class SiteCommandActions(
         {
             using var config = hostRepo.GetConfigSnapshot();
 
-            TautSiteConfig? tautConfig;
+            string? siteName = null;
 
-            if (TautSiteConfig.TryLoadBySiteName(config, targetName, out tautConfig))
+            if (TautSiteConfig.IsExistingSite(config, targetName))
             {
-                return new(
-                    SiteName: tautConfig.SiteName,
-                    RemoteName: null,
-                    TargetIsRemote: false,
-                    SiteIsFromHead: false
+                siteName = targetName;
+            }
+            else
+            {
+                TautSiteConfig.TryFindSiteNameForRemote(config, targetName, out siteName);
+            }
+
+            if (siteName is null)
+            {
+                throw new InvalidOperationException(
+                    $"The value '{targetName}' specified by {ProgramCommandLine.SiteTargetOption.Name} is invalid"
                 );
             }
 
-            if (TautSiteConfig.TryLoadByRemoteName(config, targetName, out tautConfig))
-            {
-                return new(
-                    SiteName: tautConfig.SiteName,
-                    RemoteName: targetName,
-                    TargetIsRemote: true,
-                    SiteIsFromHead: false
-                );
-            }
+            var siteConfig = TautSiteConfig.LoadNew(config, siteName);
 
-            throw new InvalidOperationException(
-                $"The value '{targetName}' specified by {ProgramCommandLine.SiteTargetOption.Name} is invalid"
+            return new(
+                SiteName: siteConfig.SiteName,
+                RemoteName: null,
+                TargetIsRemote: false,
+                SiteIsFromHead: false
             );
         }
         else if (followHead)
@@ -457,7 +447,7 @@ class SiteCommandActions(
                 );
             }
 
-            throw new InvalidOperationException($"Cannot resolve taut site name specified by HEAD");
+            throw new InvalidOperationException($"Cannot resolve taut site name from head HEAD");
         }
         else
         {
@@ -526,6 +516,31 @@ class SiteCommandActions(
 
             throw new OperationCanceledException();
         }
+    }
+
+    string ResolveLocalUrl(string remoteAddress)
+    {
+        string remoteUrl;
+
+        if (Directory.Exists(remoteAddress))
+        {
+            using var repo = Lg2Repository.New(
+                remoteAddress,
+                Lg2RepositoryOpenFlags.LG2_REPOSITORY_OPEN_NO_SEARCH
+            );
+
+            remoteUrl = repo.GetPath();
+        }
+        else if (remoteAddress.Contains(':'))
+        {
+            remoteUrl = remoteAddress;
+        }
+        else
+        {
+            throw new InvalidOperationException($"Unrecoginized repository path '{remoteAddress}'");
+        }
+
+        return remoteUrl;
     }
 
     Lg2Repository LocateTautRepo()
@@ -635,14 +650,14 @@ class ProgramCommandLine(IHost host)
         command.Arguments.Add(RemoteAddressArgument);
 
         command.SetAction(
-            (parseResult, cancelToken) =>
+            (parseResult, cancellation) =>
             {
                 var cmd = host.Services.GetRequiredService<GitRemoteHelper>();
 
                 var remoteName = parseResult.GetRequiredValue(RemoteNameArgument);
                 var remoteAddress = parseResult.GetRequiredValue(RemoteAddressArgument);
 
-                var result = cmd.WorkWithGitAsync(remoteName, remoteAddress, cancelToken);
+                var result = cmd.WorkWithGitAsync(remoteName, remoteAddress, cancellation);
 
                 return result;
             }

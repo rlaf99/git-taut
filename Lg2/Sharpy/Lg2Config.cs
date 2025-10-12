@@ -115,7 +115,7 @@ public sealed unsafe class Lg2ConfigIteratorEntry
 
     void EnsureSteps()
     {
-        var iter = EnsureOwner();
+        var iter = ObtainOwner();
 
         if (iter.Steps != _steps)
         {

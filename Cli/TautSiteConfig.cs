@@ -285,7 +285,7 @@ class TautSiteConfig
         [NotNullWhen(true)] out TautSiteConfig? result
     )
     {
-        if (TryFindSiteName(config, remoteName, out var tautSiteName) == false)
+        if (TryFindSiteNameForRemote(config, remoteName, out var tautSiteName) == false)
         {
             result = null;
 
@@ -371,14 +371,33 @@ class TautSiteConfig
         }
     }
 
+    internal static bool IsExistingSite(Lg2Config config, string siteName)
+    {
+        var pattern = $@"{SectionName}\.{siteName}\..*";
+
+        using (var cfgIter = config.NewIterator(pattern))
+        {
+            if (cfgIter.Next(out _))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     const string RemoteOfAnySitePattern = $@"{SectionName}\.(.*)\.remote";
     static Regex RemoteOfAnySiteRegex = new(RemoteOfAnySitePattern);
 
-    internal static bool TryFindSiteName(Lg2Config config, string remoteName, out string siteName)
+    internal static bool TryFindSiteNameForRemote(
+        Lg2Config config,
+        string remoteName,
+        [NotNullWhen(true)] out string? siteName
+    )
     {
-        var cfgIter = config.NewIterator(RemoteOfAnySitePattern);
+        using var cfgIter = config.NewIterator(RemoteOfAnySitePattern);
 
-        siteName = string.Empty;
+        siteName = null;
         bool found = false;
 
         while (cfgIter.Next(out var entry))
@@ -398,9 +417,9 @@ class TautSiteConfig
         return found;
     }
 
-    internal static string FindSiteName(Lg2Config config, string remoteName)
+    internal static string FindSiteNameForRemote(Lg2Config config, string remoteName)
     {
-        if (TryFindSiteName(config, remoteName, out var result))
+        if (TryFindSiteNameForRemote(config, remoteName, out var result))
         {
             return result;
         }

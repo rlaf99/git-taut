@@ -86,7 +86,7 @@ public abstract unsafe class NativeOwnedRef<TOwner, TNative>
         }
     }
 
-    internal TOwner EnsureOwner()
+    internal TOwner ObtainOwner()
     {
         if (_ownerWeakRef.TryGetTarget(out var owner) == false)
         {
