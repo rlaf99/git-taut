@@ -17,7 +17,7 @@ public class TauteningTests : IDisposable
     public TauteningTests(ITestOutputHelper output, HostBuilderFixture hostBuilder)
     {
         _output = output;
-        _host = hostBuilder.BuildHost(_output);
+        _host = hostBuilder.BuildHost();
 
         _scene = new TestScene();
         _scene.SetupRepo0(_host);

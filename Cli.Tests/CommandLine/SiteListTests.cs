@@ -9,7 +9,7 @@ namespace Cli.Tests.CommandLine;
 public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixture hostBuilder)
     : IDisposable
 {
-    IHost _host = hostBuilder.BuildHost(testOutput);
+    IHost _host = hostBuilder.BuildHost();
 
     TestScene _scene = new();
 
@@ -21,6 +21,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
 
     public void Dispose()
     {
+        _host.Dispose();
         _scene.PreserveContentWhenFailed(testOutput);
         _scene.Dispose();
     }
@@ -51,7 +52,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
     {
         _scene.SetupRepo0(_host);
         _scene.SetupRepo1(_host);
-        _scene.CloneRepo2(_host);
+        _scene.SetupRepo2(_host);
 
         var repo2Path = Path.Join(_scene.DirPath, "repo2");
         Directory.SetCurrentDirectory(repo2Path);
@@ -69,9 +70,19 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
         Assert.NotEqual(0, exitCode);
 
         var errorText =
-            $"The value '{invalidTarget}' specified by {ProgramCommandLine.CampTargetOption.Name} is invalid"
+            $"The value '{invalidTarget}' specified by {ProgramCommandLine.SiteTargetOption.Name} is invalid"
             + Environment.NewLine;
 
         Assert.Equal(errorText, _invCfg.Error.ToString());
+    }
+
+    [Fact]
+    public void TestName()
+    {
+        // Given
+
+        // When
+
+        // Then
     }
 }

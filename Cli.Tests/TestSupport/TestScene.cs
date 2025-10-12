@@ -17,9 +17,9 @@ sealed class TestScene : IDisposable
         _path = Testbed.CreateDirectory(NameSuffix);
     }
 
-    public bool ShouldPreserve { get; set; }
+    public bool ShouldPreserve { get; private set; }
 
-    public void PreserveContentWhenFailed(ITestOutputHelper? output)
+    public void PreserveContentWhenFailed(ITestOutputHelper? output = null)
     {
         var state = TestContext.Current.TestState;
         if (state?.Result == TestResult.Failed)
@@ -31,6 +31,17 @@ sealed class TestScene : IDisposable
                 var caseName = TestContext.Current.TestCase?.TestCaseDisplayName;
                 output.WriteLine($"Preserve'{DirPath}' for failed case {caseName}.");
             }
+        }
+    }
+
+    public void PreserveContentWhenAsked(ITestOutputHelper? output = null)
+    {
+        ShouldPreserve = true;
+
+        if (output is not null)
+        {
+            var caseName = TestContext.Current.TestCase?.TestCaseDisplayName;
+            output.WriteLine($"Preserve'{DirPath}' for case {caseName} as asked.");
         }
     }
 
@@ -125,14 +136,27 @@ static class SceneExtensions
         gitCli.Run("push");
     }
 
-    public static void CloneRepo2(this TestScene scene, IHost host)
+    public static void SetupRepo2(this TestScene scene, IHost host)
     {
         var gitCli = host.Services.GetRequiredService<GitCli>();
 
         using var pushDir = new PushDirectory(scene.DirPath);
 
+        const string repo0 = "repo0";
         const string repo2 = "repo2";
 
-        gitCli.Run("clone", "taut::repo0", repo2);
+        gitCli.Run("clone", "--origin", repo0, "taut::repo0", repo2);
+    }
+
+    public static void SetupRepo9(this TestScene scene, IHost host)
+    {
+        var gitCli = host.Services.GetRequiredService<GitCli>();
+
+        using var pushDir = new PushDirectory(scene.DirPath);
+
+        const string repo0 = "repo0";
+        const string repo9 = "repo9";
+
+        gitCli.Run("clone", repo0, repo9);
     }
 }

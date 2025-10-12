@@ -461,7 +461,8 @@ public static unsafe class Lg2OdbExtenions
             return false;
         }
 
-        var readStream = odb.ReadAsStream(oidRef);
+        using var readStream = odb.ReadAsStream(oidRef);
+
         if (readStream is not ILg2ObjectType objType)
         {
             throw new InvalidOperationException(
@@ -469,8 +470,13 @@ public static unsafe class Lg2OdbExtenions
             );
         }
 
-        var writeStream = otherOdb.OpenWriteStream(readStream.Length, objType.GetObjectType());
+        using var writeStream = otherOdb.OpenWriteStream(
+            readStream.Length,
+            objType.GetObjectType()
+        );
+
         readStream.CopyTo(writeStream);
+
         Lg2Oid oid = new();
         writeStream.FinalizeWrite(ref oid);
 

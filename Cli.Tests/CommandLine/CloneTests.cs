@@ -17,7 +17,7 @@ public sealed class CloneTests : IDisposable
     public CloneTests(ITestOutputHelper output, HostBuilderFixture hostBuilder)
     {
         _output = output;
-        _host = hostBuilder.BuildHost(_output);
+        _host = hostBuilder.BuildHost();
         _scene = new TestScene();
     }
 

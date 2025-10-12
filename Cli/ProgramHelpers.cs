@@ -1,5 +1,5 @@
 using System.CommandLine;
-using System.Diagnostics;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using Git.Taut;
 using Lg2.Sharpy;
@@ -14,23 +14,31 @@ namespace ProgramHelpers;
 
 static class HostApplicationBuilderExtensions
 {
-    internal static void AddGitTautCommandActions(this HostApplicationBuilder hostBuilder)
+    internal static void AddGitTautReleated(this HostApplicationBuilder builder)
     {
-        hostBuilder.Services.AddSingleton<GitRemoteHelper>();
-        hostBuilder.Services.AddSingleton<SiteCommandActions>();
-        hostBuilder.Services.AddSingleton<OtherCommandActions>();
+        builder.AddGitTautConfiguration();
+        builder.AddGitTautServices();
+        builder.AddGitTautCommandActions();
+        builder.AddGitTautLogging();
     }
 
-    internal static void AddGitTautConfiguration(this HostApplicationBuilder hostBuilder)
+    internal static void AddGitTautCommandActions(this HostApplicationBuilder builder)
     {
-        var config = hostBuilder.Configuration;
+        builder.Services.AddSingleton<GitRemoteHelper>();
+        builder.Services.AddSingleton<SiteCommandActions>();
+        builder.Services.AddSingleton<OtherCommandActions>();
+    }
+
+    internal static void AddGitTautConfiguration(this HostApplicationBuilder builder)
+    {
+        var config = builder.Configuration;
 
         config.AddEnvironmentVariables();
     }
 
-    internal static void AddGitTautServices(this HostApplicationBuilder hostBuilder)
+    internal static void AddGitTautServices(this HostApplicationBuilder builder)
     {
-        var services = hostBuilder.Services;
+        var services = builder.Services;
 
         services.AddSingleton<GitCli>();
         services.AddSingleton<TautSetup>();
@@ -40,9 +48,9 @@ static class HostApplicationBuilderExtensions
         services.AddSingleton<RecyclableMemoryStreamManager>();
     }
 
-    internal static void AddGitTautLogging(this HostApplicationBuilder hostBuilder)
+    internal static void AddGitTautLogging(this HostApplicationBuilder builder)
     {
-        var logging = hostBuilder.Logging;
+        var logging = builder.Logging;
 
         logging.ClearProviders();
 
@@ -72,7 +80,7 @@ static class HostApplicationBuilderExtensions
             options.FullMode = BackgroundBufferFullMode.Block;
         });
 
-        if (hostBuilder.Configuration.GetGitTautTrace())
+        if (builder.Configuration.GetGitTautTrace())
         {
             logging.SetMinimumLevel(LogLevel.Trace);
         }
@@ -103,7 +111,7 @@ class SiteCommandActions(
 
         var result = ResolveTargetOption(parseResult, hostRepo, followHead: true);
 
-        tautSetup.GearUpExisting(hostRepo, remoteName: null, result.TautSiteName);
+        tautSetup.GearUpExisting(hostRepo, remoteName: null, result.SiteName);
 
         using (tautSetup)
         {
@@ -121,10 +129,29 @@ class SiteCommandActions(
         logger.ZLogTrace($"Done invoking action {nameof(Run)}");
     }
 
-    internal void Add(ParseResult parseResult)
+    internal Task<int> AddAsync(ParseResult parseResult, CancellationToken cancelToken)
     {
         logger.ZLogTrace($"Start invoking action {nameof(Add)}");
 
+        try
+        {
+            Add(parseResult);
+        }
+        catch (InvalidOperationException ex)
+        {
+            var error = parseResult.InvocationConfiguration.Error;
+            error.WriteLine(ex.Message);
+
+            return Task.FromResult(1);
+        }
+
+        logger.ZLogTrace($"Done invoking action {nameof(Add)}");
+
+        return Task.FromResult(0);
+    }
+
+    internal void Add(ParseResult parseResult)
+    {
         var remoteName = parseResult.GetRequiredValue(ProgramCommandLine.RemoteNameArgument);
         var remoteAddress = parseResult.GetRequiredValue(ProgramCommandLine.RemoteAddressArgument);
 
@@ -133,16 +160,16 @@ class SiteCommandActions(
         var hostRepo = LocateHostRepo();
 
         string? tautSiteName = null;
-        if (parseResult.GetValue(ProgramCommandLine.CampTargetOption) is not null)
+        if (parseResult.GetValue(ProgramCommandLine.SiteTargetOption) is not null)
         {
             var result = ResolveTargetOption(parseResult, hostRepo, followHead: false);
-            tautSiteName = result.TautSiteName;
+            tautSiteName = result.SiteName;
         }
 
         if (linkExisting && tautSiteName is null)
         {
             throw new InvalidOperationException(
-                $"{ProgramCommandLine.LinkExistingOption} is used, but no {ProgramCommandLine.CampTargetOption.HelpName} is speficied"
+                $"No {ProgramCommandLine.SiteTargetOption.Name} is speficied when {ProgramCommandLine.LinkExistingOption.Name} is used"
             );
         }
 
@@ -185,11 +212,12 @@ class SiteCommandActions(
 
         tautSetup.GearUpBrandNew(hostRepo, remoteName, remoteUrl, tautSiteName);
 
-        tautManager.RegainHostRefs();
+        using (tautSetup)
+        {
+            tautManager.RegainHostRefs();
 
-        tautSetup.WrapUpBrandNew();
-
-        logger.ZLogTrace($"Done invoking action {nameof(Add)}");
+            tautSetup.WrapUpBrandNew();
+        }
     }
 
     internal Task<int> ListAsync(ParseResult parseResult, CancellationToken cancelToken)
@@ -219,15 +247,15 @@ class SiteCommandActions(
 
         string? tautSiteName = null;
 
-        if (parseResult.GetValue(ProgramCommandLine.CampTargetOption) is not null)
+        if (parseResult.GetValue(ProgramCommandLine.SiteTargetOption) is not null)
         {
             var result = ResolveTargetOption(parseResult, hostRepo, followHead: false);
-            tautSiteName = result.TautSiteName;
+            tautSiteName = result.SiteName;
         }
 
         using (var config = hostRepo.GetConfigSnapshot())
         {
-            TautSiteConfig.PrintCamps(config, tautSiteName);
+            TautSiteConfig.PrintSites(config, tautSiteName);
         }
     }
 
@@ -238,7 +266,7 @@ class SiteCommandActions(
         var hostRepo = LocateHostRepo();
 
         var resolvedTarget = ResolveTargetOption(parseResult, hostRepo, followHead: false);
-        var tautSiteName = resolvedTarget.TautSiteName;
+        var tautSiteName = resolvedTarget.SiteName;
 
         using (var config = hostRepo.GetConfig())
         {
@@ -263,7 +291,7 @@ class SiteCommandActions(
                 tautCfg.RemoveRemoteFromConfig(config, resolvedTarget.RemoteName!);
             }
 
-            if (tautCfg.RemoteNames.Count != 0)
+            if (tautCfg.Remotes.Count != 0)
             {
                 throw new InvalidOperationException(
                     $"There are other remotes using taut site '{tautCfg.SiteName}'"
@@ -290,7 +318,7 @@ class SiteCommandActions(
 
         var result = ResolveTargetOption(parseResult, hostRepo, followHead: true);
 
-        tautSetup.GearUpExisting(hostRepo, null, result.TautSiteName);
+        tautSetup.GearUpExisting(hostRepo, null, result.SiteName);
 
         if (File.Exists(path))
         {
@@ -374,10 +402,10 @@ class SiteCommandActions(
     }
 
     record ResolveTargetOptionResult(
-        string TautSiteName,
+        string SiteName,
         string? RemoteName,
         bool TargetIsRemote,
-        bool CampIsFromHead
+        bool SiteIsFromHead
     );
 
     ResolveTargetOptionResult ResolveTargetOption(
@@ -386,7 +414,7 @@ class SiteCommandActions(
         bool followHead
     )
     {
-        var targetName = parseResult.GetValue(ProgramCommandLine.CampTargetOption);
+        var targetName = parseResult.GetValue(ProgramCommandLine.SiteTargetOption);
         if (targetName is not null)
         {
             using var config = hostRepo.GetConfigSnapshot();
@@ -396,25 +424,25 @@ class SiteCommandActions(
             if (TautSiteConfig.TryLoadBySiteName(config, targetName, out tautConfig))
             {
                 return new(
-                    TautSiteName: tautConfig.SiteName,
+                    SiteName: tautConfig.SiteName,
                     RemoteName: null,
                     TargetIsRemote: false,
-                    CampIsFromHead: false
+                    SiteIsFromHead: false
                 );
             }
 
             if (TautSiteConfig.TryLoadByRemoteName(config, targetName, out tautConfig))
             {
                 return new(
-                    TautSiteName: tautConfig.SiteName,
+                    SiteName: tautConfig.SiteName,
                     RemoteName: targetName,
                     TargetIsRemote: true,
-                    CampIsFromHead: false
+                    SiteIsFromHead: false
                 );
             }
 
             throw new InvalidOperationException(
-                $"The value '{targetName}' specified by {ProgramCommandLine.CampTargetOption.Name} is invalid"
+                $"The value '{targetName}' specified by {ProgramCommandLine.SiteTargetOption.Name} is invalid"
             );
         }
         else if (followHead)
@@ -422,10 +450,10 @@ class SiteCommandActions(
             if (TryResolveTautSiteNameFromHead(hostRepo, out var tautSiteName))
             {
                 return new(
-                    TautSiteName: tautSiteName,
+                    SiteName: tautSiteName,
                     RemoteName: null,
                     TargetIsRemote: false,
-                    CampIsFromHead: true
+                    SiteIsFromHead: true
                 );
             }
 
@@ -434,7 +462,7 @@ class SiteCommandActions(
         else
         {
             throw new InvalidOperationException(
-                $"{ProgramCommandLine.CampTargetOption.Name} is not specified"
+                $"{ProgramCommandLine.SiteTargetOption.Name} is not specified"
             );
         }
     }
@@ -542,7 +570,7 @@ class ProgramCommandLine(IHost host)
         Description = "The address of the remote passed by Git",
     };
 
-    internal static Option<string> CampTargetOption = new("--target")
+    internal static Option<string> SiteTargetOption = new("--target")
     {
         Description =
             "Specify a taut site either by its name or by the name of an associated remote",
@@ -563,7 +591,7 @@ class ProgramCommandLine(IHost host)
     internal static Option<bool> LinkExistingOption = new("--link-existing")
     {
         Description =
-            $"Whether to setup a a link to exisitng taut site specified by {CampTargetOption.Name}",
+            $"Whether to setup a a link to exisitng taut site specified by {SiteTargetOption.Name}",
     };
 
     internal static Argument<string> PathArgument = new("path")
@@ -639,7 +667,7 @@ class ProgramCommandLine(IHost host)
 
     Command CreateCommandSite()
     {
-        Command command = new("site", "Taut site related commands") { CampTargetOption };
+        Command command = new("site", "Taut site related commands") { SiteTargetOption };
 
         return command;
     }
@@ -673,10 +701,7 @@ class ProgramCommandLine(IHost host)
 
         var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
-        command.SetAction(parseResult =>
-        {
-            actions.Add(parseResult);
-        });
+        command.SetAction(actions.AddAsync);
 
         return command;
     }

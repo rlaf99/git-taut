@@ -15,14 +15,10 @@ catch (Exception ex)
     Environment.Exit(1);
 }
 
-var hostAppBuilder = Host.CreateEmptyApplicationBuilder(null);
+var builder = Host.CreateEmptyApplicationBuilder(null);
+builder.AddGitTautReleated();
 
-hostAppBuilder.AddGitTautConfiguration();
-hostAppBuilder.AddGitTautServices();
-hostAppBuilder.AddGitTautCommandActions();
-hostAppBuilder.AddGitTautLogging();
-
-var host = hostAppBuilder.Build();
+using var host = builder.Build();
 
 ProgramCommandLine progCli = new(host);
 

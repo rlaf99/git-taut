@@ -44,12 +44,7 @@ sealed class TautSetup(
 
     bool _gearedUp;
 
-    internal bool Initialized => _gearedUp;
-
-    internal void EnsureInitialized()
-    {
-        ThrowHelper.InvalidOperationIfNotInitialized(_gearedUp, nameof(TautSetup));
-    }
+    internal bool GearedUp => _gearedUp;
 
     internal void EnsureNotGearedUp()
     {
@@ -116,7 +111,7 @@ sealed class TautSetup(
 
     void EnsureBrandNewSetup(string remoteAddress)
     {
-        SiteConfig.RemoteNames.Add(RemoteName);
+        SiteConfig.Remotes.Add(RemoteName);
 
         var tautSitePath = HostRepo.GetTautSitePath(SiteConfig.SiteName);
 
@@ -133,7 +128,7 @@ sealed class TautSetup(
 
         if (SiteConfig.LinkTo is not null)
         {
-            using (var config = HostRepo.GetConfig())
+            using (var config = HostRepo.GetConfigSnapshot())
             {
                 SiteConfig.LinkTo.Load(config);
             }
@@ -142,6 +137,8 @@ sealed class TautSetup(
 
             argList.Add("--reference");
             argList.Add(tautSitePathToLink);
+
+            logger.ZLogDebug($"{tautSitePathToLink}");
 
             logger.ZLogTrace($"{SiteConfig.SiteName} is linked to {SiteConfig.LinkTo.SiteName}");
         }
@@ -271,6 +268,7 @@ sealed class TautSetup(
         }
 
         var tautSitePath = HostRepo.GetTautSitePath(SiteConfig.SiteName);
+
         _tautRepo = Lg2Repository.New(tautSitePath);
 
         if (_remoteName is not null)

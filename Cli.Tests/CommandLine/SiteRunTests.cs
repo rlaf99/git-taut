@@ -8,12 +8,13 @@ namespace Cli.Tests.CommandLine;
 public sealed class SiteRunTests(ITestOutputHelper testOutput, HostBuilderFixture hostBuilder)
     : IDisposable
 {
-    IHost _host = hostBuilder.BuildHost(testOutput);
+    IHost _host = hostBuilder.BuildHost();
 
     TestScene _scene = new();
 
     public void Dispose()
     {
+        _host.Dispose();
         _scene.PreserveContentWhenFailed(testOutput);
         _scene.Dispose();
     }

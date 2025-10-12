@@ -509,7 +509,7 @@ partial class Aes256Cbc1
             }
 
             logger.ZLogTrace(
-                $"Compressed encryptor input from {sourceInput.Length} to {compressedStream.Length}"
+                $"Compressed encryptor input from {sourceLength} to {compressedStream.Length}"
             );
 
             compressedStream.Position = 0;

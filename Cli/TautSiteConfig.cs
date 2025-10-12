@@ -8,10 +8,15 @@ class TautSiteConfig
 {
     internal const string SectionName = "taut";
 
-    // used as sub-section name
+    internal const string CredentialUrlMatchName = "credentialurl";
+    internal const string CredentialUserNameMatchName = "credentialusername";
+    internal const string CredentialKeyTraitMatchName = "credentialkeytrait";
+    internal const string RemoteMatchName = "remote";
+    internal const string LinkToMatchName = "linkto";
+
     internal string SiteName { get; }
 
-    internal TautSiteConfig? LinkTo { get; }
+    internal TautSiteConfig? LinkTo { get; private set; }
 
     internal string CredentialUrl { get; set; } = string.Empty;
 
@@ -19,7 +24,7 @@ class TautSiteConfig
 
     internal string CredentialKeyTrait { get; set; } = string.Empty;
 
-    internal List<string> RemoteNames { get; private set; } = [];
+    internal List<string> Remotes { get; private set; } = [];
 
     internal List<string> ReverseLinks { get; private set; } = [];
 
@@ -92,7 +97,7 @@ class TautSiteConfig
 
     internal void SaveRemotes(Lg2Config config)
     {
-        foreach (var remoteName in RemoteNames)
+        foreach (var remoteName in Remotes)
         {
             config.SetString(FormatItemName("remote"), remoteName);
         }
@@ -111,7 +116,7 @@ class TautSiteConfig
 
         config.SetString(FormatItemName(nameof(CredentialKeyTrait)), CredentialKeyTrait);
 
-        foreach (var remoteName in RemoteNames)
+        foreach (var remoteName in Remotes)
         {
             config.SetString(FormatItemName("remote"), remoteName);
         }
@@ -127,6 +132,57 @@ class TautSiteConfig
         }
 
         CredentialKeyTrait = config.GetString(FormatItemName(nameof(CredentialKeyTrait)));
+    }
+
+    internal static TautSiteConfig LoadNew(Lg2Config config, string siteName)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(siteName);
+
+        TautSiteConfig result = new(siteName);
+
+        string? linkTo = null;
+
+        {
+            var prefix = $"{SectionName}.{siteName}.";
+            var pattern = $@"{SectionName}\.{siteName}\.(.*)";
+            var cfgIter = config.NewIterator(pattern);
+
+            while (cfgIter.Next(out var entry))
+            {
+                var name = entry.GetName();
+                var value = entry.GetValue();
+                var variableName = name[prefix.Length..];
+
+                switch (variableName)
+                {
+                    case CredentialUrlMatchName:
+                        result.CredentialUrl = value;
+                        break;
+                    case CredentialKeyTraitMatchName:
+                        result.CredentialKeyTrait = value;
+                        break;
+                    case CredentialUserNameMatchName:
+                        result.CredentialUserName = value;
+                        break;
+                    case RemoteMatchName:
+                        result.Remotes.Add(value);
+                        break;
+                    case LinkToMatchName:
+                        linkTo = value;
+                        break;
+                    default:
+                        // ignored
+                        break;
+                }
+            }
+        }
+
+        if (linkTo is not null)
+        {
+            result.LinkTo = LoadNew(config, linkTo);
+        }
+
+        return result;
     }
 
     internal void RemoveAllFromConfig(Lg2Config config)
@@ -146,7 +202,7 @@ class TautSiteConfig
 
     internal void RemoveRemoteFromConfig(Lg2Config config, string remoteName)
     {
-        if (RemoteNames.Remove(remoteName) == false)
+        if (Remotes.Remove(remoteName) == false)
         {
             throw new ArgumentException($"{remoteName} not found", nameof(remoteName));
         }
@@ -167,7 +223,7 @@ class TautSiteConfig
             {
                 var val = entry.GetValue();
 
-                RemoteNames.Add(val);
+                Remotes.Add(val);
             }
         }
     }
@@ -253,7 +309,7 @@ class TautSiteConfig
         return true;
     }
 
-    internal static void PrintCamps(Lg2Config config, string? targetSiteName = null)
+    internal static void PrintSites(Lg2Config config, string? targetSiteName = null)
     {
         string ExtractSubSection(string itemName)
         {
@@ -315,23 +371,23 @@ class TautSiteConfig
         }
     }
 
-    internal static bool TryFindSiteName(Lg2Config config, string remoteName, out string repoName)
+    const string RemoteOfAnySitePattern = $@"{SectionName}\.(.*)\.remote";
+    static Regex RemoteOfAnySiteRegex = new(RemoteOfAnySitePattern);
+
+    internal static bool TryFindSiteName(Lg2Config config, string remoteName, out string siteName)
     {
-        const string pattern = $@"{SectionName}\.(.*)\.remote";
+        var cfgIter = config.NewIterator(RemoteOfAnySitePattern);
 
-        var cfgIter = config.NewIterator(pattern);
-        Regex regex = new(pattern);
-
-        repoName = string.Empty;
+        siteName = string.Empty;
         bool found = false;
 
         while (cfgIter.Next(out var entry))
         {
-            var val = entry.GetValue();
-            if (val == remoteName)
+            var value = entry.GetValue();
+            if (value == remoteName)
             {
                 var name = entry.GetName();
-                repoName = regex.Match(name).Groups[1].Value;
+                siteName = RemoteOfAnySiteRegex.Match(name).Groups[1].Value;
 
                 found = true;
 
@@ -350,7 +406,7 @@ class TautSiteConfig
         }
 
         throw new InvalidOperationException(
-            $"Taut repo name is not found for remote '{remoteName}'"
+            $"Taut site name is not found for remote '{remoteName}'"
         );
     }
 }

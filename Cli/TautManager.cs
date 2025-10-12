@@ -209,7 +209,7 @@ class TautManager(
 
         var tautRefList = FilterTautSpecificRefs(TautRepo.GetRefList());
 
-        var revWalk = TautRepo.NewRevWalk();
+        using var revWalk = TautRepo.NewRevWalk();
 
         revWalk.ResetSorting(
             Lg2SortFlags.LG2_SORT_TOPOLOGICAL
@@ -532,9 +532,11 @@ class TautManager(
 
             Lg2Oid oid = new();
             oid.FromRaw(extraPayload);
-            var baseOdbOject = hostRepoOdb.Read(oid);
+
+            using var baseOdbOject = hostRepoOdb.Read(oid);
 
             var resultBuf = patch.Apply(baseOdbOject.GetObjectData());
+
             using var writeStream = hostRepoOdb.OpenWriteStream(
                 resultBuf.Length,
                 blob.GetObjectType()
@@ -566,7 +568,7 @@ class TautManager(
 
         var hostRefList = FilterRemoteRefs(HostRepo.GetRefList());
 
-        var revWalk = HostRepo.NewRevWalk();
+        using var revWalk = HostRepo.NewRevWalk();
 
         revWalk.ResetSorting(
             Lg2SortFlags.LG2_SORT_TOPOLOGICAL
@@ -974,7 +976,7 @@ class TautManager(
         using var hostRepoOdb = HostRepo.GetOdb();
         using var tautRepoOdb = TautRepo.GetOdb();
 
-        var readStream = hostRepoOdb.ReadAsStream(blob);
+        using var readStream = hostRepoOdb.ReadAsStream(blob);
 
         var encryptor = tautCipher.CreateEncryptor(readStream, DATA_COMPRESSION_MAX_RATIO);
 

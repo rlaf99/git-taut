@@ -43,7 +43,7 @@ Or else receivest with pleasure thine annoy?
 
         UserKeyHolder keyHolder = new();
 
-        keyHolder.DeriveCrudeKey(GetUserPasswordData(), []);
+        keyHolder.DeriveCrudeKey(GetUserPasswordData(), GetUserPasswordSalt());
 
         _cihper.Init(keyHolder);
     }
@@ -53,12 +53,12 @@ Or else receivest with pleasure thine annoy?
         _cihper = null;
     }
 
-    public class TestNotInitialized(ITestOutputHelper testOutput, HostBuilderFixture hostBuilder)
+    public class TestNotInitialized(HostBuilderFixture hostBuilder)
     {
         [Fact]
         public void NotInitialized()
         {
-            var host = hostBuilder.BuildHost(testOutput);
+            var host = hostBuilder.BuildHost();
             var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
             Assert.Throws<InvalidOperationException>(() => cipher.EnsureInitialized());
             Assert.Throws<InvalidOperationException>(() => cipher.GetCipherTextLength(100));
@@ -67,7 +67,7 @@ Or else receivest with pleasure thine annoy?
         [Fact]
         public void InvalidInitialization()
         {
-            var host = hostBuilder.BuildHost(testOutput);
+            var host = hostBuilder.BuildHost();
             var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
 
             UserKeyHolder keyHolder = new();
@@ -88,12 +88,12 @@ Or else receivest with pleasure thine annoy?
         }
     }
 
-    public class TestNameEncryption(ITestOutputHelper testOutput, HostBuilderFixture hostBuilder)
+    public class TestNameEncryption(HostBuilderFixture hostBuilder)
     {
         [Fact]
         public void EncryptDecrypt()
         {
-            var host = hostBuilder.BuildHost(testOutput);
+            var host = hostBuilder.BuildHost();
 
             var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
 

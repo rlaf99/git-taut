@@ -27,39 +27,16 @@ public sealed class Lg2GlobalFixture : IDisposable
 
 public sealed class HostBuilderFixture : IDisposable
 {
-    public IHost BuildHost(Action<ILoggingBuilder>? configLogging = null)
+    public IHost BuildHost()
     {
         var builder = Host.CreateEmptyApplicationBuilder(null);
 
-        builder.AddGitTautServices();
-        builder.AddGitTautCommandActions();
-
-        if (configLogging is not null)
-        {
-            configLogging(builder.Logging);
-        }
+        builder.AddGitTautReleated();
 
         return builder.Build();
     }
 
-    public IHost BuildHost(ITestOutputHelper output)
-    {
-        return BuildHost(
-            configLogging: (logging) =>
-            {
-                logging.ClearProviders();
-                logging.AddZLoggerInMemory(processor =>
-                {
-                    processor.MessageReceived += msg => output.WriteLine(msg);
-                });
-            }
-        );
-    }
-
-    public void Dispose()
-    {
-        // do nothing
-    }
+    public void Dispose() { }
 }
 
 public sealed class LoggerFactoryFixture : IDisposable
