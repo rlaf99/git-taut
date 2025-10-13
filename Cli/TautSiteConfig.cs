@@ -185,18 +185,18 @@ class TautSiteConfig
         return result;
     }
 
+    // libgit2 does not seem to support section removal
+    // ref: <https://github.com/libgit2/libgit2/issues/1205>
     internal void RemoveAllFromConfig(Lg2Config config)
     {
+        var pattern = $@"{SectionName}\.{SiteName}\..*";
+        using var cfgIter = config.NewIterator(pattern);
+
+        while (cfgIter.Next(out var entry))
         {
-            var pattern = $@"{SectionName}\.{SiteName}\..*";
-            using var cfgIter = config.NewIterator(pattern);
+            var name = entry.GetName();
 
-            while (cfgIter.Next(out var entry))
-            {
-                var name = entry.GetName();
-
-                config.DeleteEntry(name);
-            }
+            config.DeleteEntry(name);
         }
     }
 
@@ -309,7 +309,11 @@ class TautSiteConfig
         return true;
     }
 
-    internal static void PrintSites(Lg2Config config, string? targetSiteName = null)
+    internal static void PrintSites(
+        Lg2Config config,
+        TextWriter writer,
+        string? targetSiteName = null
+    )
     {
         string ExtractSubSection(string itemName)
         {
@@ -341,7 +345,7 @@ class TautSiteConfig
 
         foreach (var tautSiteName in siteNames)
         {
-            Console.Write($"{tautSiteName}");
+            writer.Write($"{tautSiteName}");
 
             {
                 var pattern = $@"{SectionName}\.{tautSiteName}\.linkTo";
@@ -351,7 +355,7 @@ class TautSiteConfig
                 {
                     var val = entry.GetValue();
 
-                    Console.Write($" @{val}");
+                    writer.Write($" @{val}");
                 }
             }
 
@@ -363,11 +367,11 @@ class TautSiteConfig
                 {
                     var val = entry.GetValue();
 
-                    Console.Write($" {val}");
+                    writer.Write($" {val}");
                 }
             }
 
-            Console.WriteLine();
+            writer.WriteLine();
         }
     }
 

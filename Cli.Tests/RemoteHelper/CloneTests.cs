@@ -3,7 +3,7 @@ using Git.Taut;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace Cli.Tests.CommandLine;
+namespace Cli.Tests.RemoteHelper;
 
 [Collection("GitTautPaths")]
 public sealed class CloneTests : IDisposable

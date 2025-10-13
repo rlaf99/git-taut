@@ -6,7 +6,7 @@ namespace Cli.Tests.TestSupport;
 
 sealed class TestScene : IDisposable
 {
-    const string NameSuffix = "_S";
+    const string NameSuffix = ".S";
 
     readonly TempPath _path;
 
@@ -146,6 +146,44 @@ static class SceneExtensions
         const string repo2 = "repo2";
 
         gitCli.Run("clone", "--origin", repo0, "taut::repo0", repo2);
+    }
+
+    public static void ConfigRepo2AddingRepo1(this TestScene scene, IHost host)
+    {
+        var gitCli = host.Services.GetRequiredService<GitCli>();
+
+        using var pushDir = new PushDirectory(scene.DirPath);
+
+        const string repo1 = "repo1";
+        const string repo2 = "repo2";
+
+        Directory.SetCurrentDirectory(repo2);
+
+        gitCli.Run("taut", "site", "add", repo1, Path.Join("..", repo1));
+    }
+
+    public static void ConfigRepo2AddingRepo1WithLinkToRepo0(this TestScene scene, IHost host)
+    {
+        var gitCli = host.Services.GetRequiredService<GitCli>();
+
+        using var pushDir = new PushDirectory(scene.DirPath);
+
+        const string repo0 = "repo0";
+        const string repo1 = "repo1";
+        const string repo2 = "repo2";
+
+        Directory.SetCurrentDirectory(repo2);
+
+        gitCli.Run(
+            "taut",
+            "site",
+            "--target",
+            repo0,
+            "add",
+            repo1,
+            Path.Join("..", repo1),
+            "--link-existing"
+        );
     }
 
     public static void SetupRepo9(this TestScene scene, IHost host)

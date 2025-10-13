@@ -1,4 +1,7 @@
+using System.CommandLine;
 using Cli.Tests.TestSupport;
+using Git.Taut;
+using Lg2.Sharpy;
 using Microsoft.Extensions.Hosting;
 using ProgramHelpers;
 
@@ -10,6 +13,13 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput, HostBuilderFix
 {
     IHost _host = hostBuilder.BuildHost();
 
+    InvocationConfiguration _invCfg = new()
+    {
+        EnableDefaultExceptionHandler = false,
+        Output = new StringWriter(),
+        Error = new StringWriter(),
+    };
+
     TestScene _scene = new();
 
     public void Dispose()
@@ -20,18 +30,135 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput, HostBuilderFix
     }
 
     [Fact]
-    public void InvalidHostRepo()
+    public void TargetNotSpecified()
     {
-        Directory.SetCurrentDirectory(_scene.DirPath);
+        _scene.SetupRepo0(_host);
+        _scene.SetupRepo1(_host);
+        _scene.SetupRepo2(_host);
 
-        const string dir0 = "dir0";
-        Directory.CreateDirectory(dir0);
-        Directory.SetCurrentDirectory(dir0);
+        const string repo2 = "repo2";
+
+        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
-        string[] cliArgs = ["site", "list"];
+
+        string[] cliArgs = ["site", "remove"];
         var parseResult = progCli.Parse(cliArgs);
-        var exitCode = parseResult.Invoke();
+
+        var exitCode = parseResult.Invoke(_invCfg);
         Assert.NotEqual(0, exitCode);
+
+        var wantedError =
+            $"Option {ProgramCommandLine.SiteTargetOption.Name} is not specified"
+            + Environment.NewLine;
+        var actualError = _invCfg.Error.ToString();
+
+        Assert.Equal(wantedError, actualError);
+    }
+
+    [Fact]
+    public void RemoveRepo0()
+    {
+        _scene.SetupRepo0(_host);
+        _scene.SetupRepo1(_host);
+        _scene.SetupRepo2(_host);
+
+        const string repo0 = "repo0";
+        const string repo2 = "repo2";
+
+        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        Directory.SetCurrentDirectory(repo2Path);
+
+        using var hostRepo = Lg2Repository.New(".");
+        using var hostConfig = hostRepo.GetConfig();
+
+        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo0);
+
+        ProgramCommandLine progCli = new(_host);
+
+        string[] targetOpt = ["--target", repo0];
+        string[] cliArgs = ["site", .. targetOpt, "remove"];
+        var parseResult = progCli.Parse(cliArgs);
+
+        var exitCode = parseResult.Invoke(_invCfg);
+        Assert.Equal(0, exitCode);
+
+        Assert.False(TautSiteConfig.TryFindSiteNameForRemote(hostConfig, repo0, out _));
+
+        var repo0SitePath = hostRepo.GetTautSitePath(repo0SiteName);
+        Assert.False(Directory.Exists(repo0SitePath));
+    }
+
+    [Fact]
+    public void RemoveRepo0_TargetLinkedByOther()
+    {
+        _scene.SetupRepo0(_host);
+        _scene.SetupRepo1(_host);
+        _scene.SetupRepo2(_host);
+        _scene.ConfigRepo2AddingRepo1WithLinkToRepo0(_host);
+
+        const string repo0 = "repo0";
+        const string repo1 = "repo1";
+        const string repo2 = "repo2";
+
+        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        Directory.SetCurrentDirectory(repo2Path);
+
+        using var hostRepo = Lg2Repository.New(".");
+        using var hostConfig = hostRepo.GetConfig();
+
+        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo0);
+        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo1);
+
+        ProgramCommandLine progCli = new(_host);
+
+        string[] targetOpt = ["--target", repo0];
+        string[] cliArgs = ["site", .. targetOpt, "remove"];
+        var parseResult = progCli.Parse(cliArgs);
+
+        var exitCode = parseResult.Invoke(_invCfg);
+        Assert.NotEqual(0, exitCode);
+
+        var wantedError =
+            $"Taut site '{repo0SiteName}' is linked by others (e.g., '{repo1SiteName}')"
+            + Environment.NewLine;
+        var actualError = _invCfg.Error.ToString();
+
+        Assert.Equal(wantedError, actualError);
+    }
+
+    [Fact]
+    public void RemoveRepo1ThatLinksToRepo0()
+    {
+        _scene.SetupRepo0(_host);
+        _scene.SetupRepo1(_host);
+        _scene.SetupRepo2(_host);
+        _scene.ConfigRepo2AddingRepo1WithLinkToRepo0(_host);
+
+        const string repo1 = "repo1";
+        const string repo2 = "repo2";
+
+        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        Directory.SetCurrentDirectory(repo2Path);
+
+        using var hostRepo = Lg2Repository.New(".");
+        using var hostConfig = hostRepo.GetConfig();
+
+        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo1);
+
+        ProgramCommandLine progCli = new(_host);
+
+        string[] targetOpt = ["--target", repo1];
+        string[] cliArgs = ["site", .. targetOpt, "remove"];
+        var parseResult = progCli.Parse(cliArgs);
+
+        var exitCode = parseResult.Invoke(_invCfg);
+        Assert.Equal(0, exitCode);
+
+        Assert.False(TautSiteConfig.TryFindSiteNameForRemote(hostConfig, repo1, out _));
+
+        var repo1SitePath = hostRepo.GetTautSitePath(repo1SiteName);
+        Assert.False(Directory.Exists(repo1SitePath));
     }
 }

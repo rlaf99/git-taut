@@ -67,7 +67,9 @@ sealed class TautSetup(
         _hostRepo = hostRepo;
         _remoteName = remoteName;
 
-        _siteConfig = new(Path.GetRandomFileName(), tautSiteNameToLink);
+        var siteName = Path.GetRandomFileName().Replace('.', '-');
+
+        _siteConfig = new(siteName, tautSiteNameToLink);
 
         EnsureHostOidType();
 

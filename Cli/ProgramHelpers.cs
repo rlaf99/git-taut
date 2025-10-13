@@ -101,8 +101,6 @@ class SiteCommandActions(
 {
     internal void Run(ParseResult parseResult)
     {
-        logger.ZLogTrace($"Start invoking action {nameof(Run)}");
-
         var cmdName = parseResult.GetRequiredValue(ProgramCommandLine.CommandNameArgument);
         var cmdArgs = parseResult.GetValue(ProgramCommandLine.CommandArgsArgument) ?? [];
 
@@ -124,27 +122,17 @@ class SiteCommandActions(
                 Console.Error.WriteLine($"Failed to run `{string.Join(" ", gitArgs)}`");
             }
         }
-
-        logger.ZLogTrace($"Done invoking action {nameof(Run)}");
-    }
-
-    internal Task<int> AddAsync(ParseResult parseResult, CancellationToken cancellation)
-    {
-        logger.ZLogTrace($"Start invoking action {nameof(Add)}");
-
-        var task = PerformAction(parseResult, cancellation, Add);
-
-        logger.ZLogTrace($"Done invoking action {nameof(Add)}");
-
-        return task;
     }
 
     internal Task<int> PerformAction(
         ParseResult parseResult,
         CancellationToken cancellation,
-        Action<ParseResult> action
+        Action<ParseResult> action,
+        string actionName
     )
     {
+        logger.ZLogTrace($"Start invoking action {actionName}");
+
         var error = parseResult.InvocationConfiguration.Error;
 
         try
@@ -157,12 +145,14 @@ class SiteCommandActions(
 
             return Task.FromResult(1);
         }
-        catch (Lg2Exception ex)
-        {
-            error.WriteLine(ex.Message);
+        // catch (Lg2Exception ex)
+        // {
+        //     error.WriteLine(ex.Message);
 
-            return Task.FromResult(1);
-        }
+        //     return Task.FromResult(1);
+        // }
+
+        logger.ZLogTrace($"Done invoking action {actionName}");
 
         return Task.FromResult(0);
     }
@@ -193,7 +183,7 @@ class SiteCommandActions(
         if (linkExisting && targetSite is null)
         {
             throw new InvalidOperationException(
-                $"No {ProgramCommandLine.SiteTargetOption.Name} is speficied when {ProgramCommandLine.LinkExistingOption.Name} is used"
+                $"Option {ProgramCommandLine.SiteTargetOption.Name} is not speficied when {ProgramCommandLine.LinkExistingOption.Name} is used"
             );
         }
 
@@ -219,17 +209,6 @@ class SiteCommandActions(
         tautSetup.WrapUpBrandNew();
     }
 
-    internal Task<int> ListAsync(ParseResult parseResult, CancellationToken cancellation)
-    {
-        logger.ZLogTrace($"Start invoking action {nameof(List)}");
-
-        var task = PerformAction(parseResult, cancellation, List);
-
-        logger.ZLogTrace($"Done invoking action {nameof(List)}");
-
-        return task;
-    }
-
     internal void List(ParseResult parseResult)
     {
         var hostRepo = LocateHostRepo();
@@ -242,16 +221,16 @@ class SiteCommandActions(
             tautSiteName = result.SiteName;
         }
 
+        var outputWriter = parseResult.InvocationConfiguration.Output;
+
         using (var config = hostRepo.GetConfigSnapshot())
         {
-            TautSiteConfig.PrintSites(config, tautSiteName);
+            TautSiteConfig.PrintSites(config, outputWriter, tautSiteName);
         }
     }
 
     internal void Remove(ParseResult parseResult)
     {
-        logger.ZLogTrace($"Start invoking action {nameof(Remove)}");
-
         var hostRepo = LocateHostRepo();
 
         var resolvedTarget = ResolveTargetOption(parseResult, hostRepo, followHead: false);
@@ -259,48 +238,44 @@ class SiteCommandActions(
 
         using (var config = hostRepo.GetConfig())
         {
-            if (TautSiteConfig.TryLoadBySiteName(config, tautSiteName, out var tautCfg) == false)
-            {
-                throw new InvalidOperationException($"Failed to load '{tautSiteName}");
-            }
+            var siteConfig = TautSiteConfig.LoadNew(config, tautSiteName);
 
-            tautCfg.ResolveReverseLinks(config);
+            siteConfig.ResolveReverseLinks(config);
 
-            if (tautCfg.ReverseLinks.Count > 0)
+            if (siteConfig.ReverseLinks.Count > 0)
             {
                 throw new InvalidOperationException(
-                    $"Taut site '{tautSiteName}' is linked by others (e.g., '{tautCfg.ReverseLinks[0]})'"
+                    $"Taut site '{tautSiteName}' is linked by others (e.g., '{siteConfig.ReverseLinks[0]}')"
                 );
             }
-
-            tautCfg.ResolveRemotes(config);
 
             if (resolvedTarget.TargetIsRemote)
             {
-                tautCfg.RemoveRemoteFromConfig(config, resolvedTarget.RemoteName!);
+                siteConfig.RemoveRemoteFromConfig(config, resolvedTarget.RemoteName!);
             }
 
-            if (tautCfg.Remotes.Count != 0)
+            if (siteConfig.Remotes.Count != 0)
             {
                 throw new InvalidOperationException(
-                    $"There are other remotes using taut site '{tautCfg.SiteName}'"
+                    $"There are other remotes using taut site '{siteConfig.SiteName}'"
                 );
             }
 
-            tautCfg.RemoveAllFromConfig(config);
-
-            var tautSitePath = hostRepo.GetTautSitePath(tautCfg.SiteName);
+            var tautSitePath = hostRepo.GetTautSitePath(siteConfig.SiteName);
 
             GitRepoHelpers.DeleteGitDir(tautSitePath);
         }
 
-        logger.ZLogTrace($"Done invoking action {nameof(Remove)}");
+        gitCli.Execute(
+            "config",
+            "remove-section",
+            "--local",
+            $@"{TautSiteConfig.SectionName}.{tautSiteName}"
+        );
     }
 
     internal void Reveal(ParseResult parseResult)
     {
-        logger.ZLogTrace($"Start invoking action {nameof(Reveal)}");
-
         var path = parseResult.GetRequiredValue(ProgramCommandLine.PathArgument);
 
         var hostRepo = LocateHostRepo();
@@ -368,14 +343,10 @@ class SiteCommandActions(
         {
             Console.Error.WriteLine($"Not a valid path: '{path}'");
         }
-
-        logger.ZLogTrace($"Done invoking action {nameof(Reveal)}");
     }
 
     internal void Rescan(ParseResult parseResult)
     {
-        logger.ZLogTrace($"Start invoking action {nameof(Rescan)}");
-
         var hostRepo = LocateHostRepo();
         var tautSiteName = ResolveTargetOption(parseResult, hostRepo, followHead: false);
 
@@ -386,8 +357,6 @@ class SiteCommandActions(
         // }
 
         // tautManager.RebuildKvStore();
-
-        logger.ZLogTrace($"Done invoking action {nameof(Rescan)}");
     }
 
     record ResolveTargetOptionResult(
@@ -409,6 +378,7 @@ class SiteCommandActions(
             using var config = hostRepo.GetConfigSnapshot();
 
             string? siteName = null;
+            bool targetIsRemote = false;
 
             if (TautSiteConfig.IsExistingSite(config, targetName))
             {
@@ -416,7 +386,11 @@ class SiteCommandActions(
             }
             else
             {
-                TautSiteConfig.TryFindSiteNameForRemote(config, targetName, out siteName);
+                targetIsRemote = TautSiteConfig.TryFindSiteNameForRemote(
+                    config,
+                    targetName,
+                    out siteName
+                );
             }
 
             if (siteName is null)
@@ -430,8 +404,8 @@ class SiteCommandActions(
 
             return new(
                 SiteName: siteConfig.SiteName,
-                RemoteName: null,
-                TargetIsRemote: false,
+                RemoteName: targetIsRemote ? targetName : null,
+                TargetIsRemote: targetIsRemote,
                 SiteIsFromHead: false
             );
         }
@@ -452,7 +426,7 @@ class SiteCommandActions(
         else
         {
             throw new InvalidOperationException(
-                $"{ProgramCommandLine.SiteTargetOption.Name} is not specified"
+                $"Option {ProgramCommandLine.SiteTargetOption.Name} is not specified"
             );
         }
     }
@@ -697,10 +671,17 @@ class ProgramCommandLine(IHost host)
 
         var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
-        command.SetAction(parseResult =>
-        {
-            actions.Run(parseResult);
-        });
+        command.SetAction(
+            (parseResult, cancellation) =>
+            {
+                return actions.PerformAction(
+                    parseResult,
+                    cancellation,
+                    actions.Run,
+                    nameof(actions.Run)
+                );
+            }
+        );
 
         return command;
     }
@@ -716,8 +697,17 @@ class ProgramCommandLine(IHost host)
 
         var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
-        command.SetAction(actions.AddAsync);
-
+        command.SetAction(
+            (parseResult, cancellation) =>
+            {
+                return actions.PerformAction(
+                    parseResult,
+                    cancellation,
+                    actions.Add,
+                    nameof(actions.Add)
+                );
+            }
+        );
         return command;
     }
 
@@ -727,7 +717,17 @@ class ProgramCommandLine(IHost host)
 
         var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
-        command.SetAction(actions.ListAsync);
+        command.SetAction(
+            (parseResult, cancellation) =>
+            {
+                return actions.PerformAction(
+                    parseResult,
+                    cancellation,
+                    actions.List,
+                    nameof(actions.List)
+                );
+            }
+        );
 
         return command;
     }
@@ -738,10 +738,17 @@ class ProgramCommandLine(IHost host)
 
         var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
-        command.SetAction(parseResult =>
-        {
-            actions.Remove(parseResult);
-        });
+        command.SetAction(
+            (parseResult, cancellation) =>
+            {
+                return actions.PerformAction(
+                    parseResult,
+                    cancellation,
+                    actions.Remove,
+                    nameof(actions.Remove)
+                );
+            }
+        );
 
         return command;
     }
@@ -755,10 +762,17 @@ class ProgramCommandLine(IHost host)
 
         var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
-        command.SetAction(parseResult =>
-        {
-            actions.Reveal(parseResult);
-        });
+        command.SetAction(
+            (parseResult, cancellation) =>
+            {
+                return actions.PerformAction(
+                    parseResult,
+                    cancellation,
+                    actions.Reveal,
+                    nameof(actions.Reveal)
+                );
+            }
+        );
 
         return command;
     }
@@ -769,10 +783,17 @@ class ProgramCommandLine(IHost host)
 
         var actions = host.Services.GetRequiredService<SiteCommandActions>();
 
-        command.SetAction(parseResult =>
-        {
-            actions.Rescan(parseResult);
-        });
+        command.SetAction(
+            (parseResult, cancellation) =>
+            {
+                return actions.PerformAction(
+                    parseResult,
+                    cancellation,
+                    actions.Rescan,
+                    nameof(actions.Rescan)
+                );
+            }
+        );
 
         return command;
     }

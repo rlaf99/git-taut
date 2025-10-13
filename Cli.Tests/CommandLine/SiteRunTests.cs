@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Cli.Tests.TestSupport;
 using Microsoft.Extensions.Hosting;
 using ProgramHelpers;
@@ -12,6 +13,12 @@ public sealed class SiteRunTests(ITestOutputHelper testOutput, HostBuilderFixtur
 
     TestScene _scene = new();
 
+    InvocationConfiguration _invCfg = new()
+    {
+        Output = new StringWriter(),
+        Error = new StringWriter(),
+    };
+
     public void Dispose()
     {
         _host.Dispose();
@@ -20,18 +27,23 @@ public sealed class SiteRunTests(ITestOutputHelper testOutput, HostBuilderFixtur
     }
 
     [Fact]
-    public void InvalidHostRepo()
+    public void RunBranch()
     {
-        Directory.SetCurrentDirectory(_scene.DirPath);
+        _scene.SetupRepo0(_host);
+        _scene.SetupRepo1(_host);
+        _scene.SetupRepo2(_host);
 
-        const string dir0 = "dir0";
-        Directory.CreateDirectory(dir0);
-        Directory.SetCurrentDirectory(dir0);
+        const string repo2 = "repo2";
+
+        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
-        string[] cliArgs = ["site", "list"];
+
+        string[] cliArgs = ["site", "run", "branch"];
         var parseResult = progCli.Parse(cliArgs);
-        var exitCode = parseResult.Invoke();
-        Assert.NotEqual(0, exitCode);
+
+        var exitCode = parseResult.Invoke(_invCfg);
+        Assert.Equal(0, exitCode);
     }
 }

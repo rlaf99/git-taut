@@ -2,7 +2,6 @@ using System.CommandLine;
 using Cli.Tests.TestSupport;
 using Git.Taut;
 using Lg2.Sharpy;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ProgramHelpers;
 
@@ -79,11 +78,11 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(1, exitCode);
 
-        var errorString =
+        var wantedError =
             $"Remote '{remoteNameToUse}' already exists in the host repository"
             + Environment.NewLine;
 
-        Assert.Equal(errorString, _invCfg.Error.ToString());
+        Assert.Equal(wantedError, _invCfg.Error.ToString());
     }
 
     [Fact]
@@ -106,11 +105,12 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(1, exitCode);
 
-        var errorString =
-            $"No {ProgramCommandLine.SiteTargetOption.Name} is speficied when {ProgramCommandLine.LinkExistingOption.Name} is used"
+        var wantedError =
+            $"Option {ProgramCommandLine.SiteTargetOption.Name} is not speficied when {ProgramCommandLine.LinkExistingOption.Name} is used"
             + Environment.NewLine;
+        var actualError = _invCfg.Error.ToString();
 
-        Assert.Equal(errorString, _invCfg.Error.ToString());
+        Assert.Equal(wantedError, actualError);
     }
 
     [Fact]

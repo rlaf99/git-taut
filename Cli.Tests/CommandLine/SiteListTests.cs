@@ -1,5 +1,7 @@
 using System.CommandLine;
 using Cli.Tests.TestSupport;
+using Git.Taut;
+using Lg2.Sharpy;
 using Microsoft.Extensions.Hosting;
 using ProgramHelpers;
 
@@ -27,13 +29,19 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
     }
 
     [Fact]
-    public void InvalidHostRepository()
+    public void ListAll()
     {
-        Directory.SetCurrentDirectory(_scene.DirPath);
+        _scene.SetupRepo0(_host);
+        _scene.SetupRepo1(_host);
+        _scene.SetupRepo2(_host);
+        _scene.ConfigRepo2AddingRepo1(_host);
 
-        const string dir0 = "dir0";
-        Directory.CreateDirectory(dir0);
-        Directory.SetCurrentDirectory(dir0);
+        const string repo0 = "repo0";
+        const string repo1 = "repo1";
+        const string repo2 = "repo2";
+
+        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
 
@@ -41,15 +49,62 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
         var parseResult = progCli.Parse(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
-        Assert.NotEqual(0, exitCode);
+        Assert.Equal(0, exitCode);
 
-        var errorString = "Not inside a git repository" + Environment.NewLine;
-        var errorOutput = _invCfg.Error.ToString();
-        Assert.Equal(errorString, errorOutput);
+        using var hostRepo = Lg2Repository.New(".");
+        using var hostConfig = hostRepo.GetConfigSnapshot();
+
+        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo0);
+        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo1);
+
+        var wantedOutput =
+            $"{repo0SiteName} {repo0}"
+            + Environment.NewLine
+            + $"{repo1SiteName} {repo1}"
+            + Environment.NewLine;
+
+        var actualOutput = _invCfg.Output.ToString();
+        Assert.Equal(wantedOutput, actualOutput);
     }
 
     [Fact]
-    public void InvalidTargetOption()
+    public void ListOne()
+    {
+        _scene.SetupRepo0(_host);
+        _scene.SetupRepo1(_host);
+        _scene.SetupRepo2(_host);
+        _scene.ConfigRepo2AddingRepo1(_host);
+
+        const string repo0 = "repo0";
+        const string repo1 = "repo1";
+        const string repo2 = "repo2";
+
+        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        Directory.SetCurrentDirectory(repo2Path);
+
+        ProgramCommandLine progCli = new(_host);
+
+        string[] targetOpt = ["--target", repo0];
+        string[] cliArgs = ["site", .. targetOpt, "list"];
+        var parseResult = progCli.Parse(cliArgs);
+
+        var exitCode = parseResult.Invoke(_invCfg);
+        Assert.Equal(0, exitCode);
+
+        using var hostRepo = Lg2Repository.New(".");
+        using var hostConfig = hostRepo.GetConfigSnapshot();
+
+        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo0);
+        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo1);
+
+        var wantedOutput = $"{repo0SiteName} {repo0}" + Environment.NewLine;
+
+        var actualOutput = _invCfg.Output.ToString();
+        Assert.Equal(wantedOutput, actualOutput);
+    }
+
+    [Fact]
+    public void ListOne_TargetNotExists()
     {
         _scene.SetupRepo0(_host);
         _scene.SetupRepo1(_host);
@@ -70,11 +125,11 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.NotEqual(0, exitCode);
 
-        var errorString =
+        var wantedError =
             $"The value '{invalidTarget}' specified by {ProgramCommandLine.SiteTargetOption.Name} is invalid"
             + Environment.NewLine;
 
-        var errorOutput = _invCfg.Error.ToString();
-        Assert.Equal(errorString, errorOutput);
+        var actualError = _invCfg.Error.ToString();
+        Assert.Equal(wantedError, actualError);
     }
 }
