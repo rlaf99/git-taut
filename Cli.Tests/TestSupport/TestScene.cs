@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Cli.Tests.TestSupport;
 
-sealed class TestScene : IDisposable
+class TestScene : IDisposable
 {
     const string NameSuffix = ".S";
 
@@ -67,32 +67,6 @@ sealed class TestScene : IDisposable
 
             _path.Clear();
         }
-    }
-}
-
-ref struct PushDirectory : IDisposable
-{
-    string? _pushed;
-
-    internal PushDirectory(string? targetDirectory = null)
-    {
-        _pushed = Directory.GetCurrentDirectory();
-
-        if (targetDirectory is not null)
-        {
-            Directory.SetCurrentDirectory(targetDirectory);
-        }
-    }
-
-    public void Dispose()
-    {
-        var pushed = Interlocked.Exchange(ref _pushed, null);
-        if (pushed is null)
-        {
-            return;
-        }
-
-        Directory.SetCurrentDirectory(pushed);
     }
 }
 

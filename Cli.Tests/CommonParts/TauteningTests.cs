@@ -3,10 +3,11 @@ using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using ProgramHelpers;
 
 namespace Cli.Tests.CommonParts;
 
-[Collection("GitTautPaths")]
+[Collection("WithGitTautPaths")]
 public class TauteningTests : IDisposable
 {
     ITestOutputHelper _output;
@@ -14,10 +15,10 @@ public class TauteningTests : IDisposable
 
     TestScene _scene;
 
-    public TauteningTests(ITestOutputHelper output, HostBuilderFixture hostBuilder)
+    public TauteningTests(ITestOutputHelper output)
     {
         _output = output;
-        _host = hostBuilder.BuildHost();
+        _host = GitTautHostBuilder.BuildHost();
 
         _scene = new TestScene();
         _scene.SetupRepo0(_host);

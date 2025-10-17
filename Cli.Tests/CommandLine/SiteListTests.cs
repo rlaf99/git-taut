@@ -4,14 +4,14 @@ using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Hosting;
 using ProgramHelpers;
+using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.CommandLine;
 
-[Collection("GitTautPaths")]
-public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixture hostBuilder)
-    : IDisposable
+[Collection("WithGitTautPaths")]
+public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost _host = hostBuilder.BuildHost();
+    IHost _host = GitTautHostBuilder.BuildHost();
 
     TestScene _scene = new();
 
@@ -36,11 +36,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
         _scene.SetupRepo2(_host);
         _scene.ConfigRepo2AddingRepo1(_host);
 
-        const string repo0 = "repo0";
-        const string repo1 = "repo1";
-        const string repo2 = "repo2";
-
-        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
@@ -54,13 +50,13 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
         using var hostRepo = Lg2Repository.New(".");
         using var hostConfig = hostRepo.GetConfigSnapshot();
 
-        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo0);
-        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo1);
+        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
+        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo1);
 
         var wantedOutput =
-            $"{repo0SiteName} {repo0}"
+            $"{repo0SiteName} {Repo0}"
             + Environment.NewLine
-            + $"{repo1SiteName} {repo1}"
+            + $"{repo1SiteName} {Repo1}"
             + Environment.NewLine;
 
         var actualOutput = _invCfg.Output.ToString();
@@ -75,16 +71,12 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
         _scene.SetupRepo2(_host);
         _scene.ConfigRepo2AddingRepo1(_host);
 
-        const string repo0 = "repo0";
-        const string repo1 = "repo1";
-        const string repo2 = "repo2";
-
-        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
 
-        string[] targetOpt = ["--target", repo0];
+        string[] targetOpt = ["--target", Repo0];
         string[] cliArgs = ["site", .. targetOpt, "list"];
         var parseResult = progCli.Parse(cliArgs);
 
@@ -94,10 +86,10 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
         using var hostRepo = Lg2Repository.New(".");
         using var hostConfig = hostRepo.GetConfigSnapshot();
 
-        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo0);
-        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo1);
+        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
+        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo1);
 
-        var wantedOutput = $"{repo0SiteName} {repo0}" + Environment.NewLine;
+        var wantedOutput = $"{repo0SiteName} {Repo0}" + Environment.NewLine;
 
         var actualOutput = _invCfg.Output.ToString();
         Assert.Equal(wantedOutput, actualOutput);
@@ -110,7 +102,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput, HostBuilderFixtu
         _scene.SetupRepo1(_host);
         _scene.SetupRepo2(_host);
 
-        var repo2Path = Path.Join(_scene.DirPath, "repo2");
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);

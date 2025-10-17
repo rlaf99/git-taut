@@ -1,10 +1,10 @@
-using System.Text.RegularExpressions;
 using Lg2.Sharpy;
 
 namespace Git.Taut;
 
 static class GitRepoHelpers
 {
+    internal const string HeadRefName = "HEAD";
     internal const string TautHomeName = "taut";
     internal const string ObjectsDir = "Objects";
     internal static readonly string ObjectsInfoDir = Path.Join(ObjectsDir, "info");

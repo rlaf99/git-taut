@@ -4,14 +4,14 @@ using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Hosting;
 using ProgramHelpers;
+using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.CommandLine;
 
-[Collection("GitTautPaths")]
-public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixture hostBuilder)
-    : IDisposable
+[Collection("WithGitTautPaths")]
+public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost _host = hostBuilder.BuildHost();
+    IHost _host = GitTautHostBuilder.BuildHost();
 
     TestScene _scene = new();
 
@@ -35,15 +35,12 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
         _scene.SetupRepo1(_host);
         _scene.SetupRepo2(_host);
 
-        const string repo1 = "repo1";
-        const string repo2 = "repo2";
-
-        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
 
-        string[] cliArgs = ["site", "add", repo1, Path.Join("..", repo1)];
+        string[] cliArgs = ["site", "add", Repo1, Path.Join("..", Repo1)];
         var parseResult = progCli.Parse(cliArgs);
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
@@ -51,9 +48,9 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
         using var hostRepo = Lg2Repository.New(".");
         using var hostConfig = hostRepo.GetConfigSnapshot();
 
-        Assert.True(TautSiteConfig.TryLoadByRemoteName(hostConfig, repo1, out var repo1SiteConfig));
+        Assert.True(TautSiteConfig.TryLoadByRemoteName(hostConfig, Repo1, out var repo1SiteConfig));
         repo1SiteConfig.ResolveRemotes(hostConfig);
-        Assert.Contains(repo1, repo1SiteConfig.Remotes);
+        Assert.Contains(Repo1, repo1SiteConfig.Remotes);
     }
 
     [Fact]
@@ -63,17 +60,13 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
         _scene.SetupRepo1(_host);
         _scene.SetupRepo2(_host);
 
-        const string repo0 = "repo0";
-        const string repo1 = "repo1";
-        const string repo2 = "repo2";
-
-        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
 
-        var remoteNameToUse = repo0;
-        string[] cliArgs = ["site", "add", remoteNameToUse, Path.Join("..", repo1)];
+        var remoteNameToUse = Repo0;
+        string[] cliArgs = ["site", "add", remoteNameToUse, Path.Join("..", Repo1)];
         var parseResult = progCli.Parse(cliArgs);
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(1, exitCode);
@@ -92,15 +85,12 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
         _scene.SetupRepo1(_host);
         _scene.SetupRepo2(_host);
 
-        const string repo1 = "repo1";
-        const string repo2 = "repo2";
-
-        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
 
-        string[] cliArgs = ["site", "add", repo1, Path.Join("..", repo1), "--link-existing"];
+        string[] cliArgs = ["site", "add", Repo1, Path.Join("..", Repo1), "--link-existing"];
         var parseResult = progCli.Parse(cliArgs);
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(1, exitCode);
@@ -120,24 +110,20 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
         _scene.SetupRepo1(_host);
         _scene.SetupRepo2(_host);
 
-        const string repo0 = "repo0";
-        const string repo1 = "repo1";
-        const string repo2 = "repo2";
-
-        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
 
         {
-            string[] targetOpt = ["--target", repo0];
+            string[] targetOpt = ["--target", Repo0];
             string[] cliArgs =
             [
                 "site",
                 .. targetOpt,
                 "add",
-                repo1,
-                Path.Join("..", repo1),
+                Repo1,
+                Path.Join("..", Repo1),
                 "--link-existing",
             ];
             var parseResult = progCli.Parse(cliArgs);
@@ -147,14 +133,14 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
         }
 
         {
-            string[] targetOpt = ["--target", repo1];
+            string[] targetOpt = ["--target", Repo1];
             string[] cliArgs =
             [
                 "site",
                 .. targetOpt,
                 "add",
-                repo1 + "_again",
-                Path.Join("..", repo1),
+                Repo1 + "_again",
+                Path.Join("..", Repo1),
                 "--link-existing",
             ];
             var parseResult = progCli.Parse(cliArgs);
@@ -175,24 +161,20 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
         _scene.SetupRepo1(_host);
         _scene.SetupRepo2(_host);
 
-        const string repo0 = "repo0";
-        const string repo1 = "repo1";
-        const string repo2 = "repo2";
-
-        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
 
-        string[] targetOpt = ["--target", repo0];
+        string[] targetOpt = ["--target", Repo0];
 
         string[] cliArgs =
         [
             "site",
             .. targetOpt,
             "add",
-            repo1,
-            Path.Join("..", repo1),
+            Repo1,
+            Path.Join("..", Repo1),
             "--link-existing",
         ];
 
@@ -206,8 +188,8 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput, HostBuilderFixtur
         using var hostRepo = Lg2Repository.New(".");
         using var hostConfig = hostRepo.GetConfigSnapshot();
 
-        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo0);
-        var repo9SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo1);
+        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
+        var repo9SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo1);
         var repo9SiteConfig = TautSiteConfig.LoadNew(hostConfig, repo9SiteName);
 
         Assert.NotNull(repo9SiteConfig.LinkTo);

@@ -11,6 +11,18 @@ using ZLogger;
 
 namespace ProgramHelpers;
 
+public sealed class GitTautHostBuilder
+{
+    public static IHost BuildHost()
+    {
+        var builder = Host.CreateEmptyApplicationBuilder(null);
+
+        builder.AddGitTautReleated();
+
+        return builder.Build();
+    }
+}
+
 static class HostApplicationBuilderExtensions
 {
     internal static void AddGitTautReleated(this HostApplicationBuilder builder)
@@ -421,7 +433,7 @@ class SiteCommandActions(
                 );
             }
 
-            throw new InvalidOperationException($"Cannot resolve taut site name from head HEAD");
+            throw new InvalidOperationException($"Cannot resolve taut site name from HEAD");
         }
         else
         {

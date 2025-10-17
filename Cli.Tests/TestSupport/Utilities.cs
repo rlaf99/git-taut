@@ -1,4 +1,6 @@
 using System.CommandLine;
+using Microsoft.Extensions.Hosting;
+using ProgramHelpers;
 
 namespace Cli.Tests.TestSupport;
 
@@ -20,5 +22,31 @@ static class ITestOutputHelperExtensions
             testOutput.WriteLine($"Error output from {nameof(InvocationConfiguration)}:");
             testOutput.WriteLine(erorrText);
         }
+    }
+}
+
+ref struct PushDirectory : IDisposable
+{
+    string? _pushed;
+
+    internal PushDirectory(string? targetDirectory = null)
+    {
+        _pushed = Directory.GetCurrentDirectory();
+
+        if (targetDirectory is not null)
+        {
+            Directory.SetCurrentDirectory(targetDirectory);
+        }
+    }
+
+    public void Dispose()
+    {
+        var pushed = Interlocked.Exchange(ref _pushed, null);
+        if (pushed is null)
+        {
+            return;
+        }
+
+        Directory.SetCurrentDirectory(pushed);
     }
 }

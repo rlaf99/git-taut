@@ -2,14 +2,14 @@ using System.CommandLine;
 using Cli.Tests.TestSupport;
 using Microsoft.Extensions.Hosting;
 using ProgramHelpers;
+using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.CommandLine;
 
-[Collection("GitTautPaths")]
-public sealed class GeneralSiteTests(ITestOutputHelper testOutput, HostBuilderFixture hostBuilder)
-    : IDisposable
+[Collection("WithGitTautPaths")]
+public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost _host = hostBuilder.BuildHost();
+    IHost _host = GitTautHostBuilder.BuildHost();
 
     TestScene _scene = new();
 
@@ -25,7 +25,6 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput, HostBuilderFi
     {
         _scene.SetupRepo0(_host);
 
-        const string repo0 = "repo0";
         const string dir0 = "dir0";
 
         Directory.SetCurrentDirectory(_scene.DirPath);
@@ -35,7 +34,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput, HostBuilderFi
         ProgramCommandLine progCli = new(_host);
 
         {
-            string[] cliArgs = ["site", "add", repo0, Path.Join("..", repo0)];
+            string[] cliArgs = ["site", "add", Repo0, Path.Join("..", Repo0)];
             var parseResult = progCli.Parse(cliArgs);
 
             InvocationConfiguration invCfg = new()
@@ -71,7 +70,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput, HostBuilderFi
         }
 
         {
-            string[] cliArgs = ["site", "remove", "--target", repo0];
+            string[] cliArgs = ["site", "remove", "--target", Repo0];
             var parseResult = progCli.Parse(cliArgs);
 
             InvocationConfiguration invCfg = new()

@@ -1,17 +1,17 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
+using Cli.Tests.TestSupport;
 using Git.Taut;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using ProgramHelpers;
 
 namespace Cli.Tests.CommonParts;
 
 public sealed partial class Aes256Cbc1Tests : IDisposable
 {
-    HostBuilderFixture _hostBuilder;
-
-    IHost _host;
+    IHost _host = GitTautHostBuilder.BuildHost();
 
     [AllowNull]
     Aes256Cbc1 _cihper;
@@ -33,12 +33,8 @@ Or else receivest with pleasure thine annoy?
         return [];
     }
 
-    public Aes256Cbc1Tests(HostBuilderFixture hostBuilder)
+    public Aes256Cbc1Tests()
     {
-        _hostBuilder = hostBuilder;
-
-        _host = _hostBuilder.BuildHost();
-
         _cihper = _host.Services.GetRequiredService<Aes256Cbc1>();
 
         UserKeyHolder keyHolder = new();
@@ -53,12 +49,12 @@ Or else receivest with pleasure thine annoy?
         _cihper = null;
     }
 
-    public class TestNotInitialized(HostBuilderFixture hostBuilder)
+    public class TestNotInitialized()
     {
         [Fact]
         public void NotInitialized()
         {
-            var host = hostBuilder.BuildHost();
+            var host = GitTautHostBuilder.BuildHost();
             var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
             Assert.Throws<InvalidOperationException>(() => cipher.EnsureInitialized());
             Assert.Throws<InvalidOperationException>(() => cipher.GetCipherTextLength(100));
@@ -67,7 +63,7 @@ Or else receivest with pleasure thine annoy?
         [Fact]
         public void InvalidInitialization()
         {
-            var host = hostBuilder.BuildHost();
+            var host = GitTautHostBuilder.BuildHost();
             var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
 
             UserKeyHolder keyHolder = new();
@@ -88,12 +84,12 @@ Or else receivest with pleasure thine annoy?
         }
     }
 
-    public class TestNameEncryption(HostBuilderFixture hostBuilder)
+    public class TestNameEncryption()
     {
         [Fact]
         public void EncryptDecrypt()
         {
-            var host = hostBuilder.BuildHost();
+            var host = GitTautHostBuilder.BuildHost();
 
             var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
 

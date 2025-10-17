@@ -2,14 +2,14 @@ using System.CommandLine;
 using Cli.Tests.TestSupport;
 using Microsoft.Extensions.Hosting;
 using ProgramHelpers;
+using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.CommandLine;
 
-[Collection("GitTautPaths")]
-public sealed class SiteRunTests(ITestOutputHelper testOutput, HostBuilderFixture hostBuilder)
-    : IDisposable
+[Collection("WithGitTautPaths")]
+public sealed class SiteRunTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost _host = hostBuilder.BuildHost();
+    IHost _host = GitTautHostBuilder.BuildHost();
 
     TestScene _scene = new();
 
@@ -33,9 +33,7 @@ public sealed class SiteRunTests(ITestOutputHelper testOutput, HostBuilderFixtur
         _scene.SetupRepo1(_host);
         _scene.SetupRepo2(_host);
 
-        const string repo2 = "repo2";
-
-        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);

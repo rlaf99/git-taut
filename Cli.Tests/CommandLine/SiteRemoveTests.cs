@@ -4,14 +4,14 @@ using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Hosting;
 using ProgramHelpers;
+using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.CommandLine;
 
-[Collection("GitTautPaths")]
-public sealed class SiteRemoveTests(ITestOutputHelper testOutput, HostBuilderFixture hostBuilder)
-    : IDisposable
+[Collection("WithGitTautPaths")]
+public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost _host = hostBuilder.BuildHost();
+    IHost _host = GitTautHostBuilder.BuildHost();
 
     InvocationConfiguration _invCfg = new()
     {
@@ -36,9 +36,7 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput, HostBuilderFix
         _scene.SetupRepo1(_host);
         _scene.SetupRepo2(_host);
 
-        const string repo2 = "repo2";
-
-        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_host);
@@ -64,27 +62,24 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput, HostBuilderFix
         _scene.SetupRepo1(_host);
         _scene.SetupRepo2(_host);
 
-        const string repo0 = "repo0";
-        const string repo2 = "repo2";
-
-        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         using var hostRepo = Lg2Repository.New(".");
         using var hostConfig = hostRepo.GetConfig();
 
-        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo0);
+        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
 
         ProgramCommandLine progCli = new(_host);
 
-        string[] targetOpt = ["--target", repo0];
+        string[] targetOpt = ["--target", Repo0];
         string[] cliArgs = ["site", .. targetOpt, "remove"];
         var parseResult = progCli.Parse(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
 
-        Assert.False(TautSiteConfig.TryFindSiteNameForRemote(hostConfig, repo0, out _));
+        Assert.False(TautSiteConfig.TryFindSiteNameForRemote(hostConfig, Repo0, out _));
 
         var repo0SitePath = hostRepo.GetTautSitePath(repo0SiteName);
         Assert.False(Directory.Exists(repo0SitePath));
@@ -98,22 +93,18 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput, HostBuilderFix
         _scene.SetupRepo2(_host);
         _scene.ConfigRepo2AddingRepo1WithLinkToRepo0(_host);
 
-        const string repo0 = "repo0";
-        const string repo1 = "repo1";
-        const string repo2 = "repo2";
-
-        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         using var hostRepo = Lg2Repository.New(".");
         using var hostConfig = hostRepo.GetConfig();
 
-        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo0);
-        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo1);
+        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
+        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo1);
 
         ProgramCommandLine progCli = new(_host);
 
-        string[] targetOpt = ["--target", repo0];
+        string[] targetOpt = ["--target", Repo0];
         string[] cliArgs = ["site", .. targetOpt, "remove"];
         var parseResult = progCli.Parse(cliArgs);
 
@@ -136,27 +127,24 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput, HostBuilderFix
         _scene.SetupRepo2(_host);
         _scene.ConfigRepo2AddingRepo1WithLinkToRepo0(_host);
 
-        const string repo1 = "repo1";
-        const string repo2 = "repo2";
-
-        var repo2Path = Path.Join(_scene.DirPath, repo2);
+        var repo2Path = Path.Join(_scene.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         using var hostRepo = Lg2Repository.New(".");
         using var hostConfig = hostRepo.GetConfig();
 
-        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, repo1);
+        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo1);
 
         ProgramCommandLine progCli = new(_host);
 
-        string[] targetOpt = ["--target", repo1];
+        string[] targetOpt = ["--target", Repo1];
         string[] cliArgs = ["site", .. targetOpt, "remove"];
         var parseResult = progCli.Parse(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
 
-        Assert.False(TautSiteConfig.TryFindSiteNameForRemote(hostConfig, repo1, out _));
+        Assert.False(TautSiteConfig.TryFindSiteNameForRemote(hostConfig, Repo1, out _));
 
         var repo1SitePath = hostRepo.GetTautSitePath(repo1SiteName);
         Assert.False(Directory.Exists(repo1SitePath));

@@ -30,18 +30,27 @@ public unsafe partial class Lg2Reference
         return valid != default;
     }
 
-    public void SetTarget(Lg2OidPlainRef oidRef, string logMessage)
+    public void SetTarget(Lg2OidPlainRef oidRef, string? logMessage = null)
     {
         EnsureValid();
 
-        using var u8LogMessage = new Lg2Utf8String(logMessage);
+        git_reference* outPtr = null;
 
-        git_reference* pRef = null;
-        var rc = git_reference_set_target(&pRef, Ptr, oidRef.Ptr, u8LogMessage.Ptr);
-        Lg2Exception.ThrowIfNotOk(rc);
+        if (logMessage is not null)
+        {
+            using var u8LogMessage = new Lg2Utf8String(logMessage);
+
+            var rc = git_reference_set_target(&outPtr, Ptr, oidRef.Ptr, u8LogMessage.Ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+        else
+        {
+            var rc = git_reference_set_target(&outPtr, Ptr, oidRef.Ptr, null);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
 
         ReleaseHandle();
-        SetHandle((nint)pRef);
+        SetHandle((nint)outPtr);
     }
 
     public void Delete()
@@ -52,6 +61,16 @@ public unsafe partial class Lg2Reference
         Lg2Exception.ThrowIfNotOk(rc);
 
         ReleaseHandle();
+    }
+
+    public bool Compare(Lg2Reference other)
+    {
+        EnsureValid();
+        other.EnsureValid();
+
+        var rc = git_reference_cmp(Ptr, other.Ptr);
+
+        return rc == 0;
     }
 }
 
@@ -284,6 +303,18 @@ unsafe partial class Lg2RepositoryExtensions
         return new(pRef);
     }
 
+    public static Lg2Reference LookupRef(this Lg2Repository repo, string refName)
+    {
+        repo.EnsureValid();
+
+        using var u8RefName = new Lg2Utf8String(refName);
+        git_reference* ptr = null;
+        var rc = git_reference_lookup(&ptr, repo.Ptr, u8RefName.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(ptr);
+    }
+
     public static bool TryLookupRef(
         this Lg2Repository repo,
         string refName,
@@ -293,8 +324,8 @@ unsafe partial class Lg2RepositoryExtensions
         repo.EnsureValid();
 
         using var u8RefName = new Lg2Utf8String(refName);
-        git_reference* pRef = null;
-        var rc = git_reference_lookup(&pRef, repo.Ptr, u8RefName.Ptr);
+        git_reference* ptr = null;
+        var rc = git_reference_lookup(&ptr, repo.Ptr, u8RefName.Ptr);
 
         if (rc != 0)
         {
@@ -308,12 +339,12 @@ unsafe partial class Lg2RepositoryExtensions
         }
         else
         {
-            reference = new Lg2Reference(pRef);
+            reference = new Lg2Reference(ptr);
             return true;
         }
     }
 
-    public static bool TrySearchRef(
+    public static bool TryObtainRef(
         this Lg2Repository repo,
         string shorthand,
         out Lg2Reference reference

@@ -1,10 +1,10 @@
 namespace Cli.Tests.TestSupport;
 
-public class GitTautPathsFixture : IDisposable
+public class WithGitTautPathsFixture : IDisposable
 {
     string? _savedPath;
 
-    public GitTautPathsFixture()
+    public WithGitTautPathsFixture()
     {
         _savedPath = Environment.GetEnvironmentVariable("PATH");
 
@@ -35,5 +35,5 @@ public class GitTautPathsFixture : IDisposable
     }
 }
 
-[CollectionDefinition("GitTautPaths")]
-public class GitTautPathsCollection : ICollectionFixture<GitTautPathsFixture> { }
+[CollectionDefinition("WithGitTautPaths")]
+public class WithGitTautPathsCollection : ICollectionFixture<WithGitTautPathsFixture> { }
