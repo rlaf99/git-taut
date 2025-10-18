@@ -361,15 +361,15 @@ partial class Aes256Cbc1
             cryptoStream.CopyTo(output);
         }
 
-        bool _isDisposed;
+        bool _disposed;
 
         protected override void Dispose(bool dispoing)
         {
-            if (_isDisposed)
+            if (_disposed)
             {
                 return;
             }
-            _isDisposed = true;
+            _disposed = true;
 
             if (dispoing)
             {
@@ -443,15 +443,15 @@ partial class Aes256Cbc1
             }
         }
 
-        bool _isDisposed;
+        bool _disposed;
 
         public void Dispose()
         {
-            if (_isDisposed)
+            if (_disposed)
             {
                 return;
             }
-            _isDisposed = true;
+            _disposed = true;
 
             _encStream.Dispose();
         }
@@ -889,15 +889,15 @@ partial class Aes256Cbc1
             }
         }
 
-        bool _isDisposed;
+        bool _disposed;
 
         protected override void Dispose(bool disposing)
         {
-            if (_isDisposed)
+            if (_disposed)
             {
                 return;
             }
-            _isDisposed = true;
+            _disposed = true;
 
             if (disposing)
             {
@@ -955,15 +955,15 @@ partial class Aes256Cbc1
             }
         }
 
-        bool _isDisposed;
+        bool _disposed;
 
         public void Dispose()
         {
-            if (_isDisposed)
+            if (_disposed)
             {
                 return;
             }
-            _isDisposed = true;
+            _disposed = true;
 
             _decStream.Dispose();
         }
