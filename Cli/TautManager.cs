@@ -833,6 +833,7 @@ class TautManager(
     string EncryptEntryName(string entryName, Lg2FileMode entryFileMode, scoped ref Lg2Oid oid)
     {
         var entryNameDataBuffer = new ArrayBufferWriter<byte>();
+
         Encoding.UTF8.GetBytes(entryName, entryNameDataBuffer);
 
         var fileModeData = BitConverter.GetBytes((uint)entryFileMode);

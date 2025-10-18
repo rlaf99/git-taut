@@ -1,3 +1,5 @@
+// The implementation here takes inspiration from <https://www.sunshine2k.de/articles/coding/crc/understanding_crc.html>
+
 namespace Git.Taut;
 
 /// <summary>

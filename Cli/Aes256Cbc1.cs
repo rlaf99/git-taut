@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 using ZLogger;
@@ -8,7 +7,7 @@ using ZstdSharp;
 
 namespace Git.Taut;
 
-class InvalidHallmarkException : Exception
+class InvalidHallmarkException : FormatException
 {
     internal InvalidHallmarkException(string? message)
         : base(message) { }
@@ -28,25 +27,20 @@ partial class Aes256Cbc1
     internal const int RANDOM_FILL_SIZE = 20;
     internal const int RANDOM_FILL_SALT_OFFSET = 4;
 
-    internal const int CIPHER_TEXT_OFFSET = HALLMARK_SIZE + RESERVED_SIZE + RANDOM_FILL_SIZE;
-    internal const int CIPHER_BLOCK_SIZE = 16;
-
-    internal const int NAME_HALLMARK_SIZE = 2;
     internal const int NAME_HASH_MIN_SIZE = 20;
     internal const int NAME_HASH_SALT_OFFSET = 4;
+    internal const int NAME_CRC_SIZE = 1;
 
+    internal const int CIPHER_TEXT_OFFSET = HALLMARK_SIZE + RESERVED_SIZE + RANDOM_FILL_SIZE;
+    internal const int CIPHER_BLOCK_SIZE = 16;
     internal const int PLAIN_TEXT_SCRAMBLE_SIZE = 4;
 
 #pragma warning disable IDE0300 // Simplify collection initialization
     internal static readonly byte[] HALLMARK_DATA = new byte[HALLMARK_SIZE] { 0, 9, 9, 0xa1 };
     internal static readonly byte[] RESERVED_DATA = new byte[RESERVED_SIZE] { 0, 0, 0, 0 };
-
-    internal static readonly byte[] NAME_HALLMARK_DATA = new byte[NAME_HALLMARK_SIZE]
-    {
-        0x99,
-        0xa1,
-    };
 #pragma warning restore IDE0300 // Simplify collection initialization
+
+    static readonly byte _hallmarkDataCrc = Crc8.Compute(HALLMARK_DATA);
 
     internal static CipherMode UsedCipherMode => CipherMode.CBC;
     internal static PaddingMode UsedPaddingMode => PaddingMode.PKCS7;
@@ -115,8 +109,6 @@ partial class Aes256Cbc1
 
         MemoryStream result = new();
 
-        result.Write(NAME_HALLMARK_DATA);
-
         using (
             var cryptoStream = new CryptoStream(
                 nameDataStream,
@@ -127,6 +119,11 @@ partial class Aes256Cbc1
         {
             cryptoStream.CopyTo(result);
         }
+
+        var encData = result.GetBuffer().AsSpan(0, (int)result.Length);
+        var encDataCrc = Crc8.Compute(encData, _hallmarkDataCrc);
+
+        result.WriteByte(encDataCrc);
 
         return result;
     }
@@ -553,23 +550,23 @@ partial class Aes256Cbc1
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(hash.Length, NAME_HASH_MIN_SIZE, nameof(hash));
 
-        if (nameData.Length < NAME_HALLMARK_SIZE)
+        if (nameData.Length <= NAME_CRC_SIZE)
         {
-            throw new InvalidHallmarkException($"Data less than {NAME_HALLMARK_SIZE} bytes");
+            throw new FormatException($"Data is no more than {NAME_CRC_SIZE} bytes");
         }
 
         if (
-            nameData.Length < (NAME_HALLMARK_SIZE + CIPHER_BLOCK_SIZE)
-            || (nameData.Length - NAME_HALLMARK_SIZE) % CIPHER_BLOCK_SIZE != 0
+            nameData.Length < (NAME_CRC_SIZE + CIPHER_BLOCK_SIZE)
+            || (nameData.Length - NAME_CRC_SIZE) % CIPHER_BLOCK_SIZE != 0
         )
         {
             throw new FormatException($"Data not aligned on {CIPHER_BLOCK_SIZE} bytes boundary");
         }
 
-        if (nameData[0..NAME_HALLMARK_SIZE].SequenceEqual(NAME_HALLMARK_DATA) == false)
+        var crc = Crc8.Compute(nameData, _hallmarkDataCrc);
+        if (crc != 0)
         {
-            var hallmark = Convert.ToHexString(NAME_HALLMARK_DATA);
-            throw new InvalidHallmarkException($"Hallmark '{hallmark}' not present");
+            throw new FormatException($"Data does not seem to have correct CRC value");
         }
 
         var ivData = hash[0..CIPHER_BLOCK_SIZE].ToArray();
@@ -578,10 +575,7 @@ partial class Aes256Cbc1
 
         var decryptTransform = GetDecryptionTransform(decKey, ivData);
 
-        var nameStream = new MemoryStream(nameData, writable: false)
-        {
-            Position = NAME_HALLMARK_SIZE,
-        };
+        var nameStream = new MemoryStream(nameData, 0, nameData.Length - 1, writable: false);
 
         MemoryStream result = new();
 

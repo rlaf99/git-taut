@@ -84,12 +84,12 @@ Or else receivest with pleasure thine annoy?
         }
     }
 
-    public class TestNameEncryption()
+    public class TestNameEncryption
     {
         [Fact]
         public void EncryptDecrypt()
         {
-            var host = GitTautHostBuilder.BuildHost();
+            using var host = GitTautHostBuilder.BuildHost();
 
             var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
 
@@ -99,14 +99,47 @@ Or else receivest with pleasure thine annoy?
 
             var name = "taut";
             var hash = RandomNumberGenerator.GetBytes(20);
+
             var nameData = Encoding.UTF8.GetBytes(name);
             var encStream = cipher.EncryptName(nameData, hash);
             var encStreamData = encStream.ToArray();
+
             var decStream = cipher.DecryptName(encStreamData, hash);
             var decStreamData = decStream.ToArray();
             var recoveredName = Encoding.UTF8.GetString(decStreamData);
 
             Assert.Equal(name, recoveredName);
+        }
+
+        [Fact]
+        public void EncryptDecrypt_InvalidCrc()
+        {
+            using var host = GitTautHostBuilder.BuildHost();
+
+            var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
+
+            UserKeyHolder keyHolder = new();
+            keyHolder.DeriveCrudeKey(GetUserPasswordData(), GetUserPasswordSalt());
+            cipher.Init(keyHolder);
+
+            var name = "taut";
+            var hash = RandomNumberGenerator.GetBytes(20);
+
+            var nameData = Encoding.UTF8.GetBytes(name);
+            var encStream = cipher.EncryptName(nameData, hash);
+            var encStreamData = encStream.ToArray();
+
+            encStreamData[^1] ^= encStreamData[^1]; // change the crc byte
+
+            {
+                var ex = Assert.Throws<FormatException>(() =>
+                    cipher.DecryptName(encStreamData, hash)
+                );
+
+                var exMessage = "Data does not seem to have correct CRC value";
+
+                Assert.Equal(exMessage, ex.Message);
+            }
         }
     }
 
