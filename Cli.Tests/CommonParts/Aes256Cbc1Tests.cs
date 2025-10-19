@@ -127,16 +127,29 @@ Or else receivest with pleasure thine annoy?
 
             var nameData = Encoding.UTF8.GetBytes(name);
             var encStream = cipher.EncryptName(nameData, hash);
-            var encStreamData = encStream.ToArray();
-
-            encStreamData[^1] ^= encStreamData[^1]; // change the crc byte
 
             {
+                var encStreamData = encStream.ToArray();
+                encStreamData[0] ^= encStreamData[0]; // change the head crc byte
+
                 var ex = Assert.Throws<FormatException>(() =>
                     cipher.DecryptName(encStreamData, hash)
                 );
 
-                var exMessage = "Data does not seem to have correct CRC value";
+                var exMessage = "Data does not seem to have correct head CRC";
+
+                Assert.Equal(exMessage, ex.Message);
+            }
+
+            {
+                var encStreamData = encStream.ToArray();
+                encStreamData[^1] ^= encStreamData[^1]; // change the tail crc byte
+
+                var ex = Assert.Throws<FormatException>(() =>
+                    cipher.DecryptName(encStreamData, hash)
+                );
+
+                var exMessage = "Data does not seem to have correct tail CRC";
 
                 Assert.Equal(exMessage, ex.Message);
             }

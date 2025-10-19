@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 using ZLogger;
 using ZstdSharp;
+using static Git.Taut.GitAttrConstants;
 
 namespace Git.Taut;
 
@@ -29,7 +30,9 @@ partial class Aes256Cbc1
 
     internal const int NAME_HASH_MIN_SIZE = 20;
     internal const int NAME_HASH_SALT_OFFSET = 4;
-    internal const int NAME_CRC_SIZE = 1;
+    internal const int NAME_HEAD_CRC_SIZE = 1;
+    internal const int NAME_TAIL_CRC_SIZE = 1;
+    internal const int NAME_CRC_SIZE = NAME_HEAD_CRC_SIZE + NAME_TAIL_CRC_SIZE;
 
     internal const int CIPHER_TEXT_OFFSET = HALLMARK_SIZE + RESERVED_SIZE + RANDOM_FILL_SIZE;
     internal const int CIPHER_BLOCK_SIZE = 16;
@@ -93,6 +96,19 @@ partial class Aes256Cbc1
         return result;
     }
 
+    internal static byte GetFirstNonZero(ReadOnlySpan<byte> data)
+    {
+        foreach (var aByte in data)
+        {
+            if (aByte != 0)
+            {
+                return aByte;
+            }
+        }
+
+        throw new InvalidOperationException($"All data are zero");
+    }
+
     #region  Encryption
 
     internal MemoryStream EncryptName(byte[] nameData, ReadOnlySpan<byte> hash)
@@ -101,13 +117,17 @@ partial class Aes256Cbc1
         ArgumentOutOfRangeException.ThrowIfLessThan(hash.Length, NAME_HASH_MIN_SIZE, nameof(hash));
 
         var ivData = hash[0..CIPHER_BLOCK_SIZE].ToArray();
+
+        int encKeyIterationCount = GetFirstNonZero(hash);
         var encKeySalt = hash[NAME_HASH_SALT_OFFSET..NAME_HASH_MIN_SIZE];
-        var encKey = KeyHolder.DeriveCipherKey(encKeySalt, 1000);
+        var encKey = KeyHolder.DeriveCipherKey(encKeySalt, encKeyIterationCount);
 
         var encryptTransform = GetEncryptionTransform(encKey, ivData);
         var nameDataStream = new MemoryStream(nameData, writable: false);
 
         MemoryStream result = new();
+
+        result.WriteByte(_hallmarkDataCrc);
 
         using (
             var cryptoStream = new CryptoStream(
@@ -120,7 +140,10 @@ partial class Aes256Cbc1
             cryptoStream.CopyTo(result);
         }
 
-        var encData = result.GetBuffer().AsSpan(0, (int)result.Length);
+        var encData = result
+            .GetBuffer()
+            .AsSpan(NAME_HEAD_CRC_SIZE, (int)result.Length - NAME_HEAD_CRC_SIZE);
+
         var encDataCrc = Crc8.Compute(encData, _hallmarkDataCrc);
 
         result.WriteByte(encDataCrc);
@@ -147,9 +170,10 @@ partial class Aes256Cbc1
         randomFill.AsSpan(0, CIPHER_BLOCK_SIZE).CopyTo(ivData);
         randomFill.AsSpan(CIPHER_BLOCK_SIZE).CopyTo(extraSalt);
 
+        int encKeyIterationCount = GetFirstNonZero(randomFill);
         var encKeySalt = randomFill.AsSpan(RANDOM_FILL_SALT_OFFSET);
 
-        var result = _keyHolder.DeriveCipherKey(encKeySalt, 1000);
+        var result = KeyHolder.DeriveCipherKey(encKeySalt, encKeyIterationCount);
 
         return result;
     }
@@ -456,16 +480,16 @@ partial class Aes256Cbc1
 
     internal Encryptor CreateEncryptor(
         Stream sourceInput,
-        double compressionMaxRatio = 0.0,
+        double targetCompressionRatio = TARGET_COMPRESSION_RATIO_DISABLED_VALUE,
         bool leaveOpen = false
     )
     {
-        return CreateEncryptor(sourceInput, compressionMaxRatio, [], leaveOpen);
+        return CreateEncryptor(sourceInput, targetCompressionRatio, [], leaveOpen);
     }
 
     internal Encryptor CreateEncryptor(
         Stream sourceInput,
-        double compressionMaxRatio,
+        double targetCompressionRatio,
         ReadOnlySpan<byte> extraPayload,
         bool leaveOpen = false
     )
@@ -477,12 +501,18 @@ partial class Aes256Cbc1
         var isCompressed = false;
         var inputStream = sourceInput;
 
-        if (compressionMaxRatio > 0.0)
+        if (targetCompressionRatio != TARGET_COMPRESSION_RATIO_DISABLED_VALUE)
         {
-            ArgumentOutOfRangeException.ThrowIfLessThan(compressionMaxRatio, 0.1);
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(compressionMaxRatio, 0.9);
+            ArgumentOutOfRangeException.ThrowIfLessThan(
+                targetCompressionRatio,
+                TARGET_COMPRESSION_RATIO_LOWER_BOUND
+            );
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(
+                targetCompressionRatio,
+                TARGET_COMPRESSION_RATIO_UPPER_BOUND
+            );
 
-            var compressedLengthLimit = (int)(sourceInput.Length * compressionMaxRatio);
+            var compressedLengthLimit = (int)(sourceInput.Length * targetCompressionRatio);
             var compressedStream = streamManager.GetStream(
                 null,
                 requiredSize: compressedLengthLimit
@@ -530,7 +560,7 @@ partial class Aes256Cbc1
             }
         }
 
-        var encryptor = new Encryptor(
+        Encryptor encryptor = new(
             this,
             inputStream,
             isCompressed,
@@ -552,7 +582,7 @@ partial class Aes256Cbc1
 
         if (nameData.Length <= NAME_CRC_SIZE)
         {
-            throw new FormatException($"Data is no more than {NAME_CRC_SIZE} bytes");
+            throw new FormatException($"Data must be more than {NAME_CRC_SIZE} bytes");
         }
 
         if (
@@ -563,19 +593,31 @@ partial class Aes256Cbc1
             throw new FormatException($"Data not aligned on {CIPHER_BLOCK_SIZE} bytes boundary");
         }
 
-        var crc = Crc8.Compute(nameData, _hallmarkDataCrc);
+        if (nameData[0] != _hallmarkDataCrc)
+        {
+            throw new FormatException($"Data does not seem to have correct head CRC");
+        }
+
+        var crc = Crc8.Compute(nameData.AsSpan(1), _hallmarkDataCrc);
         if (crc != 0)
         {
-            throw new FormatException($"Data does not seem to have correct CRC value");
+            throw new FormatException($"Data does not seem to have correct tail CRC");
         }
 
         var ivData = hash[0..CIPHER_BLOCK_SIZE].ToArray();
+
+        int decKeyIterationCount = GetFirstNonZero(hash);
         var decKeySalt = hash[NAME_HASH_SALT_OFFSET..NAME_HASH_MIN_SIZE];
-        var decKey = KeyHolder.DeriveCipherKey(decKeySalt, 1000);
+        var decKey = KeyHolder.DeriveCipherKey(decKeySalt, decKeyIterationCount);
 
         var decryptTransform = GetDecryptionTransform(decKey, ivData);
 
-        var nameStream = new MemoryStream(nameData, 0, nameData.Length - 1, writable: false);
+        var nameStream = new MemoryStream(
+            nameData,
+            NAME_HEAD_CRC_SIZE,
+            nameData.Length - NAME_CRC_SIZE,
+            writable: false
+        );
 
         MemoryStream result = new();
 
@@ -589,7 +631,11 @@ partial class Aes256Cbc1
         return result;
     }
 
-    byte[] PrepareDecryptionKey(byte[] ivData, ReadOnlySpan<byte> encKeySalt)
+    byte[] PrepareDecryptionKey(
+        byte[] ivData,
+        ReadOnlySpan<byte> decKeySalt,
+        int decKeyIterationCount
+    )
     {
         ArgumentOutOfRangeException.ThrowIfNotEqual(
             ivData.Length,
@@ -598,12 +644,12 @@ partial class Aes256Cbc1
         );
 
         ArgumentOutOfRangeException.ThrowIfNotEqual(
-            encKeySalt.Length,
+            decKeySalt.Length,
             CIPHER_BLOCK_SIZE,
-            nameof(encKeySalt)
+            nameof(decKeySalt)
         );
 
-        var result = _keyHolder.DeriveCipherKey(encKeySalt, 1000);
+        var result = KeyHolder.DeriveCipherKey(decKeySalt, decKeyIterationCount);
 
         return result;
     }
@@ -819,18 +865,19 @@ partial class Aes256Cbc1
                 throw new InvalidDataException($"Cannot read {nameof(RESERVED_SIZE)}");
             }
 
-            var randomData = new byte[RANDOM_FILL_SIZE];
-            var randomDataSize = _sourceStream.Read(randomData);
-            if (randomDataSize != RANDOM_FILL_SIZE)
+            var randomFill = new byte[RANDOM_FILL_SIZE];
+            var randomFillSize = _sourceStream.Read(randomFill);
+            if (randomFillSize != RANDOM_FILL_SIZE)
             {
                 throw new InvalidDataException($"Cannot read {nameof(RANDOM_FILL_SIZE)}");
             }
 
-            randomData.AsSpan(0, CIPHER_BLOCK_SIZE).CopyTo(_ivData);
+            randomFill.AsSpan(0, CIPHER_BLOCK_SIZE).CopyTo(_ivData);
 
-            var encKeySalt = randomData.AsSpan(RANDOM_FILL_SALT_OFFSET);
+            int decKeyIterationCount = GetFirstNonZero(randomFill);
+            var decKeySalt = randomFill.AsSpan(RANDOM_FILL_SALT_OFFSET);
 
-            _decKey = _cipher.PrepareDecryptionKey(_ivData, encKeySalt);
+            _decKey = _cipher.PrepareDecryptionKey(_ivData, decKeySalt, decKeyIterationCount);
         }
 
         internal void ExamineContentHeader()

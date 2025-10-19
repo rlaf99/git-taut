@@ -4,6 +4,7 @@ using System.Text;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Logging;
 using ZLogger;
+using static Git.Taut.GitAttrConstants;
 
 namespace Git.Taut;
 
@@ -41,9 +42,8 @@ class TautManager(
 
     internal Lg2RefSpec RemoteRefSpec => _remoteRefSpec!;
 
-    const int DELTA_ENCODING_MIN_BYTES = 100;
-    const double DELTA_ENCODING_MAX_RATIO = 0.6;
-    const double DATA_COMPRESSION_MAX_RATIO = 0.8;
+    const int DELTA_ENCODING_APPLICABLE_SIZE = 100;
+    const double TARGET_DELTA_ENCODING_RATIO = 0.6;
 
     [AllowNull]
     List<string> _gitCredFillOutput;
@@ -656,10 +656,59 @@ class TautManager(
         logger.ZLogTrace($"Done tautening host refs");
     }
 
+    double GetTargetCompressionRatio(string pathName, Lg2AttrOptions hostAttrOpts)
+    {
+        var attrVal = HostRepo.GetTargetCompressionRatioAttrValue(pathName, hostAttrOpts);
+
+        if (attrVal.IsUnset)
+        {
+            return TARGET_COMPRESSION_RATIO_DISABLED_VALUE;
+        }
+
+        if (attrVal.IsSpecified)
+        {
+            var strVal = attrVal.GetString();
+
+            if (int.TryParse(strVal, out var intVal) == false)
+            {
+                logger.ZLogWarning(
+                    $"{GitAttrHelpers.TargetCompressionRatioAttrName} is specified with an invalid value '{strVal}', switch to using default value"
+                );
+
+                return TARGET_COMPRESSION_RATIO_DEFAULT_VALUE;
+            }
+
+            const int min = (int)(TARGET_COMPRESSION_RATIO_LOWER_BOUND * 100);
+            const int max = (int)(TARGET_COMPRESSION_RATIO_UPPER_BOUND * 100);
+
+            if (intVal < min || intVal > max)
+            {
+                logger.ZLogWarning(
+                    $"{GitAttrHelpers.TargetCompressionRatioAttrName} is specified but not within the range [{min}, {max}], switch to using default value"
+                );
+
+                return TARGET_COMPRESSION_RATIO_DEFAULT_VALUE;
+            }
+
+            var ratio = (double)intVal / 100;
+
+            return ratio;
+        }
+
+        if (attrVal.IsSet)
+        {
+            logger.ZLogWarning(
+                $"{GitAttrHelpers.TargetCompressionRatioAttrName} is set but not specified for '{pathName}', switch to using default value"
+            );
+
+            return TARGET_COMPRESSION_RATIO_DEFAULT_VALUE;
+        }
+
+        return TARGET_COMPRESSION_RATIO_DEFAULT_VALUE;
+    }
+
     void TautenFilesInDiff(Lg2Commit hostCommit, Lg2AttrOptions hostAttrOpts)
     {
-        using var tautRepoOdb = TautRepo.GetOdb();
-
         var hostParentCommit = hostCommit.GetParent(0);
         var hostParentTree = hostParentCommit.GetTree();
         var hostTree = hostCommit.GetTree();
@@ -722,7 +771,7 @@ class TautManager(
 
             var newFileSize = newFile.GetSize();
 
-            if (newFileSize < DELTA_ENCODING_MIN_BYTES)
+            if (newFileSize < DELTA_ENCODING_APPLICABLE_SIZE)
             {
                 continue;
             }
@@ -732,20 +781,24 @@ class TautManager(
 
             var ratio = (double)patchSize / newFileSize;
 
-            if (ratio > DELTA_ENCODING_MAX_RATIO)
+            if (ratio > TARGET_DELTA_ENCODING_RATIO)
             {
                 continue;
             }
 
             using var tautenStream = new PatchTautenStream(patch.NewReadStream());
 
+            var targetCompressionRatio = GetTargetCompressionRatio(newFilePath, hostAttrOpts);
+
             var oldFileOidRef = oldFile.GetOidPlainRef();
 
             var encryptor = tautCipher.CreateEncryptor(
                 tautenStream,
-                DATA_COMPRESSION_MAX_RATIO,
+                targetCompressionRatio,
                 oldFileOidRef.GetRawData()
             );
+
+            using var tautRepoOdb = TautRepo.GetOdb();
 
             using var writeStream = tautRepoOdb.OpenWriteStream(
                 encryptor.GetOutputLength(),
@@ -760,7 +813,7 @@ class TautManager(
             StoreTautened(newFile, resultOid, Lg2ObjectType.LG2_OBJECT_BLOB);
 
             logger.ZLogTrace(
-                $"Tauten patch ({tautenStream.Length}:{newFileSize}) for '{newFilePath}'"
+                $"Tautened patch ({tautenStream.Length}:{newFileSize}) for '{newFilePath}'"
             );
         }
     }
@@ -916,7 +969,7 @@ class TautManager(
                         logger.ZLogTrace($"Start tautening blob {entryOidHex8} '{entryPath}'");
 
                         var blob = HostRepo.LookupBlob(entry);
-                        TautenBlob(blob, ref oid, entryPath);
+                        TautenBlob(blob, ref oid, entryPath, hostAttrOpts);
 
                         logger.ZLogTrace($"Done tautening blob {entryOidHex8} '{entryPath}'");
                     }
@@ -972,14 +1025,21 @@ class TautManager(
         }
     }
 
-    void TautenBlob(Lg2Blob blob, scoped ref Lg2Oid resultOid, string filePath)
+    void TautenBlob(
+        Lg2Blob blob,
+        scoped ref Lg2Oid resultOid,
+        string filePath,
+        Lg2AttrOptions hostAttrOpts
+    )
     {
         using var hostRepoOdb = HostRepo.GetOdb();
         using var tautRepoOdb = TautRepo.GetOdb();
 
         using var readStream = hostRepoOdb.ReadAsStream(blob);
 
-        var encryptor = tautCipher.CreateEncryptor(readStream, DATA_COMPRESSION_MAX_RATIO);
+        var targetCompressionRatio = GetTargetCompressionRatio(filePath, hostAttrOpts);
+
+        var encryptor = tautCipher.CreateEncryptor(readStream, targetCompressionRatio);
 
         using var writeStream = tautRepoOdb.OpenWriteStream(
             encryptor.GetOutputLength(),

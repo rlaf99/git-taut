@@ -70,6 +70,16 @@ public struct Lg2AttrValue
             _ => _stringValue,
         };
     }
+
+    public string GetString()
+    {
+        if (_type != Lg2AttrValueType.LG2_ATTR_VALUE_STRING)
+        {
+            throw new InvalidOperationException($"Not a string type");
+        }
+
+        return _stringValue!;
+    }
 }
 
 unsafe partial class Lg2RepositoryExtensions
