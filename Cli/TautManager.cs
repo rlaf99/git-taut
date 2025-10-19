@@ -42,9 +42,6 @@ class TautManager(
 
     internal Lg2RefSpec RemoteRefSpec => _remoteRefSpec!;
 
-    const int DELTA_ENCODING_APPLICABLE_SIZE = 100;
-    const double TARGET_DELTA_ENCODING_RATIO = 0.6;
-
     [AllowNull]
     List<string> _gitCredFillOutput;
 
@@ -656,57 +653,6 @@ class TautManager(
         logger.ZLogTrace($"Done tautening host refs");
     }
 
-    double GetTargetCompressionRatio(string pathName, Lg2AttrOptions hostAttrOpts)
-    {
-        var attrVal = HostRepo.GetTargetCompressionRatioAttrValue(pathName, hostAttrOpts);
-
-        if (attrVal.IsUnset)
-        {
-            return TARGET_COMPRESSION_RATIO_DISABLED_VALUE;
-        }
-
-        if (attrVal.IsSpecified)
-        {
-            var strVal = attrVal.GetString();
-
-            if (int.TryParse(strVal, out var intVal) == false)
-            {
-                logger.ZLogWarning(
-                    $"{GitAttrHelpers.TargetCompressionRatioAttrName} is specified with an invalid value '{strVal}', switch to using default value"
-                );
-
-                return TARGET_COMPRESSION_RATIO_DEFAULT_VALUE;
-            }
-
-            const int min = (int)(TARGET_COMPRESSION_RATIO_LOWER_BOUND * 100);
-            const int max = (int)(TARGET_COMPRESSION_RATIO_UPPER_BOUND * 100);
-
-            if (intVal < min || intVal > max)
-            {
-                logger.ZLogWarning(
-                    $"{GitAttrHelpers.TargetCompressionRatioAttrName} is specified but not within the range [{min}, {max}], switch to using default value"
-                );
-
-                return TARGET_COMPRESSION_RATIO_DEFAULT_VALUE;
-            }
-
-            var ratio = (double)intVal / 100;
-
-            return ratio;
-        }
-
-        if (attrVal.IsSet)
-        {
-            logger.ZLogWarning(
-                $"{GitAttrHelpers.TargetCompressionRatioAttrName} is set but not specified for '{pathName}', switch to using default value"
-            );
-
-            return TARGET_COMPRESSION_RATIO_DEFAULT_VALUE;
-        }
-
-        return TARGET_COMPRESSION_RATIO_DEFAULT_VALUE;
-    }
-
     void TautenFilesInDiff(Lg2Commit hostCommit, Lg2AttrOptions hostAttrOpts)
     {
         var hostParentCommit = hostCommit.GetParent(0);
@@ -763,15 +709,25 @@ class TautManager(
             var newFilePath = newFile.GetPath();
 
             var tautAttrVal = HostRepo.GetTautAttrValue(newFilePath, hostAttrOpts);
-
             if (tautAttrVal.IsSetOrSpecified == false)
             {
                 continue;
             }
 
-            var newFileSize = newFile.GetSize();
+            var deltaEncodingEnalbingSize = GetDeltaEncodingEnablingSize(newFilePath, hostAttrOpts);
+            if (deltaEncodingEnalbingSize == 0)
+            {
+                continue;
+            }
 
-            if (newFileSize < DELTA_ENCODING_APPLICABLE_SIZE)
+            var newFileSize = newFile.GetSize();
+            if (newFileSize < (ulong)deltaEncodingEnalbingSize)
+            {
+                continue;
+            }
+
+            var deltaEncodingTargetRatio = GetDeltaEncodingTargetRatio(newFilePath, hostAttrOpts);
+            if (deltaEncodingTargetRatio == DELTA_ENCODING_ENABLING_SIZE_DISABLED_VALUE)
             {
                 continue;
             }
@@ -780,21 +736,20 @@ class TautManager(
             var patchSize = patch.GetSize();
 
             var ratio = (double)patchSize / newFileSize;
-
-            if (ratio > TARGET_DELTA_ENCODING_RATIO)
+            if (ratio > deltaEncodingTargetRatio)
             {
                 continue;
             }
 
             using var tautenStream = new PatchTautenStream(patch.NewReadStream());
 
-            var targetCompressionRatio = GetTargetCompressionRatio(newFilePath, hostAttrOpts);
+            var compressionTargetRatio = GetCompressionTargetRatio(newFilePath, hostAttrOpts);
 
             var oldFileOidRef = oldFile.GetOidPlainRef();
 
             var encryptor = tautCipher.CreateEncryptor(
                 tautenStream,
-                targetCompressionRatio,
+                compressionTargetRatio,
                 oldFileOidRef.GetRawData()
             );
 
@@ -1037,9 +992,9 @@ class TautManager(
 
         using var readStream = hostRepoOdb.ReadAsStream(blob);
 
-        var targetCompressionRatio = GetTargetCompressionRatio(filePath, hostAttrOpts);
+        var compressionTargetRatio = GetCompressionTargetRatio(filePath, hostAttrOpts);
 
-        var encryptor = tautCipher.CreateEncryptor(readStream, targetCompressionRatio);
+        var encryptor = tautCipher.CreateEncryptor(readStream, compressionTargetRatio);
 
         using var writeStream = tautRepoOdb.OpenWriteStream(
             encryptor.GetOutputLength(),
@@ -1081,5 +1036,153 @@ class TautManager(
         RegainHostRefs();
 
         TautenHostRefs();
+    }
+
+    int GetDeltaEncodingEnablingSize(string pathName, Lg2AttrOptions hostAttrOpts)
+    {
+        var attrVal = HostRepo.GetDeltaEncodingEnablingSizeAttrValue(pathName, hostAttrOpts);
+
+        if (attrVal.IsUnset)
+        {
+            return DELTA_ENCODING_ENABLING_SIZE_DISABLED_VALUE;
+        }
+
+        if (attrVal.IsSpecified)
+        {
+            var strVal = attrVal.GetString();
+
+            if (int.TryParse(strVal, out var intVal) == false)
+            {
+                logger.ZLogWarning(
+                    $"{GitAttrHelpers.DeltaEncodingEnablingSizeAttrName} is specified with an invalid value '{strVal}' for '{pathName}', switch to using default value"
+                );
+
+                return DELTA_ENCODING_ENABLING_SIZE_DEFAULT_VALUE;
+            }
+
+            if (intVal < DELTA_ENCODING_ENABLING_SIZE_LOWER_BOUND)
+            {
+                logger.ZLogWarning(
+                    $"{GitAttrHelpers.DeltaEncodingEnablingSizeAttrName} is specified but less than lower bound {DELTA_ENCODING_ENABLING_SIZE_LOWER_BOUND} for '{pathName}', switch to using default value"
+                );
+
+                return DELTA_ENCODING_ENABLING_SIZE_DEFAULT_VALUE;
+            }
+
+            return intVal;
+        }
+
+        if (attrVal.IsSet)
+        {
+            logger.ZLogWarning(
+                $"{GitAttrHelpers.DeltaEncodingEnablingSizeAttrName} is set but not specified for '{pathName}', switch to using default value"
+            );
+
+            return DELTA_ENCODING_ENABLING_SIZE_DEFAULT_VALUE;
+        }
+
+        return DELTA_ENCODING_ENABLING_SIZE_DEFAULT_VALUE;
+    }
+
+    double GetDeltaEncodingTargetRatio(string pathName, Lg2AttrOptions hostAttrOpts)
+    {
+        var attrVal = HostRepo.GetDeltaEncodingTargetRatioAttrValue(pathName, hostAttrOpts);
+
+        if (attrVal.IsUnset)
+        {
+            return DELTA_ENCODING_TARGET_RATIO_DISABLED_VALUE;
+        }
+
+        if (attrVal.IsSpecified)
+        {
+            var strVal = attrVal.GetString();
+
+            if (int.TryParse(strVal, out var intVal) == false)
+            {
+                logger.ZLogWarning(
+                    $"{GitAttrHelpers.DeltaEncodingTargetRatioAttrName} is specified with an invalid value '{strVal}' for '{pathName}', switch to using default value"
+                );
+
+                return DELTA_ENCODING_TARGET_RATIO_DEFAULT_VALUE;
+            }
+
+            const int min = (int)(DELTA_ENCODING_TARGET_RATIO_LOWER_BOUND * 100);
+            const int max = (int)(DELTA_ENCODING_TARGET_RATIO_UPPER_BOUND * 100);
+
+            if (intVal < min || intVal > max)
+            {
+                logger.ZLogWarning(
+                    $"{GitAttrHelpers.DeltaEncodingTargetRatioAttrName} is specified but not within the range [{min}, {max}] for '{pathName}', switch to using default value"
+                );
+
+                return DELTA_ENCODING_TARGET_RATIO_DEFAULT_VALUE;
+            }
+
+            var ratio = (double)intVal / 100;
+
+            return ratio;
+        }
+
+        if (attrVal.IsSet)
+        {
+            logger.ZLogWarning(
+                $"{GitAttrHelpers.DeltaEncodingTargetRatioAttrName} is set but not specified for '{pathName}', switch to using default value"
+            );
+
+            return DELTA_ENCODING_TARGET_RATIO_DEFAULT_VALUE;
+        }
+
+        return DELTA_ENCODING_TARGET_RATIO_DEFAULT_VALUE;
+    }
+
+    double GetCompressionTargetRatio(string pathName, Lg2AttrOptions hostAttrOpts)
+    {
+        var attrVal = HostRepo.GetTargetCompressionRatioAttrValue(pathName, hostAttrOpts);
+
+        if (attrVal.IsUnset)
+        {
+            return COMPRESSION_TARGET_RATIO_DISABLED_VALUE;
+        }
+
+        if (attrVal.IsSpecified)
+        {
+            var strVal = attrVal.GetString();
+
+            if (int.TryParse(strVal, out var intVal) == false)
+            {
+                logger.ZLogWarning(
+                    $"{GitAttrHelpers.CompressionTargetRatioAttrName} is specified with an invalid value '{strVal}' for '{pathName}', switch to using default value"
+                );
+
+                return COMPRESSION_TARGET_RATIO_DEFAULT_VALUE;
+            }
+
+            const int min = (int)(COMPRESSION_TARGET_RATIO_LOWER_BOUND * 100);
+            const int max = (int)(COMPRESSION_TARGET_RATIO_UPPER_BOUND * 100);
+
+            if (intVal < min || intVal > max)
+            {
+                logger.ZLogWarning(
+                    $"{GitAttrHelpers.CompressionTargetRatioAttrName} is specified but not within the range [{min}, {max}] for '{pathName}', switch to using default value"
+                );
+
+                return COMPRESSION_TARGET_RATIO_DEFAULT_VALUE;
+            }
+
+            var ratio = (double)intVal / 100;
+
+            return ratio;
+        }
+
+        if (attrVal.IsSet)
+        {
+            logger.ZLogWarning(
+                $"{GitAttrHelpers.CompressionTargetRatioAttrName} is set but not specified for '{pathName}', switch to using default value"
+            );
+
+            return COMPRESSION_TARGET_RATIO_DEFAULT_VALUE;
+        }
+
+        return COMPRESSION_TARGET_RATIO_DEFAULT_VALUE;
     }
 }

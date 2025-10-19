@@ -480,16 +480,16 @@ partial class Aes256Cbc1
 
     internal Encryptor CreateEncryptor(
         Stream sourceInput,
-        double targetCompressionRatio = TARGET_COMPRESSION_RATIO_DISABLED_VALUE,
+        double compressionTargetRatio = COMPRESSION_TARGET_RATIO_DISABLED_VALUE,
         bool leaveOpen = false
     )
     {
-        return CreateEncryptor(sourceInput, targetCompressionRatio, [], leaveOpen);
+        return CreateEncryptor(sourceInput, compressionTargetRatio, [], leaveOpen);
     }
 
     internal Encryptor CreateEncryptor(
         Stream sourceInput,
-        double targetCompressionRatio,
+        double compressionTargetRatio,
         ReadOnlySpan<byte> extraPayload,
         bool leaveOpen = false
     )
@@ -501,18 +501,18 @@ partial class Aes256Cbc1
         var isCompressed = false;
         var inputStream = sourceInput;
 
-        if (targetCompressionRatio != TARGET_COMPRESSION_RATIO_DISABLED_VALUE)
+        if (compressionTargetRatio != COMPRESSION_TARGET_RATIO_DISABLED_VALUE)
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(
-                targetCompressionRatio,
-                TARGET_COMPRESSION_RATIO_LOWER_BOUND
+                compressionTargetRatio,
+                COMPRESSION_TARGET_RATIO_LOWER_BOUND
             );
             ArgumentOutOfRangeException.ThrowIfGreaterThan(
-                targetCompressionRatio,
-                TARGET_COMPRESSION_RATIO_UPPER_BOUND
+                compressionTargetRatio,
+                COMPRESSION_TARGET_RATIO_UPPER_BOUND
             );
 
-            var compressedLengthLimit = (int)(sourceInput.Length * targetCompressionRatio);
+            var compressedLengthLimit = (int)(sourceInput.Length * compressionTargetRatio);
             var compressedStream = streamManager.GetStream(
                 null,
                 requiredSize: compressedLengthLimit

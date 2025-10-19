@@ -214,17 +214,27 @@ static partial class GitConfigHelpers
 
 static class GitAttrConstants
 {
-    internal const double TARGET_COMPRESSION_RATIO_DISABLED_VALUE = 0.0;
-    internal const double TARGET_COMPRESSION_RATIO_DEFAULT_VALUE = 0.8;
-    internal const double TARGET_COMPRESSION_RATIO_LOWER_BOUND = 0.1;
-    internal const double TARGET_COMPRESSION_RATIO_UPPER_BOUND = 0.9;
+    internal const int DELTA_ENCODING_ENABLING_SIZE_DISABLED_VALUE = 0;
+    internal const int DELTA_ENCODING_ENABLING_SIZE_DEFAULT_VALUE = 100;
+    internal const int DELTA_ENCODING_ENABLING_SIZE_LOWER_BOUND = 50;
+
+    internal const double DELTA_ENCODING_TARGET_RATIO_DISABLED_VALUE = 0.0;
+    internal const double DELTA_ENCODING_TARGET_RATIO_DEFAULT_VALUE = 0.6;
+    internal const double DELTA_ENCODING_TARGET_RATIO_LOWER_BOUND = 0.2;
+    internal const double DELTA_ENCODING_TARGET_RATIO_UPPER_BOUND = 0.8;
+
+    internal const double COMPRESSION_TARGET_RATIO_DISABLED_VALUE = 0.0;
+    internal const double COMPRESSION_TARGET_RATIO_DEFAULT_VALUE = 0.8;
+    internal const double COMPRESSION_TARGET_RATIO_LOWER_BOUND = 0.1;
+    internal const double COMPRESSION_TARGET_RATIO_UPPER_BOUND = 0.9;
 }
 
 static class GitAttrHelpers
 {
     internal const string TautAttrName = "taut";
-
-    internal const string TargetCompressionRatioAttrName = "target-compression-ratio";
+    internal const string DeltaEncodingTargetRatioAttrName = "delta-encoding-target-ratio";
+    internal const string DeltaEncodingEnablingSizeAttrName = "delta-encoding-enabling-size";
+    internal const string CompressionTargetRatioAttrName = "target-compression-ratio";
 
     internal static Lg2AttrValue GetTautAttrValue(
         this Lg2Repository repo,
@@ -239,6 +249,32 @@ static class GitAttrHelpers
         return result;
     }
 
+    internal static Lg2AttrValue GetDeltaEncodingTargetRatioAttrValue(
+        this Lg2Repository repo,
+        string pathName,
+        Lg2AttrOptions attrOpts
+    )
+    {
+        repo.EnsureValid();
+
+        var result = repo.GetAttrValue(pathName, DeltaEncodingTargetRatioAttrName, attrOpts);
+
+        return result;
+    }
+
+    internal static Lg2AttrValue GetDeltaEncodingEnablingSizeAttrValue(
+        this Lg2Repository repo,
+        string pathName,
+        Lg2AttrOptions attrOpts
+    )
+    {
+        repo.EnsureValid();
+
+        var result = repo.GetAttrValue(pathName, DeltaEncodingEnablingSizeAttrName, attrOpts);
+
+        return result;
+    }
+
     internal static Lg2AttrValue GetTargetCompressionRatioAttrValue(
         this Lg2Repository repo,
         string pathName,
@@ -247,7 +283,7 @@ static class GitAttrHelpers
     {
         repo.EnsureValid();
 
-        var result = repo.GetAttrValue(pathName, TargetCompressionRatioAttrName, attrOpts);
+        var result = repo.GetAttrValue(pathName, CompressionTargetRatioAttrName, attrOpts);
 
         return result;
     }
