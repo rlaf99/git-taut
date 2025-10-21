@@ -12,6 +12,22 @@ partial class GitRemoteHelper(
     GitCli gitCli
 );
 
+static class ILoggerExtensions
+{
+    internal static void SendLineToGit<TCategory>(
+        this ILogger<TCategory> logger,
+        string? content = null
+    )
+        where TCategory : GitRemoteHelper
+    {
+        content ??= string.Empty;
+
+        logger.ZLogTrace($"Send to Git '{content}'");
+
+        Console.WriteLine(content);
+    }
+}
+
 partial class GitRemoteHelper
 {
     const string capPush = "push";
@@ -44,15 +60,6 @@ partial class GitRemoteHelper
             return new CmdFetchArgs(parts[0], parts[1]);
         }
     }
-
-    void SendLineToGit(string? content = null)
-    {
-        content ??= string.Empty;
-
-        logger.ZLogTrace($"Send to Git '{content}'");
-
-        Console.WriteLine(content);
-    }
 }
 
 partial class GitRemoteHelper
@@ -76,7 +83,7 @@ partial class GitRemoteHelper
     {
         if (input.Length == 0)
         {
-            SendLineToGit();
+            logger.SendLineToGit();
 
             return HandleGitCommandResult.Done;
         }
@@ -116,11 +123,11 @@ partial class GitRemoteHelper
 
     HandleGitCommandResult HanldeGitCmdCapabilities(string input)
     {
-        SendLineToGit(capPush);
-        SendLineToGit(capFetch);
-        SendLineToGit(capCheckConnectivity);
-        SendLineToGit(capOption);
-        SendLineToGit();
+        logger.SendLineToGit(capPush);
+        logger.SendLineToGit(capFetch);
+        logger.SendLineToGit(capCheckConnectivity);
+        logger.SendLineToGit(capOption);
+        logger.SendLineToGit();
 
         return HandleGitCommandResult.Done;
     }
@@ -146,7 +153,7 @@ partial class GitRemoteHelper
             var target = resolvedRef.GetTarget();
             var oidText = target.GetOidHexDigits();
 
-            SendLineToGit($"{oidText} HEAD");
+            logger.SendLineToGit($"{oidText} HEAD");
         }
 
         var refList = tautManager.OrdinaryTautRefs;
@@ -159,7 +166,7 @@ partial class GitRemoteHelper
             tautManager.TautRepo.GetRefOid(regainedRefName, ref oid);
             var oidText = oid.ToHexDigits();
 
-            SendLineToGit($"{oidText} {refName}");
+            logger.SendLineToGit($"{oidText} {refName}");
         }
     }
 
@@ -185,7 +192,7 @@ partial class GitRemoteHelper
             };
         }
 
-        SendLineToGit();
+        logger.SendLineToGit();
 
         return HandleGitCommandResult.Done;
     }
@@ -222,10 +229,10 @@ partial class GitRemoteHelper
 
             if (_options.CheckConnectivity)
             {
-                SendLineToGit("connectivity-ok");
+                logger.SendLineToGit("connectivity-ok");
             }
 
-            SendLineToGit();
+            logger.SendLineToGit();
 
             _fetchBatch.Clear();
         }
@@ -262,7 +269,7 @@ partial class GitRemoteHelper
 
         RegainThenListRefs();
 
-        SendLineToGit();
+        logger.SendLineToGit();
 
         return HandleGitCommandResult.Done;
     }
@@ -316,10 +323,10 @@ partial class GitRemoteHelper
                     $"Refer '{srcRefName}' to '{tauntenedSrcRefTarget.GetOidHexDigits()}'"
                 );
 
-                SendLineToGit($"ok {dstRefName}");
+                logger.SendLineToGit($"ok {dstRefName}");
             }
 
-            SendLineToGit();
+            logger.SendLineToGit();
         }
 
         if (input.Length == 0)

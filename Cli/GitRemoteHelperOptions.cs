@@ -30,7 +30,7 @@ class GitRemoteHelperOptions(ILogger<GitRemoteHelper> logger)
             return nameValue[(opt.Length + 1)..] == "true";
         }
 
-        void TraceOptionUpdate<TValue>(string opt, TValue value)
+        void TraceOptionUpdate(string opt, string value)
         {
             logger.ZLogTrace($"Set option '{opt}' to {value}");
         }
@@ -40,9 +40,10 @@ class GitRemoteHelperOptions(ILogger<GitRemoteHelper> logger)
             if (int.TryParse(nameValue[(optVerbosity.Length + 1)..], out var value))
             {
                 Verbosity = value;
-                Console.WriteLine("ok");
 
-                TraceOptionUpdate(optVerbosity, value);
+                logger.SendLineToGit("ok");
+
+                TraceOptionUpdate(optVerbosity, value.ToString());
             }
             else
             {
@@ -52,44 +53,46 @@ class GitRemoteHelperOptions(ILogger<GitRemoteHelper> logger)
         else if (nameValue.StartsWith(optProgress))
         {
             ShowProgress = GetBooleanValue(optProgress);
-            Console.WriteLine("ok");
 
-            TraceOptionUpdate(optProgress, ShowProgress);
+            logger.SendLineToGit("ok");
+
+            TraceOptionUpdate(optProgress, ShowProgress.ToString());
         }
         else if (nameValue.StartsWith(optCloning))
         {
             IsCloning = GetBooleanValue(optCloning);
-            Console.WriteLine("ok");
 
-            TraceOptionUpdate(optCloning, IsCloning);
+            logger.SendLineToGit("ok");
+
+            TraceOptionUpdate(optCloning, IsCloning.ToString());
         }
         else if (nameValue.StartsWith(optCheckConnectivity))
         {
             CheckConnectivity = GetBooleanValue(optCheckConnectivity);
-            Console.WriteLine("ok");
 
-            TraceOptionUpdate(optCheckConnectivity, CheckConnectivity);
+            logger.SendLineToGit("ok");
+
+            TraceOptionUpdate(optCheckConnectivity, CheckConnectivity.ToString());
         }
         else if (nameValue.StartsWith(optForce))
         {
             ForceUpdate = GetBooleanValue(optForce);
-            Console.WriteLine("ok");
 
-            TraceOptionUpdate(optForce, ForceUpdate);
+            logger.SendLineToGit("ok");
+
+            TraceOptionUpdate(optForce, ForceUpdate.ToString());
         }
         else if (nameValue.StartsWith(optDryRun))
         {
             DryRun = GetBooleanValue(optDryRun);
 
-            Console.WriteLine("ok");
+            logger.SendLineToGit("ok");
 
-            TraceOptionUpdate(optDryRun, DryRun);
+            TraceOptionUpdate(optDryRun, DryRun.ToString());
         }
         else
         {
-            Console.WriteLine("unsupported");
-
-            logger.ZLogTrace($"Unsupported option '{nameValue}'");
+            logger.SendLineToGit("unsupported");
         }
     }
 }

@@ -8,10 +8,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Version>0.0.1</Version>
+    <PublishAot>true</PublishAot>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LightningDB" Version="0.19.0" />
+    <PackageReference Include="LightningDB" Version="0.19.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.10" />

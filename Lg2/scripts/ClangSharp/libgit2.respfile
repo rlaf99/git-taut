@@ -14,7 +14,7 @@ multi-file
 unix-types
 
 --libraryPath
-libgit2
+git2
 
 
 --language

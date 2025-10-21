@@ -116,7 +116,7 @@ public sealed unsafe class Lg2StrArray : IDisposable
 
     public static Lg2StrArray FromList(List<string> input)
     {
-        var stringsSize = Marshal.SizeOf(typeof(sbyte*)) * input.Count;
+        var stringsSize = sizeof(sbyte*) * input.Count;
 
         git_strarray strarray = new()
         {

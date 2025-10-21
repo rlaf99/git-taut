@@ -61,8 +61,18 @@ static class TestScenePlannerExtensions
         using var pushDir = new PushDirectory(scene.DirPath);
 
         gitCli.Run("init", "--bare", Repo0);
+    }
 
-        var repo0Path = Path.Join(scene.DirPath, Repo0);
+    public static void ConfigRepo0WithTags(this TestScenePlanner planner)
+    {
+        var scene = planner.Scene;
+        var host = planner.Host;
+
+        var gitCli = host.Services.GetRequiredService<GitCli>();
+
+        using var pushDir = new PushDirectory(Path.Join(scene.DirPath, Repo0));
+
+        gitCli.Run("tag", "tag0", "HEAD");
     }
 
     public static void SetupRepo1(this TestScenePlanner planner)
