@@ -10,14 +10,46 @@ The encryption uses [the cipher scheme](./docs/CipherScheme.md). Additionally, [
 
 *git-taut* functions as a Git remote-helper, thus most of the operations are transparent to normal git use.
 
-### Install Lg2.native nuget
+## How to install
 
-`Lg2.native` nuget is published at <https://github.com/rlaf99/libgit2/pkgs/nuget/Lg2.native>.
+Currently, `git-taut` is provided as a dotnet tool on following platforms
+
+- Windows x64
+- Linux x64
+- macOS arm64
+
+To install it, some prerequeistes must be met:
+
+- .NET SDK 9.0
+- `Lg2.native` nuget package which provides the prebuilt libgit2 runtimes (see below)
+
+### Install Lg2.native NuGet Package
+
+`Lg2.native` is published at <https://github.com/rlaf99/libgit2/pkgs/nuget/Lg2.native>.
 
 The nuget resitry has to be added before installing `Lg2.native`
 
 ```
-dotnet nuget add source --username [YourGitHubUsername] --password [YourPAT] --name github_rlaf99 https://nuget.pkg.github.com/rlaf99/index.json
+dotnet nuget add source --username [GitHubUsername] --password [GitHubAccessToken] --name github_rlaf99 https://nuget.pkg.github.com/rlaf99/index.json
 ```
 
-Then `Lg2.native` can be installed as usual (e.g., `dotnet package add Lg2.native`), and successfully restored.
+It should be sufficient for the `[GitHubAccessToken]` to only have package read permission.
+
+Then `Lg2.native` can be successfully when resorting nuget packages.
+
+
+### Install `git-taut` as a DotNet Tool 
+
+In the root directory, run 
+
+```
+dotnet pack Cli
+```
+
+then the correpsonding nuget package is generated inside `nupkg` directory.
+
+To install the nuget package, run
+
+```
+dotnet tool install --global --add-source nupkg git-taut
+```
