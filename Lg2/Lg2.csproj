@@ -11,4 +11,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="$(AssemblyName).Tests" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Lg2.native" Version="0.191.0" />
+  </ItemGroup>
 </Project>

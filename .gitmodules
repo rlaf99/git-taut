@@ -1,6 +1,6 @@
-[submodule "thirdparty/libgit2"]
-	path = thirdparty/libgit2
-	url = https://github.com/libgit2/libgit2.git
 [submodule "thirdparty/lmdb"]
 	path = thirdparty/lmdb
 	url = https://github.com/LMDB/lmdb.git
+[submodule "thirdparty/libgit2"]
+	path = thirdparty/libgit2
+	url = https://github.com/rlaf99/libgit2.git

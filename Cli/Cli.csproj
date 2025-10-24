@@ -9,9 +9,13 @@
     <Nullable>enable</Nullable>
     <Version>0.0.1</Version>
     <PublishAot>true</PublishAot>
+    <PackAsTool>true</PackAsTool>
+    <!-- <ToolCommandName>git-taut</ToolCommandName> -->
+    <PackageOutputPath>../nupkg</PackageOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Lg2.native" Version="0.191.0" />
     <PackageReference Include="LightningDB" Version="0.19.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.10" />
@@ -32,6 +36,6 @@
     <InternalsVisibleTo Include="$(MSBuildProjectName).Tests" />
   </ItemGroup>
 
-  <Import Project="../thirdparty/libgit2build/libgit2.targets"></Import>
+  <!-- <Import Project="../thirdparty/libgit2build/libgit2.targets"></Import> -->
 
 </Project>

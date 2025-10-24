@@ -29,6 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Lg2.native" Version="0.191.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.10" />
@@ -46,5 +47,5 @@
     <ProjectReference Include="..\Cli\Cli.csproj" />
   </ItemGroup>
 
-  <Import Project="../thirdparty/libgit2build/libgit2.targets"></Import>
+  <!-- <Import Project="../thirdparty/libgit2build/libgit2.targets"></Import> -->
 </Project>

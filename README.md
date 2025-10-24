@@ -10,3 +10,14 @@ The encryption uses [the cipher scheme](./docs/CipherScheme.md). Additionally, [
 
 *git-taut* functions as a Git remote-helper, thus most of the operations are transparent to normal git use.
 
+### Install Lg2.native nuget
+
+`Lg2.native` nuget is published at <https://github.com/rlaf99/libgit2/pkgs/nuget/Lg2.native>.
+
+The nuget resitry has to be added before installing `Lg2.native`
+
+```
+dotnet nuget add source --username [YourGitHubUsername] --password [YourPAT] --name github_rlaf99 https://nuget.pkg.github.com/rlaf99/index.json
+```
+
+Then `Lg2.native` can be installed as usual (e.g., `dotnet package add Lg2.native`), and successfully restored.
