@@ -78,6 +78,44 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
     }
 
     [Fact]
+    public void CloneTautRepo0IntoRepo2_ViaHttp()
+    {
+        _planner.SetupRepo0();
+        _planner.SetupRepo1();
+
+        using var repo0Http = _planner.ServeRepo0();
+
+        var repo0HttpUri = repo0Http.GetServingUri();
+
+        testOutput.WriteLine($"Serving {Repo0} at {repo0HttpUri.AbsoluteUri}");
+
+        var gitCli = Host.Services.GetRequiredService<GitCli>();
+
+        Directory.SetCurrentDirectory(Scene.DirPath);
+        gitCli.Run("clone", "--origin", Repo0, $"taut::{repo0HttpUri.AbsoluteUri}", Repo2);
+
+        Directory.SetCurrentDirectory(Repo2);
+
+        UpdateContentAndPush(gitCli);
+
+        using var repo2 = Lg2Repository.New(".");
+        using var repo2Config = repo2.GetConfigSnapshot();
+        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(repo2Config, Repo0);
+
+        Directory.SetCurrentDirectory(Path.Join("..", Repo1));
+        gitCli.Run("pull");
+
+        Directory.SetCurrentDirectory("..");
+        var repo0sitePath = GitRepoHelpers.GetTautSitePath(Repo2Git, repo0SiteName);
+        using var repo0Site = Lg2Repository.New(repo0sitePath);
+        using var repo0Base = Lg2Repository.New(Repo0);
+
+        Assert.True(CompareBranch(repo0Base, repo0Site, "master"));
+
+        Assert.Fail();
+    }
+
+    [Fact]
     public void CloneTautRepo0IntoRepo2_WithTags()
     {
         _planner.SetupRepo0();

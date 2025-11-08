@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Diagnostics.CodeAnalysis;
+using Cli.Tests.TestSupport;
 using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Configuration;
@@ -38,6 +39,9 @@ static class HostApplicationBuilderExtensions
         builder.Services.AddSingleton<GitRemoteHelper>();
         builder.Services.AddSingleton<SiteCommandActions>();
         builder.Services.AddSingleton<OtherCommandActions>();
+#if DEBUG
+        builder.Services.AddSingleton<DebugCommandActions>();
+#endif
     }
 
     internal static void AddGitTautConfiguration(this HostApplicationBuilder builder)
@@ -102,6 +106,205 @@ static class HostApplicationBuilderExtensions
     }
 }
 
+class CommandActionsBase
+{
+    internal record ResolveTargetOptionResult(
+        string SiteName,
+        string? RemoteName,
+        bool TargetIsRemote,
+        bool SiteIsFromHead
+    );
+
+    internal ResolveTargetOptionResult ResolveTargetOption(
+        ParseResult parseResult,
+        Lg2Repository hostRepo,
+        bool followHead
+    )
+    {
+        var targetName = parseResult.GetValue(ProgramCommandLine.SiteTargetOption);
+        if (targetName is not null)
+        {
+            using var config = hostRepo.GetConfigSnapshot();
+
+            string? siteName = null;
+            bool targetIsRemote = false;
+
+            if (TautSiteConfig.IsExistingSite(config, targetName))
+            {
+                siteName = targetName;
+            }
+            else
+            {
+                targetIsRemote = TautSiteConfig.TryFindSiteNameForRemote(
+                    config,
+                    targetName,
+                    out siteName
+                );
+            }
+
+            if (siteName is null)
+            {
+                throw new InvalidOperationException(
+                    $"The value '{targetName}' specified by {ProgramCommandLine.SiteTargetOption.Name} is invalid"
+                );
+            }
+
+            var siteConfig = TautSiteConfig.LoadNew(config, siteName);
+
+            return new(
+                SiteName: siteConfig.SiteName,
+                RemoteName: targetIsRemote ? targetName : null,
+                TargetIsRemote: targetIsRemote,
+                SiteIsFromHead: false
+            );
+        }
+        else if (followHead)
+        {
+            if (TryResolveTautSiteNameFromHead(hostRepo, out var tautSiteName))
+            {
+                return new(
+                    SiteName: tautSiteName,
+                    RemoteName: null,
+                    TargetIsRemote: false,
+                    SiteIsFromHead: true
+                );
+            }
+
+            throw new InvalidOperationException($"Cannot resolve taut site name from HEAD");
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                $"Option {ProgramCommandLine.SiteTargetOption.Name} is not specified"
+            );
+        }
+    }
+
+    internal bool TryResolveTautSiteNameFromHead(
+        Lg2Repository hostRepo,
+        [NotNullWhen(true)] out string? tautSiteName
+    )
+    {
+        var repoHead = hostRepo.GetHead();
+        if (repoHead.IsBranch() == false)
+        {
+            tautSiteName = null;
+            return false;
+        }
+
+        var headRefName = repoHead.GetName();
+        var remoteName = hostRepo.GetBranchUpstreamRemoteName(headRefName);
+
+        using (var config = hostRepo.GetConfigSnapshot())
+        {
+            if (TautSiteConfig.TryLoadByRemoteName(config, remoteName, out var tautConfig))
+            {
+                tautSiteName = tautConfig.SiteName;
+
+                return true;
+            }
+        }
+
+        tautSiteName = null;
+        return false;
+    }
+
+    internal Lg2Repository LocateHostRepo()
+    {
+        if (KnownEnvironVars.TryGetGitDir(out var gitDir))
+        {
+            return Lg2Repository.New(gitDir);
+        }
+
+        var currentDir = Directory.GetCurrentDirectory();
+        if (Lg2Repository.TryDiscover(currentDir, out var hostRepo) == false)
+        {
+            throw new InvalidOperationException($"Not inside a git repository");
+        }
+
+        return hostRepo;
+    }
+
+    internal Lg2Repository OpenTautRepo(string repoPath)
+    {
+        try
+        {
+            var tautRepo = Lg2Repository.New(repoPath);
+
+            return tautRepo;
+        }
+        catch (Exception)
+        {
+            Console.Error.WriteLine($"Cannot open taut repo at path '{repoPath}'");
+
+            throw new OperationCanceledException();
+        }
+    }
+
+    internal string ResolveLocalUrl(string remoteAddress)
+    {
+        string remoteUrl;
+
+        if (Directory.Exists(remoteAddress))
+        {
+            using var repo = Lg2Repository.New(
+                remoteAddress,
+                Lg2RepositoryOpenFlags.LG2_REPOSITORY_OPEN_NO_SEARCH
+            );
+
+            remoteUrl = repo.GetPath();
+        }
+        else if (remoteAddress.Contains(':'))
+        {
+            remoteUrl = remoteAddress;
+        }
+        else
+        {
+            throw new InvalidOperationException($"Unrecoginized repository path '{remoteAddress}'");
+        }
+
+        return remoteUrl;
+    }
+
+    internal Lg2Repository LocateTautRepo()
+    {
+        var currentDir = Directory.GetCurrentDirectory();
+
+        var hostRepo = LocateHostRepo();
+
+        var tautRepoFullPath = GitRepoHelpers.GetTautHomePath(hostRepo.GetPath());
+        var tautRepoRelPath = Path.GetRelativePath(currentDir, tautRepoFullPath);
+
+        return OpenTautRepo(tautRepoRelPath);
+    }
+}
+
+#if DEBUG
+class DebugCommandActions(ILoggerFactory loggerFactory) : CommandActionsBase
+{
+    internal async Task ServeHttpAsync(ParseResult parseResult, CancellationToken cancellation)
+    {
+        using var hostRepo = LocateHostRepo();
+
+        GitHttpBackend gitHttp = new(hostRepo.GetPath(), loggerFactory);
+
+        gitHttp.Start();
+
+        var servingUri = gitHttp.GetServingUri();
+        Console.Error.WriteLine($"Serving at {servingUri}");
+
+        TaskCompletionSource tcs = new();
+
+        cancellation.Register(() =>
+        {
+            tcs.SetCanceled();
+        });
+
+        await tcs.Task;
+    }
+}
+#endif
+
 class SiteCommandActions(
     ILogger<SiteCommandActions> logger,
     GitCli gitCli,
@@ -109,7 +312,7 @@ class SiteCommandActions(
     TautManager tautManager,
     TautMapping tautMapping,
     Aes256Cbc1 cipher
-)
+) : CommandActionsBase
 {
     internal void Run(ParseResult parseResult)
     {
@@ -370,179 +573,9 @@ class SiteCommandActions(
 
         // tautManager.RebuildKvStore();
     }
-
-    record ResolveTargetOptionResult(
-        string SiteName,
-        string? RemoteName,
-        bool TargetIsRemote,
-        bool SiteIsFromHead
-    );
-
-    ResolveTargetOptionResult ResolveTargetOption(
-        ParseResult parseResult,
-        Lg2Repository hostRepo,
-        bool followHead
-    )
-    {
-        var targetName = parseResult.GetValue(ProgramCommandLine.SiteTargetOption);
-        if (targetName is not null)
-        {
-            using var config = hostRepo.GetConfigSnapshot();
-
-            string? siteName = null;
-            bool targetIsRemote = false;
-
-            if (TautSiteConfig.IsExistingSite(config, targetName))
-            {
-                siteName = targetName;
-            }
-            else
-            {
-                targetIsRemote = TautSiteConfig.TryFindSiteNameForRemote(
-                    config,
-                    targetName,
-                    out siteName
-                );
-            }
-
-            if (siteName is null)
-            {
-                throw new InvalidOperationException(
-                    $"The value '{targetName}' specified by {ProgramCommandLine.SiteTargetOption.Name} is invalid"
-                );
-            }
-
-            var siteConfig = TautSiteConfig.LoadNew(config, siteName);
-
-            return new(
-                SiteName: siteConfig.SiteName,
-                RemoteName: targetIsRemote ? targetName : null,
-                TargetIsRemote: targetIsRemote,
-                SiteIsFromHead: false
-            );
-        }
-        else if (followHead)
-        {
-            if (TryResolveTautSiteNameFromHead(hostRepo, out var tautSiteName))
-            {
-                return new(
-                    SiteName: tautSiteName,
-                    RemoteName: null,
-                    TargetIsRemote: false,
-                    SiteIsFromHead: true
-                );
-            }
-
-            throw new InvalidOperationException($"Cannot resolve taut site name from HEAD");
-        }
-        else
-        {
-            throw new InvalidOperationException(
-                $"Option {ProgramCommandLine.SiteTargetOption.Name} is not specified"
-            );
-        }
-    }
-
-    bool TryResolveTautSiteNameFromHead(
-        Lg2Repository hostRepo,
-        [NotNullWhen(true)] out string? tautSiteName
-    )
-    {
-        var repoHead = hostRepo.GetHead();
-        if (repoHead.IsBranch() == false)
-        {
-            tautSiteName = null;
-            return false;
-        }
-
-        var headRefName = repoHead.GetName();
-        var remoteName = hostRepo.GetBranchUpstreamRemoteName(headRefName);
-
-        using (var config = hostRepo.GetConfigSnapshot())
-        {
-            if (TautSiteConfig.TryLoadByRemoteName(config, remoteName, out var tautConfig))
-            {
-                tautSiteName = tautConfig.SiteName;
-
-                return true;
-            }
-        }
-
-        tautSiteName = null;
-        return false;
-    }
-
-    Lg2Repository LocateHostRepo()
-    {
-        if (KnownEnvironVars.TryGetGitDir(out var gitDir))
-        {
-            return Lg2Repository.New(gitDir);
-        }
-
-        var currentDir = Directory.GetCurrentDirectory();
-        if (Lg2Repository.TryDiscover(currentDir, out var hostRepo) == false)
-        {
-            throw new InvalidOperationException($"Not inside a git repository");
-        }
-
-        return hostRepo;
-    }
-
-    Lg2Repository OpenTautRepo(string repoPath)
-    {
-        try
-        {
-            var tautRepo = Lg2Repository.New(repoPath);
-
-            return tautRepo;
-        }
-        catch (Exception)
-        {
-            Console.Error.WriteLine($"Cannot open taut repo at path '{repoPath}'");
-
-            throw new OperationCanceledException();
-        }
-    }
-
-    string ResolveLocalUrl(string remoteAddress)
-    {
-        string remoteUrl;
-
-        if (Directory.Exists(remoteAddress))
-        {
-            using var repo = Lg2Repository.New(
-                remoteAddress,
-                Lg2RepositoryOpenFlags.LG2_REPOSITORY_OPEN_NO_SEARCH
-            );
-
-            remoteUrl = repo.GetPath();
-        }
-        else if (remoteAddress.Contains(':'))
-        {
-            remoteUrl = remoteAddress;
-        }
-        else
-        {
-            throw new InvalidOperationException($"Unrecoginized repository path '{remoteAddress}'");
-        }
-
-        return remoteUrl;
-    }
-
-    Lg2Repository LocateTautRepo()
-    {
-        var currentDir = Directory.GetCurrentDirectory();
-
-        var hostRepo = LocateHostRepo();
-
-        var tautRepoFullPath = GitRepoHelpers.GetTautHomePath(hostRepo.GetPath());
-        var tautRepoRelPath = Path.GetRelativePath(currentDir, tautRepoFullPath);
-
-        return OpenTautRepo(tautRepoRelPath);
-    }
 }
 
-class OtherCommandActions(ILogger<OtherCommandActions> logger)
+class OtherCommandActions(ILogger<OtherCommandActions> logger) : CommandActionsBase
 {
     internal void ShowInternal(ParseResult parseResult)
     {
@@ -625,8 +658,29 @@ class ProgramCommandLine(IHost host)
         rootCommand.Subcommands.Add(CreateCommandRemoteHelper());
         rootCommand.Subcommands.Add(CreateCommandShowInternal());
 
+#if DEBUG
+        rootCommand.Subcommands.Add(CreateCommandServeHttp());
+#endif
+
         return rootCommand;
     }
+
+#if DEBUG
+    Command CreateCommandServeHttp()
+    {
+        Command command = new("dbg-serve-http", "Serve a repository through HTTP");
+
+        command.SetAction(
+            (parseResult, cancellation) =>
+            {
+                var commands = host.Services.GetRequiredService<DebugCommandActions>();
+
+                return commands.ServeHttpAsync(parseResult, cancellation);
+            }
+        );
+        return command;
+    }
+#endif
 
     Command CreateCommandRemoteHelper()
     {

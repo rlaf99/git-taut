@@ -12,6 +12,8 @@
     <PackAsTool>true</PackAsTool>
     <!-- <ToolCommandName>git-taut</ToolCommandName> -->
     <PackageOutputPath>../nupkg</PackageOutputPath>
+
+    <RuntimeIdentifiers>win-x64;linux-x64;osx-arm64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,13 +31,25 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="dbg\**\*.cs" />
+  </ItemGroup>
+
+  <Choose>
+    <When Condition="'$(Configuration)' == 'Debug'">
+      <ItemGroup>
+        <PackageReference Include="KestrelCgi" Version="0.0.1" />
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+        <Compile Include="dbg\**\*.cs" />
+      </ItemGroup>
+    </When>
+  </Choose>
+
+  <ItemGroup>
     <ProjectReference Include="..\Lg2\Lg2.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="$(MSBuildProjectName).Tests" />
   </ItemGroup>
-
-  <!-- <Import Project="../thirdparty/libgit2build/libgit2.targets"></Import> -->
 
 </Project>

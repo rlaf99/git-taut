@@ -1,6 +1,4 @@
 using System.CommandLine;
-using Microsoft.Extensions.Hosting;
-using ProgramHelpers;
 
 namespace Cli.Tests.TestSupport;
 

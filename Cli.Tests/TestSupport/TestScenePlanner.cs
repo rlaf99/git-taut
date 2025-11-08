@@ -1,6 +1,7 @@
 using Git.Taut;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.TestSupport;
@@ -61,6 +62,19 @@ static class TestScenePlannerExtensions
         using var pushDir = new PushDirectory(scene.DirPath);
 
         gitCli.Run("init", "--bare", Repo0);
+    }
+
+    public static GitHttpBackend ServeRepo0(this TestScenePlanner planner)
+    {
+        var scene = planner.Scene;
+        var host = planner.Host;
+
+        var repo0Path = Path.Join(scene.DirPath, Repo0);
+        GitHttpBackend gitHttp = new(repo0Path, new NullLoggerFactory());
+
+        gitHttp.Start();
+
+        return gitHttp;
     }
 
     public static void ConfigRepo0WithTags(this TestScenePlanner planner)
