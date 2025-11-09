@@ -1,6 +1,7 @@
 using Git.Taut;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
@@ -70,7 +71,13 @@ static class TestScenePlannerExtensions
         var host = planner.Host;
 
         var repo0Path = Path.Join(scene.DirPath, Repo0);
-        GitHttpBackend gitHttp = new(repo0Path, new NullLoggerFactory());
+
+        var gitCli = host.Services.GetRequiredService<GitCli>();
+        gitCli.Run("--git-dir", repo0Path, "config", "http.receivepack", "true");
+
+        var loggerFactory = host.Services.GetRequiredService<ILoggerFactory>();
+
+        GitHttpBackend gitHttp = new(repo0Path, loggerFactory);
 
         gitHttp.Start();
 

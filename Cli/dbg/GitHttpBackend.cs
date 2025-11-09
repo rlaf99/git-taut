@@ -35,10 +35,10 @@ class GitHttpBackend : IDisposable
         return builder.Uri;
     }
 
-    internal GitHttpBackend(string repoPath, ILoggerFactory loggerFactory)
+    internal GitHttpBackend(string repoPath, ILoggerFactory loggerFactory, int portNumber = 0)
     {
         KestrelServerOptions serverOptions = new();
-        serverOptions.Listen(IPAddress.Loopback, 0);
+        serverOptions.Listen(IPAddress.Loopback, portNumber);
 
         SocketTransportOptions transportOptions = new();
 

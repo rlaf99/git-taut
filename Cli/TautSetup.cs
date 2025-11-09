@@ -140,8 +140,6 @@ sealed class TautSetup(
             argList.Add("--reference");
             argList.Add(tautSitePathToLink);
 
-            logger.ZLogDebug($"{tautSitePathToLink}");
-
             logger.ZLogTrace($"{SiteConfig.SiteName} is linked to {SiteConfig.LinkTo.SiteName}");
         }
 
@@ -154,14 +152,14 @@ sealed class TautSetup(
 
         _tautRepo = Lg2Repository.New(tautSitePath);
 
-        TautSetDescription();
-        TautSetFetchConfig();
+        SetSiteDescription();
+        SetSiteFetchConfig();
         // TautAddHostObjects();
         UpdateRemoteUrls();
         UpdateTautConfig();
     }
 
-    void TautSetDescription()
+    void SetSiteDescription()
     {
         var descriptionFile = GitRepoHelpers.GetDescriptionFile(_tautRepo);
 
@@ -173,7 +171,7 @@ sealed class TautSetup(
             writer.WriteLine(defaultDescription);
         }
 
-        logger.ZLogTrace($"Wrote '{defaultDescription}' to '{descriptionFile}'");
+        logger.ZLogTrace($"Updated '{descriptionFile}'");
     }
 
     // Not used, as `--reference repo` is used when cloning.
@@ -197,7 +195,7 @@ sealed class TautSetup(
         logger.ZLogTrace($"Wrote '{relativePath}' to '{tautRepoObjectsInfoAlternatesFile}'");
     }
 
-    void TautSetFetchConfig()
+    void SetSiteFetchConfig()
     {
         using var config = _tautRepo.GetConfig();
         config.SetString(GitConfigHelpers.Fetch_Prune, "true");
@@ -210,8 +208,14 @@ sealed class TautSetup(
             var remoteUrl = remote.GetUrl();
             var remoteUri = new Uri(remoteUrl);
 
-            // normalize the remote's file path
-            TautRepo.SetRemoteUrl(RemoteName, remoteUri.AbsolutePath);
+            if (remoteUri.IsFile)
+            {
+                TautRepo.SetRemoteUrl(RemoteName, remoteUri.AbsolutePath);
+            }
+            else
+            {
+                TautRepo.SetRemoteUrl(RemoteName, remoteUri.AbsoluteUri);
+            }
 
             var hostRemoteUrl = GitRepoHelpers.AddTautRemoteHelperPrefix(remoteUri.AbsoluteUri);
             _hostRepo.SetRemoteUrl(RemoteName, hostRemoteUrl);
@@ -235,7 +239,6 @@ sealed class TautSetup(
         var gitCredUrl = GitRepoHelpers.ConvertPathToTautCredentialUrl(tautSitePath);
 
         SiteConfig.CredentialUrl = gitCredUrl;
-
         SiteConfig.SaveCredentialUrl(hostConfig);
 
         using (var gitCred = new GitCredential(gitCli, gitCredUrl))
@@ -280,16 +283,16 @@ sealed class TautSetup(
                 tautSitePath,
                 "fetch",
                 RemoteName,
-                "+refs/heads/*:refs/heads/*"
+                GitRepoHelpers.DefaultFetchSpec
             );
 
             logger.ZLogTrace($"Fetched '{RemoteName}' for '{SiteConfig.SiteName}'");
 
-            var tautRemote = _tautRepo.LookupRemote(RemoteName);
+            using var tautRemote = _tautRepo.LookupRemote(RemoteName);
             var tautRemoteUrl = tautRemote.GetUrl();
             var tautRemoteUri = new Uri(tautRemoteUrl);
 
-            var hostRemote = _hostRepo.LookupRemote(RemoteName);
+            using var hostRemote = _hostRepo.LookupRemote(RemoteName);
             var hostRemoteUrl = hostRemote.GetUrl();
             hostRemoteUrl = GitRepoHelpers.RemoveTautRemoteHelperPrefix(hostRemoteUrl);
             var hostRemoteUri = new Uri(hostRemoteUrl);

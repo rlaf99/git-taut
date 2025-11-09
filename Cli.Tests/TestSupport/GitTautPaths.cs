@@ -15,7 +15,7 @@ public class WithGitTautPathsFixture : IDisposable
         {
             updatedPath = string.IsNullOrEmpty(updatedPath)
                 ? scriptPath
-                : updatedPath + Path.PathSeparator + scriptPath;
+                : scriptPath + Path.PathSeparator + updatedPath;
         }
 
         var execPath = Environment.GetEnvironmentVariable("GIT_TAUT_EXECUTABLE_PATH");
@@ -23,7 +23,7 @@ public class WithGitTautPathsFixture : IDisposable
         {
             updatedPath = string.IsNullOrEmpty(updatedPath)
                 ? execPath
-                : updatedPath + Path.PathSeparator + execPath;
+                : execPath + Path.PathSeparator + updatedPath;
         }
 
         Environment.SetEnvironmentVariable("PATH", updatedPath);

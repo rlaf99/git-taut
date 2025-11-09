@@ -111,8 +111,6 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
         using var repo0Base = Lg2Repository.New(Repo0);
 
         Assert.True(CompareBranch(repo0Base, repo0Site, "master"));
-
-        Assert.Fail();
     }
 
     [Fact]

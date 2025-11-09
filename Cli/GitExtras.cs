@@ -4,6 +4,7 @@ namespace Git.Taut;
 
 static class GitRepoHelpers
 {
+    internal const string DefaultFetchSpec = "+refs/heads/*:refs/heads/*";
     internal const string HeadRefName = "HEAD";
     internal const string TautHomeName = "taut";
     internal const string ObjectsDir = "Objects";

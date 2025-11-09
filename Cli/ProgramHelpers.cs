@@ -286,7 +286,9 @@ class DebugCommandActions(ILoggerFactory loggerFactory) : CommandActionsBase
     {
         using var hostRepo = LocateHostRepo();
 
-        GitHttpBackend gitHttp = new(hostRepo.GetPath(), loggerFactory);
+        int portNumber = parseResult.GetValue(ProgramCommandLine.PortToListenOption);
+
+        GitHttpBackend gitHttp = new(hostRepo.GetPath(), loggerFactory, portNumber);
 
         gitHttp.Start();
 
@@ -633,6 +635,14 @@ class ProgramCommandLine(IHost host)
         Description = "Specify the path",
     };
 
+#if DEBUG
+    internal static Option<int> PortToListenOption = new("--port")
+    {
+        DefaultValueFactory = _ => 0,
+        Description = $"The port number to listen on (dynamically assigned if 0)",
+    };
+#endif
+
     internal ParseResult Parse(string[] args, ParserConfiguration? parserConfiguration = null)
     {
         var rootCommand = BuildCommands();
@@ -669,6 +679,8 @@ class ProgramCommandLine(IHost host)
     Command CreateCommandServeHttp()
     {
         Command command = new("dbg-serve-http", "Serve a repository through HTTP");
+
+        command.Options.Add(PortToListenOption);
 
         command.SetAction(
             (parseResult, cancellation) =>
