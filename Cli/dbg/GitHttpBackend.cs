@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Cli.Tests.TestSupport;
+namespace ProgramHelpers;
 
 class GitHttpBackend : IDisposable
 {

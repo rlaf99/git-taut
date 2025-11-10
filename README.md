@@ -12,7 +12,7 @@ The encryption uses [the cipher scheme](./docs/CipherScheme.md). Additionally, [
 
 ## How to install
 
-Currently, `git-taut` is provided as a dotnet tool on following platforms
+Currently, `git-taut` is provided as a dotnet tool for the following platforms
 
 - Windows x64
 - Linux x64
@@ -30,7 +30,7 @@ To install it, some prerequeistes must be met:
 The nuget resitry has to be added before installing `Lg2.native`
 
 ```
-dotnet nuget add source --username [GitHubUsername] --password [GitHubAccessToken] --name github_rlaf99 https://nuget.pkg.github.com/rlaf99/index.json
+dotnet nuget add source --username [GitHubUsername] --password [GitHubAccessToken] --store-password-in-clear-text --name github_rlaf99 https://nuget.pkg.github.com/rlaf99/index.json
 ```
 
 It should be sufficient for the `[GitHubAccessToken]` to only have package read permission.
@@ -51,5 +51,5 @@ then the correpsonding nuget package is generated inside `nupkg` directory.
 To install the nuget package, run
 
 ```
-dotnet tool install --global --add-source nupkg git-taut
+dotnet tool install --global --add-source nupkg --prerelease git-taut
 ```
