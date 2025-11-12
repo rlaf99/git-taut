@@ -91,9 +91,9 @@ class TautManager(
         }
     }
 
-    internal List<string> OrdinaryTautRefs => FilterTautSpecificRefs(TautRepo.GetRefList());
+    internal List<string> OrdinaryTautRefs => ExcludeTautSpecificRefs(TautRepo.GetRefList());
 
-    List<string> FilterTautSpecificRefs(List<string> refList)
+    List<string> ExcludeTautSpecificRefs(List<string> refList)
     {
         var result = new List<string>();
 
@@ -115,6 +115,7 @@ class TautManager(
         return result;
     }
 
+    // TODO: filter only refs relevant to this taut site
     List<string> FilterRemoteRefs(List<string> refList)
     {
         var result = new List<string>();
@@ -204,7 +205,7 @@ class TautManager(
     {
         logger.ZLogTrace($"Start regaining host refs");
 
-        var tautRefList = FilterTautSpecificRefs(TautRepo.GetRefList());
+        var tautRefList = ExcludeTautSpecificRefs(TautRepo.GetRefList());
 
         using var revWalk = TautRepo.NewRevWalk();
 
@@ -260,11 +261,11 @@ class TautManager(
 
         foreach (var refName in tautRefList)
         {
-            var tautOid = new Lg2Oid();
+            Lg2Oid tautOid = new();
             TautRepo.GetRefOid(refName, ref tautOid);
             var tautOidHex8 = tautOid.ToHexDigits(8);
 
-            var hostOid = new Lg2Oid();
+            Lg2Oid hostOid = new();
             tautMapping.GetRegained(tautOid, ref hostOid);
             var hostOidHex8 = hostOid.ToHexDigits(8);
 
@@ -619,11 +620,11 @@ class TautManager(
 
         foreach (var refName in hostRefList)
         {
-            var hostOid = new Lg2Oid();
+            Lg2Oid hostOid = new();
             HostRepo.GetRefOid(refName, ref hostOid);
             var hostOidHex8 = hostOid.ToHexDigits(8);
 
-            var tautenedOid = new Lg2Oid();
+            Lg2Oid tautenedOid = new();
             tautMapping.GetTautened(hostOid, ref tautenedOid);
             var tautenedOidHex8 = tautenedOid.ToHexDigits(8);
 

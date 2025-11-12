@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Lg2.Sharpy;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
@@ -7,6 +8,7 @@ namespace Git.Taut;
 
 partial class GitRemoteHelper(
     ILogger<GitRemoteHelper> logger,
+    IConfiguration config,
     TautSetup tautSetup,
     TautManager tautManager,
     GitCli gitCli
@@ -177,6 +179,7 @@ partial class GitRemoteHelper
         if (TautSiteConfig.TryFindSiteNameForRemote(hostConfig, _remoteName, out var tautSiteName))
         {
             tautSetup.GearUpExisting(HostRepo, _remoteName, tautSiteName);
+            tautSetup.FetchRemote();
 
             RegainThenListRefs();
         }
@@ -267,6 +270,18 @@ partial class GitRemoteHelper
 
         tautManager.TautenHostRefs();
 
+        bool noFetch = config.GetGitListForPushNoFetch();
+        if (noFetch)
+        {
+            logger.ZLogTrace(
+                $"Skip fetching {_remoteName} as {KnownEnvironVars.GitListForPushNoFetch} is set"
+            );
+        }
+        else
+        {
+            tautSetup.FetchRemote();
+        }
+
         RegainThenListRefs();
 
         logger.SendLineToGit();
@@ -314,14 +329,17 @@ partial class GitRemoteHelper
 
                 gitCli.Execute(args);
 
-                var srcRef = tautManager.TautRepo.LookupRef(srcRefName);
-                var tauntenedSrcRef = tautManager.TautRepo.LookupRef(tauntenedSrcRefName);
-                var tauntenedSrcRefTarget = tauntenedSrcRef.GetTarget();
-                srcRef.SetTarget(tauntenedSrcRefTarget);
+                if (_options.DryRun == false)
+                {
+                    var tauntenedSrcRef = tautManager.TautRepo.LookupRef(tauntenedSrcRefName);
+                    var tauntenedSrcRefTarget = tauntenedSrcRef.GetTarget();
 
-                logger.ZLogTrace(
-                    $"Refer '{srcRefName}' to '{tauntenedSrcRefTarget.GetOidHexDigits()}'"
-                );
+                    tautManager.TautRepo.NewRef(srcRefName, tauntenedSrcRefTarget, force: true);
+
+                    logger.ZLogTrace(
+                        $"Refer '{srcRefName}' to '{tauntenedSrcRefTarget.GetOidHexDigits()}'"
+                    );
+                }
 
                 logger.SendLineToGit($"ok {dstRefName}");
             }

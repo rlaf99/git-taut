@@ -10,6 +10,64 @@ The encryption uses [the cipher scheme](./docs/CipherScheme.md). Additionally, [
 
 *git-taut* functions as a Git remote-helper, thus most of the operations are transparent to normal git use.
 
+## Under the hood
+
+T.B.D.
+
+## Usage
+
+### Setting username and password
+
+Setting up a *taut site* requires you to provide username (optional) and password.
+The username is optional, and used as salt when generating encryption keys.
+`git-taut` utilites Git credential helper for retrieving them.
+The prompt will show the location of the *taut site* as URL.
+
+### Deciding what files to encrypt
+
+`git-taut` relies on [gitattributes] to tell what should be encrypted.
+Directories and files with `taut` attribute set will be encrypted by `git-taut`.
+
+`git-check-attr` can be used to check whehter `taut` attribute is set for a path:
+
+```
+git check-attr some/path
+```
+
+If `taut` attribute is set, then the output shows
+
+```
+"some/path": taut: set
+```
+
+#### Example 1: Encrypting files with extension `.a_file`
+
+If a `.gitattribute` contains the following setting, then files with extension `.a_file` in this directory as well as sub-directories will be encrypted.
+
+```
+*.a_file taut
+```
+
+The above set `taut` attribute on all files with extension `.a_file`.
+
+#### Exampl 2: Ecrypting filers under directory `a_dir`
+
+To encrypt all files under folder `a_dir`, ensure corresponding `.gitattribute` has the following setting
+
+```
+a_dir/** taut
+```
+
+The above sets `taut` attribute on all content under `a_dir`. However, it does not cause the name of `a_dir` to be encrypted. 
+Use the following setting To achieve it
+
+```
+a_dir taut
+```
+
+The above set `taut` attribute on `a_dir` itself.
+
+
 ## How to install
 
 Currently, `git-taut` is provided as a dotnet tool for the following platforms
@@ -53,3 +111,8 @@ To install the nuget package, run
 ```
 dotnet tool install --global --add-source nupkg --prerelease git-taut
 ```
+
+And don't forget to copy [git-remote-taut] to a directory in PATH, otherwse Git does not know how to invoke the remote helper provided by git-taut.
+
+[git-remote-taut]: ./Cli/scripts/git-remote-taut
+[gitattributes]: https://git-scm.com/docs/gitattributes

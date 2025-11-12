@@ -232,12 +232,15 @@ unsafe partial class Lg2RepositoryExtensions
         string refName,
         Lg2OidPlainRef oidRef,
         bool force,
-        string logMessage
+        string? logMessage = null
     )
     {
         repo.EnsureValid();
 
         using var u8Name = new Lg2Utf8String(refName);
+
+        logMessage ??= string.Empty;
+
         using var u8LogMessage = new Lg2Utf8String(logMessage);
         git_reference* pRef = null;
         var rc = git_reference_create(

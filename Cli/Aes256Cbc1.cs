@@ -248,7 +248,7 @@ partial class Aes256Cbc1
 
             _headerStream.Write(scrambleData);
 
-            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(_sourceLength, 0);
+            ArgumentOutOfRangeException.ThrowIfLessThan(_sourceLength, 0);
             ArgumentOutOfRangeException.ThrowIfGreaterThan(_sourceLength, PLAIN_TEXT_MAX_SIZE);
 
             var sourceLengthData = BitConverter.GetBytes(_sourceLength);

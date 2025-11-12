@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Lg2.Sharpy;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
@@ -265,6 +266,21 @@ sealed class TautSetup(
         }
     }
 
+    internal void FetchRemote()
+    {
+        var tautRepoPath = TautRepo.GetPath();
+
+        gitCli.Execute(
+            "--git-dir",
+            tautRepoPath,
+            "fetch",
+            RemoteName,
+            GitRepoHelpers.DefaultFetchSpec
+        );
+
+        logger.ZLogTrace($"Fetched '{RemoteName}' for '{SiteConfig.SiteName}'");
+    }
+
     void EnsureExistingSetup()
     {
         using (var config = HostRepo.GetConfig())
@@ -278,16 +294,6 @@ sealed class TautSetup(
 
         if (_remoteName is not null)
         {
-            gitCli.Execute(
-                "--git-dir",
-                tautSitePath,
-                "fetch",
-                RemoteName,
-                GitRepoHelpers.DefaultFetchSpec
-            );
-
-            logger.ZLogTrace($"Fetched '{RemoteName}' for '{SiteConfig.SiteName}'");
-
             using var tautRemote = _tautRepo.LookupRemote(RemoteName);
             var tautRemoteUrl = tautRemote.GetUrl();
             var tautRemoteUri = new Uri(tautRemoteUrl);

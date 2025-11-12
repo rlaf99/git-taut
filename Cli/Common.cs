@@ -15,6 +15,8 @@ static class KnownEnvironVars
 
     internal const string GitTautTrace = "GIT_TAUT_TRACE";
 
+    internal const string GitListForPushNoFetch = "GIT_TAUT_LIST_FOR_PUSH_NO_FETCH";
+
     internal const string GitAlternateObjectDirectories = "GIT_ALTERNATE_OBJECT_DIRECTORIES";
 
     internal static bool TryGetGitDir(out string gitDir)
@@ -54,9 +56,8 @@ static class KnownEnvironVars
 
 static class AppConfigurationExtensions
 {
-    internal static bool GetGitTautTrace(this IConfiguration config)
+    static bool GetBooleanValue(string? val)
     {
-        var val = config[KnownEnvironVars.GitTautTrace];
         if (val is null)
         {
             return false;
@@ -68,6 +69,18 @@ static class AppConfigurationExtensions
         }
 
         return true;
+    }
+
+    internal static bool GetGitTautTrace(this IConfiguration config)
+    {
+        var val = config[KnownEnvironVars.GitTautTrace];
+        return GetBooleanValue(val);
+    }
+
+    internal static bool GetGitListForPushNoFetch(this IConfiguration config)
+    {
+        var val = config[KnownEnvironVars.GitListForPushNoFetch];
+        return GetBooleanValue(val);
     }
 }
 
