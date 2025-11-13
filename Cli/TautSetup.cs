@@ -275,7 +275,7 @@ sealed class TautSetup(
             tautRepoPath,
             "fetch",
             RemoteName,
-            GitRepoHelpers.DefaultFetchSpec
+            GitRepoHelpers.HeadsFetchSpec
         );
 
         logger.ZLogTrace($"Fetched '{RemoteName}' for '{SiteConfig.SiteName}'");

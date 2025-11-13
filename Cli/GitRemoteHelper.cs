@@ -143,7 +143,7 @@ partial class GitRemoteHelper
             var resolvedRef = headRef;
 
             var headRefName = headRef.GetName();
-            if (headRefName != GitRepoHelpers.HeadRefName)
+            if (headRefName != GitRepoHelpers.HEAD)
             {
                 var regainedHeadRefName = tautManager.RegainedRefSpec.TransformToTarget(
                     headRefName
@@ -206,11 +206,13 @@ partial class GitRemoteHelper
         {
             foreach (var fetchCmd in _fetchBatch)
             {
+                logger.ZLogTrace($"Handle '{fetchCmd}'");
+
                 var args = CmdFetchArgs.Parse(fetchCmd[cmdFetch.Length..].TrimStart());
 
                 Lg2Oid oid = new();
 
-                if (args.Name == GitRepoHelpers.HeadRefName)
+                if (args.Name == GitRepoHelpers.HEAD)
                 {
                     tautManager.TautRepo.GetRefOid(args.Name, ref oid);
                 }
@@ -219,6 +221,8 @@ partial class GitRemoteHelper
                     var regainedRefName = tautManager.RegainedRefSpec.TransformToTarget(args.Name);
                     tautManager.TautRepo.GetRefOid(regainedRefName, ref oid);
                 }
+
+                // Next: fetch from kv store and translate it
 
                 var oidText = oid.ToHexDigits();
 
@@ -236,13 +240,18 @@ partial class GitRemoteHelper
             }
 
             logger.SendLineToGit();
-
-            _fetchBatch.Clear();
         }
 
         if (input.Length == 0)
         {
-            HandleBatch();
+            try
+            {
+                HandleBatch();
+            }
+            finally
+            {
+                _fetchBatch.Clear();
+            }
 
             return HandleGitCommandResult.Done;
         }
@@ -349,7 +358,14 @@ partial class GitRemoteHelper
 
         if (input.Length == 0)
         {
-            HandleBatch();
+            try
+            {
+                HandleBatch();
+            }
+            finally
+            {
+                _pushBatch.Clear();
+            }
 
             return HandleGitCommandResult.Done;
         }
