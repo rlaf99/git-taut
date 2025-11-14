@@ -501,7 +501,7 @@ partial class Aes256Cbc1
         var isCompressed = false;
         var inputStream = sourceInput;
 
-        if (compressionTargetRatio != COMPRESSION_TARGET_RATIO_DISABLED_VALUE)
+        if (sourceLength > 0 && compressionTargetRatio != COMPRESSION_TARGET_RATIO_DISABLED_VALUE)
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(
                 compressionTargetRatio,

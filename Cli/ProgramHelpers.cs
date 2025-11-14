@@ -58,6 +58,7 @@ static class HostApplicationBuilderExtensions
         services.AddSingleton<TautSetup>();
         services.AddSingleton<TautManager>();
         services.AddSingleton<TautMapping>();
+        services.AddSingleton<TautAttributes>();
         services.AddSingleton<Aes256Cbc1>();
         services.AddSingleton<RecyclableMemoryStreamManager>();
     }
@@ -420,7 +421,7 @@ class SiteCommandActions(
 
         tautSetup.GearUpBrandNew(hostRepo, remoteName, remoteUrl, targetSite);
 
-        tautManager.RegainHostRefs();
+        tautManager.RegainRefHeads();
 
         tautSetup.WrapUpBrandNew();
     }

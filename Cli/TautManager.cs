@@ -10,6 +10,7 @@ namespace Git.Taut;
 
 class TautManager(
     ILogger<TautManager> logger,
+    TautAttributes tautAttrs,
     TautMapping tautMapping,
     Aes256Cbc1 tautCipher,
     GitCli gitCli
@@ -23,24 +24,34 @@ class TautManager(
     Lg2Repository _hostRepo;
     internal Lg2Repository HostRepo => _hostRepo!;
 
-    const string TautenedRefGlob = "refs/tautened/*";
-    const string RegainedRefGlob = "refs/regained/*";
+    const string RefsTautenedHeads = "reffs/tautened/heads/*";
+    const string RefsTautenedTags = "reffs/tautened/tags/*";
+    const string RefsTautened = "refs/tautened/*";
 
-    const string TautenedRefSpecText = "refs/*:refs/tautened/*";
-    const string RegainedRefSpecText = "refs/*:refs/regained/*";
-    const string RemoteRefSpecText = "refs/*:refs/remotes/*";
+    const string RefsRegainedHeads = "refs/regained/heads/*";
+    const string RefsRegainedTags = "refs/regained/tags/*";
+    const string RefsRegained = "refs/regained/*";
 
-    readonly Lg2RefSpec _tautenedRefSpec = Lg2RefSpec.NewForPush(TautenedRefSpecText);
+    const string RefsTags = "refs/tags/*";
 
-    internal Lg2RefSpec TautenedRefSpec => _tautenedRefSpec!;
+    const string RefsToRefsTautenedSpecText = "refs/*:refs/tautened/*";
+    const string RefsToRefsRegainedSpecText = "refs/*:refs/regained/*";
+    const string RefsToRefsRemotesSpecText = "refs/*:refs/remotes/*";
+    const string RefsToRefsTagsSpecText = "refs/*:refs/tags/*";
 
-    readonly Lg2RefSpec _regainedRefSpec = Lg2RefSpec.NewForFetch(RegainedRefSpecText);
+    readonly Lg2RefSpec _refsToRefsTautenedSpec = Lg2RefSpec.NewForPush(RefsToRefsTautenedSpecText);
+    internal Lg2RefSpec RefsToRefsTautenedSpec => _refsToRefsTautenedSpec;
 
-    internal Lg2RefSpec RegainedRefSpec => _regainedRefSpec!;
+    readonly Lg2RefSpec _refsToRefsRegainedSpec = Lg2RefSpec.NewForFetch(
+        RefsToRefsRegainedSpecText
+    );
+    internal Lg2RefSpec RefsToRefsRegainedSpec => _refsToRefsRegainedSpec;
 
-    readonly Lg2RefSpec _remoteRefSpec = Lg2RefSpec.NewForPush(RemoteRefSpecText);
+    readonly Lg2RefSpec _refsToRefsRemoteSpec = Lg2RefSpec.NewForPush(RefsToRefsRemotesSpecText);
+    internal Lg2RefSpec RefsToRefsRemoteSpec => _refsToRefsRemoteSpec;
 
-    internal Lg2RefSpec RemoteRefSpec => _remoteRefSpec!;
+    readonly Lg2RefSpec _refsToRefsTagsSpec = Lg2RefSpec.NewForPush(RefsToRefsTagsSpecText);
+    internal Lg2RefSpec RefsToRefsTagsSpec => _refsToRefsTagsSpec;
 
     [AllowNull]
     List<string> _gitCredFillOutput;
@@ -63,7 +74,7 @@ class TautManager(
     {
         get
         {
-            var iter = TautRepo.NewRefIteratorGlob(RegainedRefGlob);
+            var iter = TautRepo.NewRefIteratorGlob(RefsRegained);
 
             List<string> result = [];
             while (iter.NextName(out var refName))
@@ -79,7 +90,7 @@ class TautManager(
     {
         get
         {
-            var iter = TautRepo.NewRefIteratorGlob(TautenedRefGlob);
+            var iter = TautRepo.NewRefIteratorGlob(RefsTautened);
 
             List<string> result = [];
             while (iter.NextName(out var refName))
@@ -91,20 +102,25 @@ class TautManager(
         }
     }
 
-    internal List<string> OrdinaryTautRefs => ExcludeTautSpecificRefs(TautRepo.GetRefList());
+    internal List<string> OrdinaryTautRefs => FilterLocalRefHeads(TautRepo.GetRefList());
 
-    List<string> ExcludeTautSpecificRefs(List<string> refList)
+    List<string> FilterLocalRefHeads(List<string> refList)
     {
         var result = new List<string>();
 
         foreach (var refName in refList)
         {
-            if (_regainedRefSpec.DstMatches(refName))
+            if (_refsToRefsRegainedSpec.DstMatches(refName))
             {
                 continue;
             }
 
-            if (_tautenedRefSpec.DstMatches(refName))
+            if (_refsToRefsTautenedSpec.DstMatches(refName))
+            {
+                continue;
+            }
+
+            if (_refsToRefsTagsSpec.DstMatches(refName))
             {
                 continue;
             }
@@ -122,7 +138,7 @@ class TautManager(
 
         foreach (var refName in refList)
         {
-            if (_remoteRefSpec.DstMatches(refName))
+            if (_refsToRefsRemoteSpec.DstMatches(refName))
             {
                 continue;
             }
@@ -190,9 +206,9 @@ class TautManager(
 
     #region Regaining
 
-    internal void RegainHostRefs()
+    internal void RegainRefHeads()
     {
-        RegainHostRefsPrivate();
+        RegainRefHeadsPrivate();
 
         if (_gitCredFillOutput is not null)
         {
@@ -201,11 +217,11 @@ class TautManager(
         }
     }
 
-    void RegainHostRefsPrivate()
+    void RegainRefHeadsPrivate()
     {
-        logger.ZLogTrace($"Start regaining host refs");
+        logger.ZLogTrace($"Start regaining ref heads");
 
-        var tautRefList = ExcludeTautSpecificRefs(TautRepo.GetRefList());
+        var refHeads = FilterLocalRefHeads(TautRepo.GetRefList());
 
         using var revWalk = TautRepo.NewRevWalk();
 
@@ -215,7 +231,7 @@ class TautManager(
                 | Lg2SortFlags.LG2_SORT_REVERSE
         );
 
-        using (var regainedRefIter = TautRepo.NewRefIteratorGlob(RegainedRefGlob))
+        using (var regainedRefIter = TautRepo.NewRefIteratorGlob(RefsRegainedHeads))
         {
             for (string refName; regainedRefIter.NextName(out refName); )
             {
@@ -231,7 +247,7 @@ class TautManager(
             }
         }
 
-        foreach (var refName in tautRefList)
+        foreach (var refName in refHeads)
         {
             logger.ZLogTrace($"RevWalk.Push {refName}");
 
@@ -259,7 +275,7 @@ class TautManager(
             logger.ZLogTrace($"Done regaining commit {commitOidHex8} '{commitSummary}'");
         }
 
-        foreach (var refName in tautRefList)
+        foreach (var refName in refHeads)
         {
             Lg2Oid tautOid = new();
             TautRepo.GetRefOid(refName, ref tautOid);
@@ -269,7 +285,7 @@ class TautManager(
             tautMapping.GetRegained(tautOid, ref hostOid);
             var hostOidHex8 = hostOid.ToHexDigits(8);
 
-            var regainedRefName = _regainedRefSpec.TransformToTarget(refName);
+            var regainedRefName = _refsToRefsRegainedSpec.TransformToTarget(refName);
 
             if (tautOid.Equals(ref hostOid))
             {
@@ -287,7 +303,7 @@ class TautManager(
             }
         }
 
-        logger.ZLogTrace($"Done regaining host refs");
+        logger.ZLogTrace($"Done regaining ref heads");
     }
 
     internal void RegainCommit(Lg2Commit tautCommit)
@@ -560,11 +576,11 @@ class TautManager(
 
     #region Tautening
 
-    internal void TautenHostRefs()
+    internal void TautenRefHeads()
     {
-        logger.ZLogTrace($"Start tautening host refs");
+        logger.ZLogTrace($"Start tautening ref heads");
 
-        var hostRefList = FilterRemoteRefs(HostRepo.GetRefList());
+        var hostRefHeads = FilterRemoteRefs(HostRepo.GetRefList());
 
         using var revWalk = HostRepo.NewRevWalk();
 
@@ -574,7 +590,7 @@ class TautManager(
                 | Lg2SortFlags.LG2_SORT_REVERSE
         );
 
-        using (var tautenedRefIter = TautRepo.NewRefIteratorGlob(TautenedRefGlob))
+        using (var tautenedRefIter = TautRepo.NewRefIteratorGlob(RefsTautenedHeads))
         {
             for (string refName; tautenedRefIter.NextName(out refName); )
             {
@@ -590,7 +606,7 @@ class TautManager(
             }
         }
 
-        foreach (var refName in hostRefList)
+        foreach (var refName in hostRefHeads)
         {
             logger.ZLogTrace($"RevWalk.Push {refName}");
 
@@ -618,7 +634,7 @@ class TautManager(
             logger.ZLogTrace($"Done tautening commit {commitOidHex8} '{commitSummary}'");
         }
 
-        foreach (var refName in hostRefList)
+        foreach (var refName in hostRefHeads)
         {
             Lg2Oid hostOid = new();
             HostRepo.GetRefOid(refName, ref hostOid);
@@ -628,7 +644,7 @@ class TautManager(
             tautMapping.GetTautened(hostOid, ref tautenedOid);
             var tautenedOidHex8 = tautenedOid.ToHexDigits(8);
 
-            var tautenedRefName = _tautenedRefSpec.TransformToTarget(refName);
+            var tautenedRefName = _refsToRefsTautenedSpec.TransformToTarget(refName);
 
             if (hostOid.Equals(ref tautenedOid))
             {
@@ -646,12 +662,13 @@ class TautManager(
             }
         }
 
+        // NEXT: do in while handling pushes
         var hostHeadRef = HostRepo.GetHead();
         var hostHeadRefName = hostHeadRef.GetName();
-        var tautHeadRefName = _tautenedRefSpec.TransformToTarget(hostHeadRefName);
+        var tautHeadRefName = _refsToRefsTautenedSpec.TransformToTarget(hostHeadRefName);
         TautRepo.SetHead(tautHeadRefName);
 
-        logger.ZLogTrace($"Done tautening host refs");
+        logger.ZLogTrace($"Done tautening ref heads");
     }
 
     void TautenFilesInDiff(Lg2Commit hostCommit, Lg2AttrOptions hostAttrOpts)
@@ -715,7 +732,11 @@ class TautManager(
                 continue;
             }
 
-            var deltaEncodingEnalbingSize = GetDeltaEncodingEnablingSize(newFilePath, hostAttrOpts);
+            var deltaEncodingEnalbingSize = tautAttrs.GetDeltaEncodingEnablingSize(
+                newFilePath,
+                HostRepo,
+                hostAttrOpts
+            );
             if (deltaEncodingEnalbingSize == 0)
             {
                 continue;
@@ -727,7 +748,11 @@ class TautManager(
                 continue;
             }
 
-            var deltaEncodingTargetRatio = GetDeltaEncodingTargetRatio(newFilePath, hostAttrOpts);
+            var deltaEncodingTargetRatio = tautAttrs.GetDeltaEncodingTargetRatio(
+                newFilePath,
+                HostRepo,
+                hostAttrOpts
+            );
             if (deltaEncodingTargetRatio == DELTA_ENCODING_ENABLING_SIZE_DISABLED_VALUE)
             {
                 continue;
@@ -744,7 +769,11 @@ class TautManager(
 
             using var tautenStream = new PatchTautenStream(patch.NewReadStream());
 
-            var compressionTargetRatio = GetCompressionTargetRatio(newFilePath, hostAttrOpts);
+            var compressionTargetRatio = tautAttrs.GetCompressionTargetRatio(
+                newFilePath,
+                HostRepo,
+                hostAttrOpts
+            );
 
             var oldFileOidRef = oldFile.GetOidPlainRef();
 
@@ -814,7 +843,7 @@ class TautManager(
             HostRepo.FlushAttrCache();
         }
 
-        var oid = new Lg2Oid();
+        Lg2Oid oid = new();
         tautMapping.GetTautened(hostTree, ref oid);
 
         var tautTree = TautRepo.LookupTree(oid);
@@ -993,7 +1022,11 @@ class TautManager(
 
         using var readStream = hostRepoOdb.ReadAsStream(blob);
 
-        var compressionTargetRatio = GetCompressionTargetRatio(filePath, hostAttrOpts);
+        var compressionTargetRatio = tautAttrs.GetCompressionTargetRatio(
+            filePath,
+            HostRepo,
+            hostAttrOpts
+        );
 
         var encryptor = tautCipher.CreateEncryptor(readStream, compressionTargetRatio);
 
@@ -1034,156 +1067,8 @@ class TautManager(
             logger.ZLogTrace($"Delete {refName}");
         }
 
-        RegainHostRefs();
+        RegainRefHeads();
 
-        TautenHostRefs();
-    }
-
-    int GetDeltaEncodingEnablingSize(string pathName, Lg2AttrOptions hostAttrOpts)
-    {
-        var attrVal = HostRepo.GetDeltaEncodingEnablingSizeAttrValue(pathName, hostAttrOpts);
-
-        if (attrVal.IsUnset)
-        {
-            return DELTA_ENCODING_ENABLING_SIZE_DISABLED_VALUE;
-        }
-
-        if (attrVal.IsSpecified)
-        {
-            var strVal = attrVal.GetString();
-
-            if (int.TryParse(strVal, out var intVal) == false)
-            {
-                logger.ZLogWarning(
-                    $"{GitAttrHelpers.DeltaEncodingEnablingSizeAttrName} is specified with an invalid value '{strVal}' for '{pathName}', switch to using default value"
-                );
-
-                return DELTA_ENCODING_ENABLING_SIZE_DEFAULT_VALUE;
-            }
-
-            if (intVal < DELTA_ENCODING_ENABLING_SIZE_LOWER_BOUND)
-            {
-                logger.ZLogWarning(
-                    $"{GitAttrHelpers.DeltaEncodingEnablingSizeAttrName} is specified but less than lower bound {DELTA_ENCODING_ENABLING_SIZE_LOWER_BOUND} for '{pathName}', switch to using default value"
-                );
-
-                return DELTA_ENCODING_ENABLING_SIZE_DEFAULT_VALUE;
-            }
-
-            return intVal;
-        }
-
-        if (attrVal.IsSet)
-        {
-            logger.ZLogWarning(
-                $"{GitAttrHelpers.DeltaEncodingEnablingSizeAttrName} is set but not specified for '{pathName}', switch to using default value"
-            );
-
-            return DELTA_ENCODING_ENABLING_SIZE_DEFAULT_VALUE;
-        }
-
-        return DELTA_ENCODING_ENABLING_SIZE_DEFAULT_VALUE;
-    }
-
-    double GetDeltaEncodingTargetRatio(string pathName, Lg2AttrOptions hostAttrOpts)
-    {
-        var attrVal = HostRepo.GetDeltaEncodingTargetRatioAttrValue(pathName, hostAttrOpts);
-
-        if (attrVal.IsUnset)
-        {
-            return DELTA_ENCODING_TARGET_RATIO_DISABLED_VALUE;
-        }
-
-        if (attrVal.IsSpecified)
-        {
-            var strVal = attrVal.GetString();
-
-            if (int.TryParse(strVal, out var intVal) == false)
-            {
-                logger.ZLogWarning(
-                    $"{GitAttrHelpers.DeltaEncodingTargetRatioAttrName} is specified with an invalid value '{strVal}' for '{pathName}', switch to using default value"
-                );
-
-                return DELTA_ENCODING_TARGET_RATIO_DEFAULT_VALUE;
-            }
-
-            const int min = (int)(DELTA_ENCODING_TARGET_RATIO_LOWER_BOUND * 100);
-            const int max = (int)(DELTA_ENCODING_TARGET_RATIO_UPPER_BOUND * 100);
-
-            if (intVal < min || intVal > max)
-            {
-                logger.ZLogWarning(
-                    $"{GitAttrHelpers.DeltaEncodingTargetRatioAttrName} is specified but not within the range [{min}, {max}] for '{pathName}', switch to using default value"
-                );
-
-                return DELTA_ENCODING_TARGET_RATIO_DEFAULT_VALUE;
-            }
-
-            var ratio = (double)intVal / 100;
-
-            return ratio;
-        }
-
-        if (attrVal.IsSet)
-        {
-            logger.ZLogWarning(
-                $"{GitAttrHelpers.DeltaEncodingTargetRatioAttrName} is set but not specified for '{pathName}', switch to using default value"
-            );
-
-            return DELTA_ENCODING_TARGET_RATIO_DEFAULT_VALUE;
-        }
-
-        return DELTA_ENCODING_TARGET_RATIO_DEFAULT_VALUE;
-    }
-
-    double GetCompressionTargetRatio(string pathName, Lg2AttrOptions hostAttrOpts)
-    {
-        var attrVal = HostRepo.GetTargetCompressionRatioAttrValue(pathName, hostAttrOpts);
-
-        if (attrVal.IsUnset)
-        {
-            return COMPRESSION_TARGET_RATIO_DISABLED_VALUE;
-        }
-
-        if (attrVal.IsSpecified)
-        {
-            var strVal = attrVal.GetString();
-
-            if (int.TryParse(strVal, out var intVal) == false)
-            {
-                logger.ZLogWarning(
-                    $"{GitAttrHelpers.CompressionTargetRatioAttrName} is specified with an invalid value '{strVal}' for '{pathName}', switch to using default value"
-                );
-
-                return COMPRESSION_TARGET_RATIO_DEFAULT_VALUE;
-            }
-
-            const int min = (int)(COMPRESSION_TARGET_RATIO_LOWER_BOUND * 100);
-            const int max = (int)(COMPRESSION_TARGET_RATIO_UPPER_BOUND * 100);
-
-            if (intVal < min || intVal > max)
-            {
-                logger.ZLogWarning(
-                    $"{GitAttrHelpers.CompressionTargetRatioAttrName} is specified but not within the range [{min}, {max}] for '{pathName}', switch to using default value"
-                );
-
-                return COMPRESSION_TARGET_RATIO_DEFAULT_VALUE;
-            }
-
-            var ratio = (double)intVal / 100;
-
-            return ratio;
-        }
-
-        if (attrVal.IsSet)
-        {
-            logger.ZLogWarning(
-                $"{GitAttrHelpers.CompressionTargetRatioAttrName} is set but not specified for '{pathName}', switch to using default value"
-            );
-
-            return COMPRESSION_TARGET_RATIO_DEFAULT_VALUE;
-        }
-
-        return COMPRESSION_TARGET_RATIO_DEFAULT_VALUE;
+        TautenRefHeads();
     }
 }

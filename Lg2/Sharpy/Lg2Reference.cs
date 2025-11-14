@@ -108,6 +108,26 @@ public static unsafe partial class Lg2ReferenceExtensions
         return new(pOid);
     }
 
+    public static string GetSymbolicTarget(this Lg2Reference reference)
+    {
+        reference.EnsureValid();
+
+        if (reference.GetRefType() != Lg2RefType.LG2_REFERENCE_SYMBOLIC)
+        {
+            throw new InvalidOperationException($"{reference.GetName()} is not symbolic");
+        }
+
+        var pName = git_reference_symbolic_target(reference.Ptr);
+        if (pName is null)
+        {
+            throw new InvalidOperationException($"{reference.GetName()}'s symbolic target is null");
+        }
+
+        var result = Marshal.PtrToStringUTF8((nint)pName)!;
+
+        return result;
+    }
+
     public static string GetShorthand(this Lg2Reference reference)
     {
         reference.EnsureValid();

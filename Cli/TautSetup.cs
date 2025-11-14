@@ -154,7 +154,7 @@ sealed class TautSetup(
         _tautRepo = Lg2Repository.New(tautSitePath);
 
         SetSiteDescription();
-        SetSiteFetchConfig();
+        // SetSiteFetchConfig();
         // TautAddHostObjects();
         UpdateRemoteUrls();
         UpdateTautConfig();
@@ -268,14 +268,19 @@ sealed class TautSetup(
 
     internal void FetchRemote()
     {
+        const string plusRefsHeadsToRefsHeads = "+refs/heads/*:refs/heads/*";
+        const string plusRefsTagsToRefsTags = "+refs/tags/*:refs/tags/*";
+
         var tautRepoPath = TautRepo.GetPath();
 
         gitCli.Execute(
             "--git-dir",
             tautRepoPath,
             "fetch",
+            "--prune",
             RemoteName,
-            GitRepoHelpers.HeadsFetchSpec
+            plusRefsHeadsToRefsHeads,
+            plusRefsTagsToRefsTags
         );
 
         logger.ZLogTrace($"Fetched '{RemoteName}' for '{SiteConfig.SiteName}'");
