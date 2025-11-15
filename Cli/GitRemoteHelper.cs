@@ -14,20 +14,19 @@ partial class GitRemoteHelper(
     GitCli gitCli
 );
 
-static class ILoggerExtensions
+class GitRemoteHelperOptions
 {
-    internal static void SendLineToGit<TCategory>(
-        this ILogger<TCategory> logger,
-        string? content = null
-    )
-        where TCategory : GitRemoteHelper
-    {
-        content ??= string.Empty;
+    internal int Verbosity = 1;
 
-        logger.ZLogTrace($"Send to Git '{content}'");
+    internal bool ShowProgress = false;
 
-        Console.WriteLine(content);
-    }
+    internal bool IsCloning = false;
+
+    internal bool CheckConnectivity = false;
+
+    internal bool ForceUpdate = false;
+
+    internal bool DryRun = false;
 }
 
 partial class GitRemoteHelper
@@ -44,11 +43,15 @@ partial class GitRemoteHelper
     const string cmdFetch = "fetch";
     const string cmdOption = "option";
 
-    readonly GitRemoteHelperOptions _options = new(logger);
-}
+    const string optVerbosity = "verbosity";
+    const string optProgress = "progress";
+    const string optCloning = "cloning";
+    const string optCheckConnectivity = "check-connectivity";
+    const string optForce = "force";
+    const string optDryRun = "dry-run";
 
-partial class GitRemoteHelper
-{
+    readonly GitRemoteHelperOptions _options = new();
+
     record struct CmdFetchArgs(string Hash, string Name)
     {
         internal static CmdFetchArgs Parse(string input)
@@ -61,6 +64,15 @@ partial class GitRemoteHelper
 
             return new CmdFetchArgs(parts[0], parts[1]);
         }
+    }
+
+    void SendLineToGit(string? content = null)
+    {
+        content ??= string.Empty;
+
+        logger.ZLogTrace($"Send to Git '{content}'");
+
+        Console.WriteLine(content);
     }
 }
 
@@ -85,7 +97,7 @@ partial class GitRemoteHelper
     {
         if (input.Length == 0)
         {
-            logger.SendLineToGit();
+            SendLineToGit();
 
             return HandleGitCommandResult.Done;
         }
@@ -125,11 +137,11 @@ partial class GitRemoteHelper
 
     HandleGitCommandResult HanldeGitCmdCapabilities(string input)
     {
-        logger.SendLineToGit(capPush);
-        logger.SendLineToGit(capFetch);
-        logger.SendLineToGit(capCheckConnectivity);
-        logger.SendLineToGit(capOption);
-        logger.SendLineToGit();
+        SendLineToGit(capPush);
+        SendLineToGit(capFetch);
+        SendLineToGit(capCheckConnectivity);
+        SendLineToGit(capOption);
+        SendLineToGit();
 
         return HandleGitCommandResult.Done;
     }
@@ -148,14 +160,14 @@ partial class GitRemoteHelper
             {
                 var symTarget = headRef.GetSymbolicTarget();
 
-                logger.SendLineToGit($"@{symTarget} {headRefName}");
+                SendLineToGit($"@{symTarget} {headRefName}");
             }
             else
             {
                 var target = headRef.GetTarget();
                 var oidText = target.GetOidHexDigits();
 
-                logger.SendLineToGit($"{oidText} {headRefName}");
+                SendLineToGit($"{oidText} {headRefName}");
             }
         }
 
@@ -171,7 +183,7 @@ partial class GitRemoteHelper
             tautManager.TautRepo.GetRefOid(regainedRefHead, ref oid);
             var oidText = oid.GetOidHexDigits();
 
-            logger.SendLineToGit($"{oidText} {refHead}");
+            SendLineToGit($"{oidText} {refHead}");
         }
 
         var refTags = GitRefSpecs.FilterLocalRefTags(refList);
@@ -184,7 +196,7 @@ partial class GitRemoteHelper
             tautManager.TautRepo.GetRefOid(regainedRefTag, ref oid);
             var oidText = oid.GetOidHexDigits();
 
-            logger.SendLineToGit($"{oidText} {refTag}");
+            SendLineToGit($"{oidText} {refTag}");
         }
     }
 
@@ -212,7 +224,7 @@ partial class GitRemoteHelper
             };
         }
 
-        logger.SendLineToGit();
+        SendLineToGit();
 
         return HandleGitCommandResult.Done;
     }
@@ -241,8 +253,6 @@ partial class GitRemoteHelper
                     tautManager.TautRepo.GetRefOid(regainedRefName, ref oid);
                 }
 
-                // Next: fetch from kv store and translate it
-
                 var oidText = oid.GetOidHexDigits();
 
                 if (args.Hash != oidText)
@@ -255,10 +265,10 @@ partial class GitRemoteHelper
 
             if (_options.CheckConnectivity)
             {
-                logger.SendLineToGit("connectivity-ok");
+                SendLineToGit("connectivity-ok");
             }
 
-            logger.SendLineToGit();
+            SendLineToGit();
         }
 
         if (input.Length == 0)
@@ -313,7 +323,7 @@ partial class GitRemoteHelper
 
         RegainThenListRefs();
 
-        logger.SendLineToGit();
+        SendLineToGit();
 
         return HandleGitCommandResult.Done;
     }
@@ -372,10 +382,10 @@ partial class GitRemoteHelper
                     );
                 }
 
-                logger.SendLineToGit($"ok {dstRefName}");
+                SendLineToGit($"ok {dstRefName}");
             }
 
-            logger.SendLineToGit();
+            SendLineToGit();
         }
 
         if (input.Length == 0)
@@ -407,7 +417,76 @@ partial class GitRemoteHelper
     HandleGitCommandResult HandleGitCmdOption(string input)
     {
         var nameValue = input[cmdOption.Length..].TrimStart();
-        _options.HandleNameValue(nameValue);
+
+        bool GetBooleanValue(string opt)
+        {
+            return nameValue[(opt.Length + 1)..] == "true";
+        }
+
+        void TraceOptionUpdate(string opt, string value)
+        {
+            logger.ZLogTrace($"Set option '{opt}' to {value}");
+        }
+
+        if (nameValue.StartsWith(optVerbosity))
+        {
+            if (int.TryParse(nameValue[(optVerbosity.Length + 1)..], out var value))
+            {
+                _options.Verbosity = value;
+
+                SendLineToGit("ok");
+
+                TraceOptionUpdate(optVerbosity, value.ToString());
+            }
+            else
+            {
+                Console.WriteLine("error falied to parse the value");
+            }
+        }
+        else if (nameValue.StartsWith(optProgress))
+        {
+            _options.ShowProgress = GetBooleanValue(optProgress);
+
+            SendLineToGit("ok");
+
+            TraceOptionUpdate(optProgress, _options.ShowProgress.ToString());
+        }
+        else if (nameValue.StartsWith(optCloning))
+        {
+            _options.IsCloning = GetBooleanValue(optCloning);
+
+            SendLineToGit("ok");
+
+            TraceOptionUpdate(optCloning, _options.IsCloning.ToString());
+        }
+        else if (nameValue.StartsWith(optCheckConnectivity))
+        {
+            _options.CheckConnectivity = GetBooleanValue(optCheckConnectivity);
+
+            SendLineToGit("ok");
+
+            TraceOptionUpdate(optCheckConnectivity, _options.CheckConnectivity.ToString());
+        }
+        else if (nameValue.StartsWith(optForce))
+        {
+            _options.ForceUpdate = GetBooleanValue(optForce);
+
+            SendLineToGit("ok");
+
+            TraceOptionUpdate(optForce, _options.ForceUpdate.ToString());
+        }
+        else if (nameValue.StartsWith(optDryRun))
+        {
+            _options.DryRun = GetBooleanValue(optDryRun);
+
+            SendLineToGit("ok");
+
+            TraceOptionUpdate(optDryRun, _options.DryRun.ToString());
+        }
+        else
+        {
+            SendLineToGit("unsupported");
+        }
 
         return HandleGitCommandResult.Done;
     }

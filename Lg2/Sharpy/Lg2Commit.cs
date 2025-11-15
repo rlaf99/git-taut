@@ -172,43 +172,6 @@ public static unsafe class Lg2CommitExtensions
     }
 }
 
-public unsafe ref struct Lg2SignaturePlainRef
-{
-    internal readonly git_signature* Ptr;
-
-    internal ref git_signature Ref
-    {
-        get
-        {
-            EnsureValid();
-            return ref (*Ptr);
-        }
-    }
-
-    internal Lg2SignaturePlainRef(git_signature* pSig)
-    {
-        Ptr = pSig;
-    }
-
-    public void EnsureValid()
-    {
-        if (Ptr is null)
-        {
-            throw new InvalidOperationException($"Invalid {nameof(Lg2SignaturePlainRef)}");
-        }
-    }
-}
-
-public unsafe class Lg2SignatureOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_signature>
-    where TOwner : class
-{
-    internal Lg2SignatureOwnedRef(TOwner owner, git_signature* pNative)
-        : base(owner, pNative) { }
-
-    public static implicit operator Lg2SignaturePlainRef(Lg2SignatureOwnedRef<TOwner> ownedRef) =>
-        new(ownedRef.Ptr);
-}
-
 public unsafe class Lg2CommitAmend
 {
     Lg2Commit _commit;

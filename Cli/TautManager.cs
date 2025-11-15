@@ -1094,12 +1094,9 @@ class TautManager(
 
     #endregion Tautening
 
-    internal void RebuildKvStore()
+    internal void RebuildTautMapping()
     {
-        if (TautRepo is null)
-        {
-            throw new InvalidOperationException($"Taut repo is null");
-        }
+        throw new NotImplementedException();
 
         logger.ZLogTrace($"Rebuilding {nameof(tautMapping)}");
 
