@@ -1,5 +1,8 @@
 using Lg2.Sharpy;
 
+// Only captures direct output, see https://github.com/xunit/xunit/issues/1730
+[assembly: CaptureConsole] 
+
 [assembly: AssemblyFixture(typeof(Cli.Tests.Lg2GlobalFixture))]
 
 namespace Cli.Tests;

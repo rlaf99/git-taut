@@ -78,7 +78,7 @@ Currently, `git-taut` is provided as a dotnet tool for the following platforms
 
 To install it, some prerequeistes must be met:
 
-- .NET SDK 9.0
+- .NET SDK 10.0
 - `Lg2.native` nuget package which provides the prebuilt libgit2 runtimes (see below)
 
 ### Install Lg2.native NuGet Package

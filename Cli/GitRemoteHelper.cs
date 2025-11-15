@@ -137,6 +137,7 @@ partial class GitRemoteHelper
     void RegainThenListRefs()
     {
         tautManager.RegainRefHeads();
+        tautManager.RegainRefTags();
 
         if (tautManager.TautRepo.TryLookupRef(GitRepoHelpers.HEAD, out var headRef))
         {
@@ -158,17 +159,32 @@ partial class GitRemoteHelper
             }
         }
 
-        var refList = tautManager.OrdinaryTautRefs;
+        var refList = tautManager.TautRepo.GetRefList();
 
-        foreach (var refName in refList)
+        var refHeads = GitRefSpecs.FilterLocalRefHeads(refList);
+
+        foreach (var refHead in refHeads)
         {
-            var regainedRefName = tautManager.RefsToRefsRegainedSpec.TransformToTarget(refName);
+            var regainedRefHead = GitRefSpecs.RefsToRefsRegained.TransformToTarget(refHead);
 
             Lg2Oid oid = new();
-            tautManager.TautRepo.GetRefOid(regainedRefName, ref oid);
-            var oidText = oid.ToHexDigits();
+            tautManager.TautRepo.GetRefOid(regainedRefHead, ref oid);
+            var oidText = oid.GetOidHexDigits();
 
-            logger.SendLineToGit($"{oidText} {refName}");
+            logger.SendLineToGit($"{oidText} {refHead}");
+        }
+
+        var refTags = GitRefSpecs.FilterLocalRefTags(refList);
+
+        foreach (var refTag in refTags)
+        {
+            var regainedRefTag = GitRefSpecs.RefsToRefsRegained.TransformToTarget(refTag);
+
+            Lg2Oid oid = new();
+            tautManager.TautRepo.GetRefOid(regainedRefTag, ref oid);
+            var oidText = oid.GetOidHexDigits();
+
+            logger.SendLineToGit($"{oidText} {refTag}");
         }
     }
 
@@ -179,6 +195,7 @@ partial class GitRemoteHelper
         if (TautSiteConfig.TryFindSiteNameForRemote(hostConfig, _remoteName, out var tautSiteName))
         {
             tautSetup.GearUpExisting(HostRepo, _remoteName, tautSiteName);
+
             tautSetup.FetchRemote();
 
             RegainThenListRefs();
@@ -218,7 +235,7 @@ partial class GitRemoteHelper
                 }
                 else
                 {
-                    var regainedRefName = tautManager.RefsToRefsRegainedSpec.TransformToTarget(
+                    var regainedRefName = GitRefSpecs.RefsToRefsRegained.TransformToTarget(
                         args.Name
                     );
                     tautManager.TautRepo.GetRefOid(regainedRefName, ref oid);
@@ -226,7 +243,7 @@ partial class GitRemoteHelper
 
                 // Next: fetch from kv store and translate it
 
-                var oidText = oid.ToHexDigits();
+                var oidText = oid.GetOidHexDigits();
 
                 if (args.Hash != oidText)
                 {
@@ -280,6 +297,7 @@ partial class GitRemoteHelper
         tautSetup.GearUpExisting(HostRepo, RemoteName, tautSiteName);
 
         tautManager.TautenRefHeads();
+        tautManager.TautenRefTags();
 
         bool noFetch = config.GetGitListForPushNoFetch();
         if (noFetch)
@@ -323,7 +341,7 @@ partial class GitRemoteHelper
                 var srcRefName = refSpec.GetSrc();
                 var dstRefName = refSpec.GetDst();
 
-                var tauntenedSrcRefName = tautManager.RefsToRefsTautenedSpec.TransformToTarget(
+                var tauntenedSrcRefName = GitRefSpecs.RefsToRefsTautened.TransformToTarget(
                     srcRefName
                 );
 

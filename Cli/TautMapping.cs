@@ -283,7 +283,7 @@ static class LightningExtensions
 
                 Lg2Oid oid = new();
                 oid.FromRaw(storedValue);
-                var storedOidText = oid.ToHexDigits();
+                var storedOidText = oid.GetOidHexDigits();
 
                 throw new InvalidDataException(
                     $"{targetOidText} does not match stored {storedOidText}"

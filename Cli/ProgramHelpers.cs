@@ -17,7 +17,7 @@ public sealed class GitTautHostBuilder
     {
         var builder = Host.CreateEmptyApplicationBuilder(null);
 
-        builder.AddGitTautReleated();
+        builder.AddForGitTaut();
 
         return builder.Build();
     }
@@ -25,7 +25,7 @@ public sealed class GitTautHostBuilder
 
 static class HostApplicationBuilderExtensions
 {
-    internal static void AddGitTautReleated(this HostApplicationBuilder builder)
+    internal static void AddForGitTaut(this HostApplicationBuilder builder)
     {
         builder.AddGitTautConfiguration();
         builder.AddGitTautServices();
@@ -529,7 +529,7 @@ class SiteCommandActions(
             Lg2Oid targetOid = new();
             tautMapping.GetTautened(entry, ref targetOid);
 
-            Console.WriteLine($"Target object id: {targetOid.ToHexDigits()}");
+            Console.WriteLine($"Target object id: {targetOid.GetOidHexDigits()}");
 
             using var tautOdb = tautSetup.TautRepo.GetOdb();
 

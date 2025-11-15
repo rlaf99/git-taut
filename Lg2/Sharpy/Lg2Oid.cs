@@ -115,12 +115,12 @@ public unsafe ref struct Lg2Oid
 
 public static unsafe class Lg2OidExtensions
 {
-    public static string ToHexDigits(this scoped ref Lg2Oid oid)
+    public static string GetOidHexDigits(this scoped ref Lg2Oid oid)
     {
         return oid.Raw.Fmt();
     }
 
-    public static string ToHexDigits(this scoped ref Lg2Oid oid, int size)
+    public static string GetOidHexDigits(this scoped ref Lg2Oid oid, int size)
     {
         return oid.Raw.NFmt(size);
     }

@@ -7,10 +7,12 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Cli.Tests</RootNamespace>
     <TargetFramework>net10.0</TargetFramework>
-    
+
+    <!-- <TestingPlatformCaptureOutput>false</TestingPlatformCaptureOutput> -->
     <!--
     To enable the Microsoft Testing Platform 'dotnet test' experience, add property:
       <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+      default for .net 10
 
     To enable the Microsoft Testing Platform native command line experience, add property:
       <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
@@ -32,12 +34,12 @@
     <PackageReference Include="KestrelCgi" Version="0.0.1" />
     <PackageReference Include="Lg2.native" Version="0.191.0" />
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
-    <PackageReference Include="xunit.v3" Version="3.2.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+    <!-- <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" /> -->
+    <PackageReference Include="xunit.v3.mtp-v2" Version="3.2.0" />
+    <!-- <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
+    </PackageReference> -->
     <PackageReference Include="ZLogger" Version="2.5.10" />
   </ItemGroup>
 
