@@ -15,7 +15,7 @@ public unsafe partial class Lg2Reference
     internal Lg2Reference(git_reference* pNative)
         : base(pNative) { }
 
-    public static unsafe void NativeRelease(git_reference* pNative)
+    public static void NativeRelease(git_reference* pNative)
     {
         git_reference_free(pNative);
     }
@@ -126,6 +126,17 @@ public static unsafe partial class Lg2ReferenceExtensions
         var result = Marshal.PtrToStringUTF8((nint)pName)!;
 
         return result;
+    }
+
+    public static Lg2Reference ResolveTarget(this Lg2Reference reference)
+    {
+        reference.EnsureValid();
+
+        git_reference* pRef = null;
+        var rc = git_reference_resolve(&pRef, reference.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return new(pRef);
     }
 
     public static string GetShorthand(this Lg2Reference reference)

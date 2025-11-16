@@ -15,26 +15,47 @@ public unsafe class Lg2Commit
     internal Lg2Commit(git_commit* pNative)
         : base(pNative) { }
 
-    public static unsafe void NativeRelease(git_commit* pNative)
+    public static void NativeRelease(git_commit* pNative)
     {
         git_commit_free(pNative);
     }
 
-    public Lg2OidPlainRef GetOidPlainRef()
-    {
-        EnsureValid();
+    public Lg2OidPlainRef GetOidPlainRef() => Ref.GetOidPlainRef();
 
-        var pOid = git_commit_id(Ptr);
-
-        return new(pOid);
-    }
-
-    public Lg2ObjectType GetObjectType()
-    {
-        return Lg2ObjectType.LG2_OBJECT_COMMIT;
-    }
+    public Lg2ObjectType GetObjectType() => Lg2ObjectType.LG2_OBJECT_COMMIT;
 
     public static implicit operator Lg2OidPlainRef(Lg2Commit commit) => commit.GetOidPlainRef();
+}
+
+public unsafe class Lg2CommitOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_commit>, ILg2ObjectInfo
+    where TOwner : class
+{
+    internal Lg2CommitOwnedRef(TOwner owner, git_commit* pNative)
+        : base(owner, pNative) { }
+
+    public Lg2ObjectType GetObjectType() => Lg2ObjectType.LG2_OBJECT_COMMIT;
+
+    public Lg2OidPlainRef GetOidPlainRef() => Ref.GetOidPlainRef();
+
+    public static implicit operator Lg2OidPlainRef(Lg2CommitOwnedRef<TOwner> commit) =>
+        commit.GetOidPlainRef();
+}
+
+static unsafe class RawCommitExtensions
+{
+    internal static Lg2OidPlainRef GetOidPlainRef(this scoped ref git_commit commit)
+    {
+        fixed (git_commit* ptr = &commit)
+        {
+            var pOid = git_commit_id(ptr);
+            if (pOid == null)
+            {
+                throw new InvalidOperationException($"result is null");
+            }
+
+            return new(pOid);
+        }
+    }
 }
 
 public static unsafe class Lg2CommitExtensions

@@ -79,12 +79,15 @@ public static unsafe class Lg2PathSpecExtensions
 
 unsafe partial class RawStrArrayExtensions
 {
-    internal static git_pathspec* NewPathSpec(this git_strarray strarray)
+    internal static git_pathspec* NewPathSpec(this scoped ref git_strarray strarray)
     {
         git_pathspec* pPathSpec = null;
 
-        var rc = git_pathspec_new(&pPathSpec, &strarray);
-        Lg2Exception.ThrowIfNotOk(rc);
+        fixed (git_strarray* ptr = &strarray)
+        {
+            var rc = git_pathspec_new(&pPathSpec, ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
 
         return pPathSpec;
     }

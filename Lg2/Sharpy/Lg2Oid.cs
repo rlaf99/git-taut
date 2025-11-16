@@ -138,7 +138,7 @@ public static unsafe class Lg2OidExtensions
 
 internal static unsafe class RawOidExtentions
 {
-    internal static string Fmt(ref readonly this git_oid oid)
+    internal static string Fmt(this scoped ref git_oid oid)
     {
         const int NULL = 1;
 
@@ -155,7 +155,7 @@ internal static unsafe class RawOidExtentions
         return result!;
     }
 
-    internal static string NFmt(ref readonly this git_oid oid, int size)
+    internal static string NFmt(this scoped ref git_oid oid, int size)
     {
         if (size > GIT_OID_MAX_HEXSIZE)
         {
@@ -177,7 +177,7 @@ internal static unsafe class RawOidExtentions
         return result!;
     }
 
-    internal static string PathFmt(ref readonly this git_oid oid)
+    internal static string PathFmt(this scoped ref git_oid oid)
     {
         const int SLASH_AND_NULL = 1 + 1;
 

@@ -137,7 +137,7 @@ public sealed unsafe class Lg2StrArray : IDisposable
 
 internal static unsafe partial class RawStrArrayExtensions
 {
-    internal static List<string> ToList(ref readonly this git_strarray strarray)
+    internal static List<string> ToList(this scoped ref git_strarray strarray)
     {
         List<string> result = [];
 

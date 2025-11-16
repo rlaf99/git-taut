@@ -31,36 +31,27 @@ public static unsafe class Lg2ObjectTypeExtensions
             || objType == Lg2ObjectType.LG2_OBJECT_TAG;
     }
 
-    public static bool IsTree(this Lg2ObjectType objType)
-    {
-        return objType == Lg2ObjectType.LG2_OBJECT_TREE;
-    }
+    public static bool IsTree(this Lg2ObjectType objType) =>
+        objType == Lg2ObjectType.LG2_OBJECT_TREE;
 
-    public static bool IsCommit(this Lg2ObjectType objType)
-    {
-        return objType == Lg2ObjectType.LG2_OBJECT_COMMIT;
-    }
+    public static bool IsCommit(this Lg2ObjectType objType) =>
+        objType == Lg2ObjectType.LG2_OBJECT_COMMIT;
 
-    public static bool IsBlob(this Lg2ObjectType objType)
-    {
-        return objType == Lg2ObjectType.LG2_OBJECT_BLOB;
-    }
+    public static bool IsBlob(this Lg2ObjectType objType) =>
+        objType == Lg2ObjectType.LG2_OBJECT_BLOB;
 
-    public static bool IsTag(this Lg2ObjectType objType)
-    {
-        return objType == Lg2ObjectType.LG2_OBJECT_TAG;
-    }
+    public static bool IsTag(this Lg2ObjectType objType) => objType == Lg2ObjectType.LG2_OBJECT_TAG;
 
     public static string GetName(this Lg2ObjectType objType)
     {
         var pStr = git_object_type2string((git_object_t)objType);
-        var result = Marshal.PtrToStringUTF8((nint)pStr) ?? string.Empty;
+        var result = Marshal.PtrToStringUTF8((nint)pStr)!;
 
         return result;
     }
 }
 
-internal static unsafe class RawObjectTypeExtensions
+static unsafe class RawObjectTypeExtensions
 {
     internal static Lg2ObjectType GetLg2(this git_object_t objType)
     {
@@ -80,6 +71,18 @@ public enum Lg2RefType
     LG2_REFERENCE_DIRECT = git_reference_t.GIT_REFERENCE_DIRECT,
     LG2_REFERENCE_SYMBOLIC = git_reference_t.GIT_REFERENCE_SYMBOLIC,
     LG2_REFERENCE_ALL = git_reference_t.GIT_REFERENCE_ALL,
+}
+
+public static unsafe class Lg2RefTypeExtensions
+{
+    public static bool IsInvalid(this Lg2RefType refType) =>
+        refType == Lg2RefType.LG2_REFERENCE_INVALID;
+
+    public static bool IsDirect(this Lg2RefType refType) =>
+        refType == Lg2RefType.LG2_REFERENCE_DIRECT;
+
+    public static bool IsSymbolic(this Lg2RefType refType) =>
+        refType == Lg2RefType.LG2_REFERENCE_SYMBOLIC;
 }
 
 [Flags]

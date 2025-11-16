@@ -45,7 +45,7 @@ class TautManager(
     {
         get
         {
-            var iter = TautRepo.NewRefIteratorGlob(GitRefSpecs.RefsRegainedText);
+            var iter = TautRepo.NewRefIteratorGlob(GitRefSpecs.RefsRegainedAll);
 
             List<string> result = [];
             while (iter.NextName(out var refName))
@@ -61,7 +61,7 @@ class TautManager(
     {
         get
         {
-            var iter = TautRepo.NewRefIteratorGlob(GitRefSpecs.RefsTautenedText);
+            var iter = TautRepo.NewRefIteratorGlob(GitRefSpecs.RefsTautenedAll);
 
             List<string> result = [];
             while (iter.NextName(out var refName))
@@ -227,7 +227,7 @@ class TautManager(
                 | Lg2SortFlags.LG2_SORT_REVERSE
         );
 
-        using (var regainedRefIter = TautRepo.NewRefIteratorGlob(GitRefSpecs.RefsRegainedHeadsText))
+        using (var regainedRefIter = TautRepo.NewRefIteratorGlob(GitRefSpecs.RefsRegainedHeadsAll))
         {
             for (string refName; regainedRefIter.NextName(out refName); )
             {
@@ -576,54 +576,100 @@ class TautManager(
     {
         logger.ZLogTrace($"Start tautening ref tags");
 
-        var refList = HostRepo.GetRefList();
-        var refTags = GitRefSpecs.FilterLocalRefTags(refList);
+        var tagRefs = HostRepo.GetTagRefs();
 
-        foreach (var refTag in refTags)
+        foreach (var tagRef in tagRefs)
         {
-            using var tagRef = HostRepo.LookupRef(refTag);
-            var tagOid = tagRef.GetTarget();
+            var tagName = tagRef.GetName();
 
-            if (tautMapping.HasTautened(tagOid) == false)
+            if (tagRef.IsTag() == false)
             {
-                var tagOidHex8 = tagOid.GetOidHexDigits(8);
-
-                logger.ZLogTrace($"Start tautening {tagOidHex8}");
-
-                var hostCommit = HostRepo.LookupCommit(tagOid);
-                TautenCommit(hostCommit);
-
-                logger.ZLogTrace($"Done tautening {tagOidHex8}");
+                throw new InvalidOperationException($"ref '{tagName}' is not a tag");
             }
 
-            Lg2Oid tautenedTagOid = new();
-            tautMapping.GetTautened(tagOid, ref tautenedTagOid);
+            logger.ZLogTrace($"Start tautening tag {tagName}");
 
-            var tautenedRefTag = GitRefSpecs.RefsToRefsTautened.TransformToTarget(refTag);
-
-            if (TautRepo.TryLookupRef(tautenedRefTag, out var tautenedTagRef) == false)
+            var refType = tagRef.GetRefType();
+            if (refType.IsDirect() == false)
             {
-                TautRepo.NewRef(tautenedRefTag, tautenedTagOid, force: false);
+                throw new InvalidOperationException(
+                    $"ref '{tagRef.GetName()}' is not a direct reference"
+                );
+            }
+
+            var targetOid = tagRef.GetTarget();
+            var targetObj = HostRepo.LookupObject(targetOid, Lg2ObjectType.LG2_OBJECT_ANY);
+
+            TautenTagTarget(targetObj);
+
+            Lg2Oid tautenedOid = new();
+            tautMapping.GetTautened(targetOid, ref tautenedOid);
+
+            var tautenedTagName = GitRefSpecs.RefsToRefsTautened.TransformToTarget(tagName);
+
+            if (TautRepo.TryLookupRef(tautenedTagName, out var tautenedTagRef) == false)
+            {
+                TautRepo.NewRef(tautenedTagName, tautenedOid, force: false);
 
                 logger.ZLogTrace(
-                    $"Created new tag '{tautenedRefTag}' '{tautenedTagOid.GetOidHexDigits(8)}'"
+                    $"Created new tag '{tautenedTagName}' '{tautenedOid.GetOidHexDigits(8)}'"
                 );
             }
             else
             {
-                var oldTautenedTagOid = tautenedTagRef.GetTarget();
-                if (oldTautenedTagOid.Equals(tautenedTagOid) == false)
+                var oldTautenedOid = tautenedTagRef.GetTarget();
+                if (oldTautenedOid.Equals(tautenedOid) == false)
                 {
-                    tautenedTagRef.SetTarget(tautenedTagOid);
+                    tautenedTagRef.SetTarget(tautenedOid);
 
                     logger.ZLogTrace(
-                        $"Updated tag '{tautenedRefTag}' from '{oldTautenedTagOid.GetOidHexDigits(8)}' to '{tautenedTagOid.GetOidHexDigits(8)}'"
+                        $"Updated tag '{tautenedTagName}' from '{oldTautenedOid.GetOidHexDigits(8)}' to '{tautenedOid.GetOidHexDigits(8)}'"
                     );
                 }
             }
+
+            logger.ZLogTrace($"Done tautening tag {tagName}");
         }
 
         logger.ZLogTrace($"Done tautening ref tags");
+    }
+
+    void TautenTagTarget(Lg2Object targetObj)
+    {
+        var targetObjType = targetObj.GetObjectType();
+
+        if (targetObjType.IsTag())
+        {
+            var annotatedTag = targetObj.AsTag();
+
+            var nextTargetObj = annotatedTag.GetTarget();
+
+            TautenTagTarget(nextTargetObj);
+
+            // NEXT: recreate the annotated tag
+        }
+        else if (targetObjType.IsCommit())
+        {
+            var commit = targetObj.AsCommit();
+            var commitOid = commit.GetOidPlainRef();
+            var commitOidHex8 = commitOid.GetOidHexDigits(8);
+
+            if (tautMapping.HasTautened(commitOid) == false)
+            {
+                logger.ZLogTrace($"Start tautening commit {commitOidHex8}");
+
+                var hostCommit = HostRepo.LookupCommit(commitOid);
+                TautenCommit(hostCommit);
+
+                logger.ZLogTrace($"Done tautening commit {commitOidHex8}");
+            }
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                $"Unexpected tag target object type {targetObjType.GetName()}"
+            );
+        }
     }
 
     internal void TautenRefHeads()
@@ -640,7 +686,7 @@ class TautManager(
                 | Lg2SortFlags.LG2_SORT_REVERSE
         );
 
-        using (var tautenedRefIter = TautRepo.NewRefIteratorGlob(GitRefSpecs.RefsTautenedHeadsText))
+        using (var tautenedRefIter = TautRepo.NewRefIteratorGlob(GitRefSpecs.RefsTautenedHeadsAll))
         {
             for (string refName; tautenedRefIter.NextName(out refName); )
             {

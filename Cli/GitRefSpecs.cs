@@ -4,15 +4,16 @@ namespace Git.Taut;
 
 static class GitRefSpecs
 {
-    public const string RefsTautenedHeadsText = "refs/tautened/heads/*";
-    public const string RefsTautenedTagsText = "refs/tautened/tags/*";
-    public const string RefsTautenedText = "refs/tautened/*";
+    public const string RefsTautenedHeadsAll = "refs/tautened/heads/*";
+    public const string RefsTautenedTagsAll = "refs/tautened/tags/*";
+    public const string RefsTautenedAll = "refs/tautened/*";
 
-    public const string RefsRegainedHeadsText = "refs/regained/heads/*";
-    public const string RefsRegainedTagsText = "refs/regained/tags/*";
-    public const string RefsRegainedText = "refs/regained/*";
+    public const string RefsRegainedHeadsAll = "refs/regained/heads/*";
+    public const string RefsRegainedTagsAll = "refs/regained/tags/*";
+    public const string RefsRegainedAll = "refs/regained/*";
 
-    public const string RefsTagsText = "refs/tags/*";
+    public const string RefsHeadsAll = "refs/heads/*";
+    public const string RefsTagsAll = "refs/tags/*";
 
     public const string RefsToRefsTautenedText = "refs/*:refs/tautened/*";
     public const string RefsToRefsRegainedText = "refs/*:refs/regained/*";
@@ -83,5 +84,42 @@ static class GitRefSpecs
         }
 
         return result;
+    }
+}
+
+static class Lg2RepositoryExtensions
+{
+    internal static List<Lg2Reference> GetTagRefs(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        List<Lg2Reference> tagRefs = [];
+
+        using (var tagIter = repo.NewRefIteratorGlob(GitRefSpecs.RefsTagsAll))
+        {
+            for (Lg2Reference tagRef; tagIter.Next(out tagRef); )
+            {
+                tagRefs.Add(tagRef);
+            }
+        }
+
+        return tagRefs;
+    }
+
+    internal static List<Lg2Reference> GetHeadRefs(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        List<Lg2Reference> tagRefs = [];
+
+        using (var tagIter = repo.NewRefIteratorGlob(GitRefSpecs.RefsHeadsAll))
+        {
+            for (Lg2Reference tagRef; tagIter.Next(out tagRef); )
+            {
+                tagRefs.Add(tagRef);
+            }
+        }
+
+        return tagRefs;
     }
 }

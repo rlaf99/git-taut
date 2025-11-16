@@ -13,7 +13,7 @@ public interface ILg2ObjectInfo : ILg2ObjectType
     Lg2OidPlainRef GetOidPlainRef();
 }
 
-public static unsafe class Lg2objInfoExtensions
+public static class Lg2objInfoExtensions
 {
     public static string GetOidHexDigits(this ILg2ObjectInfo objInfo)
     {
@@ -75,19 +75,38 @@ public unsafe class Lg2Object
 
         return (Lg2ObjectType)git_object_type(Ptr);
     }
+
+    public Lg2CommitOwnedRef<Lg2Object> AsCommit()
+    {
+        if (GetObjectType().IsCommit() == false)
+        {
+            throw new InvalidOperationException($"not a commit object");
+        }
+
+        return new(this, (git_commit*)Ptr);
+        ;
+    }
+
+    public Lg2TagOwnedRef<Lg2Object> AsTag()
+    {
+        if (GetObjectType().IsTag() == false)
+        {
+            throw new InvalidOperationException($"not a tag object");
+        }
+
+        return new(this, (git_tag*)Ptr);
+    }
 }
 
 unsafe partial class Lg2RepositoryExtensions
 {
     public static Lg2Object LookupObject(
         this Lg2Repository repo,
-        ILg2ObjectInfo objInfo,
+        Lg2OidPlainRef oidRef,
         Lg2ObjectType objType
     )
     {
         repo.EnsureValid();
-
-        var oidRef = objInfo.GetOidPlainRef();
 
         git_object* pObj = null;
         var rc = git_object_lookup(&pObj, repo.Ptr, oidRef.Ptr, (git_object_t)objType);
