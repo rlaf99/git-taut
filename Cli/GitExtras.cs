@@ -129,7 +129,7 @@ static class GitRepoHelpers
         repo.EnsureValid();
 
         var fullPath = UseForwardSlash(Path.GetFullPath(somePath));
-        var workDir = TrimEndingSlash(repo.GetWorkDir());
+        var workDir = TrimEndingSlash(repo.GetWorkDirectory());
 
         if (fullPath.StartsWith(workDir))
         {

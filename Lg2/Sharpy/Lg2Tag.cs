@@ -4,10 +4,34 @@ using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
 
-public unsafe class Lg2Tag
-    : NativeSafePointer<Lg2Tag, git_tag>,
-        INativeRelease<git_tag>,
-        ILg2ObjectInfo
+unsafe partial class Lg2Methods
+{
+    public static bool Lg2TagNameIsValid(string name)
+    {
+        var u8Name = new Lg2Utf8String(name);
+
+        int valid = 0;
+        var rc = git_tag_name_is_valid(&valid, u8Name.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return valid == 0;
+    }
+}
+
+public interface ILg2Tag : ILg2ObjectInfo
+{
+    string GetName();
+
+    Lg2SignaturePlainRef GetTagger();
+
+    string GetMessage();
+
+    Lg2Object GetTarget();
+
+    Lg2ObjectType GetTargetType();
+}
+
+public unsafe class Lg2Tag : NativeSafePointer<Lg2Tag, git_tag>, INativeRelease<git_tag>, ILg2Tag
 {
     public Lg2Tag()
         : this(default) { }
@@ -24,19 +48,18 @@ public unsafe class Lg2Tag
 
     public Lg2ObjectType GetObjectType() => Lg2ObjectType.LG2_OBJECT_TAG;
 
-    public static bool IsValidName(string name)
-    {
-        var u8Name = new Lg2Utf8String(name);
+    public string GetName() => Ref.GetName();
 
-        int valid = 0;
-        var rc = git_tag_name_is_valid(&valid, u8Name.Ptr);
-        Lg2Exception.ThrowIfNotOk(rc);
+    public Lg2SignaturePlainRef GetTagger() => Ref.GetTagger();
 
-        return valid == 0;
-    }
+    public string GetMessage() => Ref.GetMessage();
+
+    public Lg2Object GetTarget() => Ref.GetTarget();
+
+    public Lg2ObjectType GetTargetType() => Ref.GetTargetType();
 }
 
-public unsafe class Lg2TagOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_tag>, ILg2ObjectInfo
+public unsafe class Lg2TagOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_tag>, ILg2Tag
     where TOwner : class
 {
     internal Lg2TagOwnedRef(TOwner owner, git_tag* pNative)
@@ -45,6 +68,12 @@ public unsafe class Lg2TagOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_tag>, IL
     public Lg2ObjectType GetObjectType() => Lg2ObjectType.LG2_OBJECT_TAG;
 
     public Lg2OidPlainRef GetOidPlainRef() => Ref.GetOidPlainRef();
+
+    public string GetName() => Ref.GetName();
+
+    public Lg2SignaturePlainRef GetTagger() => Ref.GetTagger();
+
+    public string GetMessage() => Ref.GetMessage();
 
     public Lg2Object GetTarget() => Ref.GetTarget();
 
@@ -60,7 +89,7 @@ static unsafe class RawTagExtensions
             var pOid = git_tag_id(pTag);
             if (pOid == null)
             {
-                throw new InvalidOperationException($"result is null");
+                throw new InvalidOperationException($"Result is null");
             }
 
             return new(pOid);
@@ -96,12 +125,26 @@ static unsafe class RawTagExtensions
             var pName = git_tag_name(pTag);
             if (pName == null)
             {
-                throw new InvalidOperationException($"result is null");
+                throw new InvalidOperationException($"Result is null");
             }
 
             var result = Marshal.PtrToStringUTF8((nint)pName)!;
 
             return result;
+        }
+    }
+
+    internal static Lg2SignaturePlainRef GetTagger(this scoped ref git_tag tag)
+    {
+        fixed (git_tag* pTag = &tag)
+        {
+            var pSig = git_tag_tagger(pTag);
+            if (pSig is null)
+            {
+                throw new InvalidOperationException($"Result is null");
+            }
+
+            return new(pSig);
         }
     }
 
@@ -112,7 +155,7 @@ static unsafe class RawTagExtensions
             var pMessage = git_tag_message(pTag);
             if (pMessage == null)
             {
-                throw new InvalidOperationException($"result is null");
+                throw new InvalidOperationException($"Result is null");
             }
 
             var result = Marshal.PtrToStringUTF8((nint)pMessage)!;

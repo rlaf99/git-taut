@@ -146,65 +146,188 @@ class TautManager(
         }
     }
 
+    void EnsureDirectTagRef(Lg2Reference tagRef, string tagName)
+    {
+        if (tagRef.IsTag() == false)
+        {
+            throw new InvalidOperationException($"ref '{tagName}' is not a tag");
+        }
+
+        var refType = tagRef.GetRefType();
+        if (refType.IsDirect() == false)
+        {
+            throw new InvalidOperationException(
+                $"ref '{tagRef.GetName()}' is not a direct reference"
+            );
+        }
+    }
+
     #region Regaining
 
-    internal void RegainRefTags()
+    internal void RegainTags()
     {
-        logger.ZLogTrace($"Start regaining ref tags");
+        logger.ZLogTrace($"Start regaining tags");
 
-        var refList = TautRepo.GetRefList();
-        var refTags = GitRefSpecs.FilterLocalRefTags(refList);
+        var tagRefs = TautRepo.GetTagRefs();
 
-        foreach (var refTag in refTags)
+        foreach (var tagRef in tagRefs)
         {
-            using var tagRef = TautRepo.LookupRef(refTag);
-            var tagOid = tagRef.GetTarget();
+            var tagName = tagRef.GetName();
 
-            if (tautMapping.HasRegained(tagOid) == false)
+            EnsureDirectTagRef(tagRef, tagName);
+
+            logger.ZLogTrace($"Start regaining tag {tagName}");
+
+            var targetOid = tagRef.GetTarget();
+
+            if (tautMapping.HasRegained(targetOid) == false)
             {
-                var tagOidHex8 = tagOid.GetOidHexDigits(8);
-
-                logger.ZLogTrace($"Start regaining {tagOidHex8}");
-
-                var tautCommit = TautRepo.LookupCommit(tagOid);
-                RegainCommit(tautCommit);
-
-                logger.ZLogTrace($"Done regaining {tagOidHex8}");
+                var targetObj = TautRepo.LookupObject(targetOid, Lg2ObjectType.LG2_OBJECT_ANY);
+                var task = RegainTagTargetAsync(targetObj);
+                task.GetAwaiter().GetResult();
             }
 
-            Lg2Oid regainedTagOid = new();
-            tautMapping.GetRegained(tagOid, ref regainedTagOid);
+            Lg2Oid regainedOid = new();
+            tautMapping.GetRegained(targetOid, ref regainedOid);
 
-            var regainedRefTag = GitRefSpecs.RefsToRefsRegained.TransformToTarget(refTag);
+            var regainedTagName = GitRefSpecs.RefsToRefsRegained.TransformToTarget(tagName);
 
-            if (TautRepo.TryLookupRef(regainedRefTag, out var regainedTagRef) == false)
+            if (TautRepo.TryLookupRef(regainedTagName, out var regaintedTagRef) == false)
             {
-                TautRepo.NewRef(regainedRefTag, regainedTagOid, force: false);
+                TautRepo.NewRef(regainedTagName, regainedOid, force: false);
 
                 logger.ZLogTrace(
-                    $"Created new tag '{regainedRefTag}' '{regainedTagOid.GetOidHexDigits(8)}'"
+                    $"Created new tag '{regainedTagName}' '{regainedOid.GetOidHexDigits(8)}"
                 );
             }
             else
             {
-                var oldRegainedTagOid = regainedTagRef.GetTarget();
-                if (oldRegainedTagOid.Equals(regainedTagOid) == false)
+                var oldRegainedOid = regaintedTagRef.GetTarget();
+                if (oldRegainedOid.Equals(regainedOid) == false)
                 {
-                    regainedTagRef.SetTarget(regainedTagOid);
+                    regaintedTagRef.SetTarget(regainedOid);
 
                     logger.ZLogTrace(
-                        $"Updated tag '{regainedRefTag}' from '{oldRegainedTagOid.GetOidHexDigits(8)}' to '{regainedTagOid.GetOidHexDigits(8)}'"
+                        $"Updated tag '{regainedTagName}' from '{oldRegainedOid.GetOidHexDigits(8)}' to '{regainedOid.GetOidHexDigits(8)}'"
                     );
                 }
             }
+
+            logger.ZLogTrace($"Done regaining tag {tagName}");
         }
 
-        logger.ZLogTrace($"Done regaining ref tags");
+        // foreach (var tagRef in tagRefs)
+        // {
+        //     var tagOid = tagRef.GetTarget();
+
+        //     if (tautMapping.HasRegained(tagOid) == false)
+        //     {
+        //         var tagOidHex8 = tagOid.GetOidHexDigits(8);
+
+        //         logger.ZLogTrace($"Start regaining {tagOidHex8}");
+
+        //         var tautCommit = TautRepo.LookupCommit(tagOid);
+        //         RegainCommit(tautCommit);
+
+        //         logger.ZLogTrace($"Done regaining {tagOidHex8}");
+        //     }
+
+        //     Lg2Oid regainedTagOid = new();
+        //     tautMapping.GetRegained(tagOid, ref regainedTagOid);
+
+        //     var tagName = tagRef.GetName();
+        //     var regainedRefTag = GitRefSpecs.RefsToRefsRegained.TransformToTarget(tagName);
+
+        //     if (TautRepo.TryLookupRef(regainedRefTag, out var regainedTagRef) == false)
+        //     {
+        //         TautRepo.NewRef(regainedRefTag, regainedTagOid, force: false);
+
+        //         logger.ZLogTrace(
+        //             $"Created new tag '{regainedRefTag}' '{regainedTagOid.GetOidHexDigits(8)}'"
+        //         );
+        //     }
+        //     else
+        //     {
+        //         var oldRegainedTagOid = regainedTagRef.GetTarget();
+        //         if (oldRegainedTagOid.Equals(regainedTagOid) == false)
+        //         {
+        //             regainedTagRef.SetTarget(regainedTagOid);
+
+        //             logger.ZLogTrace(
+        //                 $"Updated tag '{regainedRefTag}' from '{oldRegainedTagOid.GetOidHexDigits(8)}' to '{regainedTagOid.GetOidHexDigits(8)}'"
+        //             );
+        //         }
+        //     }
+        // }
+
+        logger.ZLogTrace($"Done regaining tags");
     }
 
-    internal void RegainRefHeads()
+    async Task RegainTagTargetAsync(Lg2Object targetObj)
     {
-        RegainRefHeadsPrivate();
+        await Task.Yield(); // make it asynchronously recursive
+
+        var targetObjType = targetObj.GetObjectType();
+
+        if (targetObjType.IsTag())
+        {
+            var annotatedTag = targetObj.AsTag();
+            var tagTargetObj = annotatedTag.GetTarget();
+
+            if (tautMapping.HasRegained(tagTargetObj) == false)
+            {
+                var oidHex8 = tagTargetObj.GetOidHexDigits(8);
+
+                logger.ZLogTrace($"Start regaining tag object {oidHex8}");
+
+                await RegainTagTargetAsync(tagTargetObj);
+
+                logger.ZLogTrace($"Done regaining tag object {oidHex8}");
+            }
+
+            Lg2Oid oid = new();
+            tautMapping.GetRegained(tagTargetObj, ref oid);
+
+            var regainedTagTargetObj = TautRepo.LookupObject(oid, Lg2ObjectType.LG2_OBJECT_TAG);
+
+            TautRepo.NewAnnotatedTag(
+                annotatedTag.GetName(),
+                regainedTagTargetObj,
+                annotatedTag.GetTagger(),
+                annotatedTag.GetMessage(),
+                force: false,
+                ref oid
+            );
+
+            StoreRegained(annotatedTag, oid);
+        }
+        else if (targetObjType.IsCommit())
+        {
+            var commit = targetObj.AsCommit();
+            var commitOid = commit.GetOidPlainRef();
+
+            if (tautMapping.HasRegained(commitOid) == false)
+            {
+                var oidHex8 = commitOid.GetOidHexDigits(8);
+
+                logger.ZLogTrace($"Start regaining commit {oidHex8}");
+
+                RegainCommit(commit);
+
+                logger.ZLogTrace($"Done regaining commit {oidHex8}");
+            }
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                $"Unexpected tag target object type {targetObjType.GetName()}"
+            );
+        }
+    }
+
+    internal void RegainHeads()
+    {
+        RegainHeadsPrivate();
 
         if (_gitCredFillOutput is not null)
         {
@@ -213,11 +336,11 @@ class TautManager(
         }
     }
 
-    void RegainRefHeadsPrivate()
+    void RegainHeadsPrivate()
     {
-        logger.ZLogTrace($"Start regaining ref heads");
+        logger.ZLogTrace($"Start regaining heads");
 
-        var refHeads = GitRefSpecs.FilterLocalRefHeads(TautRepo.GetRefList());
+        var headRefNames = TautRepo.GetHeadRefNames();
 
         using var revWalk = TautRepo.NewRevWalk();
 
@@ -243,7 +366,7 @@ class TautManager(
             }
         }
 
-        foreach (var refName in refHeads)
+        foreach (var refName in headRefNames)
         {
             logger.ZLogTrace($"RevWalk.Push {refName}");
 
@@ -271,7 +394,7 @@ class TautManager(
             logger.ZLogTrace($"Done regaining commit {commitOidHex8} '{commitSummary}'");
         }
 
-        foreach (var refName in refHeads)
+        foreach (var refName in headRefNames)
         {
             Lg2Oid tautOid = new();
             TautRepo.GetRefOid(refName, ref tautOid);
@@ -299,10 +422,10 @@ class TautManager(
             }
         }
 
-        logger.ZLogTrace($"Done regaining ref heads");
+        logger.ZLogTrace($"Done regaining heads");
     }
 
-    internal void RegainCommit(Lg2Commit tautCommit)
+    internal void RegainCommit(ILg2Commit tautCommit)
     {
         var tautTree = tautCommit.GetTree();
         var tautTreeOidHex8 = tautTree.GetOidHexDigits(8);
@@ -408,7 +531,7 @@ class TautManager(
 
     async Task RegainTreeAsync(Lg2Tree tautTree)
     {
-        await Task.Yield(); // prevent it from running synchronously
+        await Task.Yield(); // make it asynchronously recursive
 
         var treeBuilder = HostRepo.NewTreeBuilder();
         var regainedSet = new HashSet<nuint>();
@@ -572,9 +695,9 @@ class TautManager(
 
     #region Tautening
 
-    internal void TautenRefTags()
+    internal void TautenTags()
     {
-        logger.ZLogTrace($"Start tautening ref tags");
+        logger.ZLogTrace($"Start tautening tags");
 
         var tagRefs = HostRepo.GetTagRefs();
 
@@ -582,25 +705,18 @@ class TautManager(
         {
             var tagName = tagRef.GetName();
 
-            if (tagRef.IsTag() == false)
-            {
-                throw new InvalidOperationException($"ref '{tagName}' is not a tag");
-            }
+            EnsureDirectTagRef(tagRef, tagName);
 
             logger.ZLogTrace($"Start tautening tag {tagName}");
 
-            var refType = tagRef.GetRefType();
-            if (refType.IsDirect() == false)
-            {
-                throw new InvalidOperationException(
-                    $"ref '{tagRef.GetName()}' is not a direct reference"
-                );
-            }
-
             var targetOid = tagRef.GetTarget();
-            var targetObj = HostRepo.LookupObject(targetOid, Lg2ObjectType.LG2_OBJECT_ANY);
 
-            TautenTagTarget(targetObj);
+            if (tautMapping.HasTautened(targetOid) == false)
+            {
+                var targetObj = HostRepo.LookupObject(targetOid, Lg2ObjectType.LG2_OBJECT_ANY);
+                var task = TautenTagTargetAsync(targetObj);
+                task.GetAwaiter().GetResult();
+            }
 
             Lg2Oid tautenedOid = new();
             tautMapping.GetTautened(targetOid, ref tautenedOid);
@@ -631,37 +747,61 @@ class TautManager(
             logger.ZLogTrace($"Done tautening tag {tagName}");
         }
 
-        logger.ZLogTrace($"Done tautening ref tags");
+        logger.ZLogTrace($"Done tautening tags");
     }
 
-    void TautenTagTarget(Lg2Object targetObj)
+    async Task TautenTagTargetAsync(Lg2Object targetObj)
     {
+        await Task.Yield(); // make it asynchronously recursive
+
         var targetObjType = targetObj.GetObjectType();
 
         if (targetObjType.IsTag())
         {
             var annotatedTag = targetObj.AsTag();
+            var tagTargetObj = annotatedTag.GetTarget();
 
-            var nextTargetObj = annotatedTag.GetTarget();
+            if (tautMapping.HasTautened(tagTargetObj) == false)
+            {
+                var oidHex8 = tagTargetObj.GetOidHexDigits(8);
 
-            TautenTagTarget(nextTargetObj);
+                logger.ZLogTrace($"Start tautening tag object {oidHex8}");
 
-            // NEXT: recreate the annotated tag
+                await TautenTagTargetAsync(tagTargetObj);
+
+                logger.ZLogTrace($"Done tautening tag object {oidHex8}");
+            }
+
+            Lg2Oid oid = new();
+            tautMapping.GetTautened(tagTargetObj, ref oid);
+
+            var tautenedTagTargetObj = TautRepo.LookupObject(oid, Lg2ObjectType.LG2_OBJECT_TAG);
+
+            TautRepo.NewAnnotatedTag(
+                annotatedTag.GetName(),
+                tautenedTagTargetObj,
+                annotatedTag.GetTagger(),
+                annotatedTag.GetMessage(),
+                force: false,
+                ref oid
+            );
+
+            StoreTautened(annotatedTag, oid);
         }
         else if (targetObjType.IsCommit())
         {
             var commit = targetObj.AsCommit();
             var commitOid = commit.GetOidPlainRef();
-            var commitOidHex8 = commitOid.GetOidHexDigits(8);
 
             if (tautMapping.HasTautened(commitOid) == false)
             {
-                logger.ZLogTrace($"Start tautening commit {commitOidHex8}");
+                var oidHex8 = commitOid.GetOidHexDigits(8);
 
-                var hostCommit = HostRepo.LookupCommit(commitOid);
-                TautenCommit(hostCommit);
+                logger.ZLogTrace($"Start tautening commit {oidHex8}");
 
-                logger.ZLogTrace($"Done tautening commit {commitOidHex8}");
+                TautenCommit(commit);
+
+                logger.ZLogTrace($"Done tautening commit {oidHex8}");
             }
         }
         else
@@ -672,11 +812,11 @@ class TautManager(
         }
     }
 
-    internal void TautenRefHeads()
+    internal void TautenHeads()
     {
-        logger.ZLogTrace($"Start tautening ref heads");
+        logger.ZLogTrace($"Start tautening heads");
 
-        var hostRefHeads = FilterRemoteRefs(HostRepo.GetRefList());
+        var headRefNames = HostRepo.GetHeadRefNames();
 
         using var revWalk = HostRepo.NewRevWalk();
 
@@ -702,7 +842,7 @@ class TautManager(
             }
         }
 
-        foreach (var refName in hostRefHeads)
+        foreach (var refName in headRefNames)
         {
             logger.ZLogTrace($"RevWalk.Push {refName}");
 
@@ -730,7 +870,7 @@ class TautManager(
             logger.ZLogTrace($"Done tautening commit {commitOidHex8} '{commitSummary}'");
         }
 
-        foreach (var refName in hostRefHeads)
+        foreach (var refName in headRefNames)
         {
             Lg2Oid hostOid = new();
             HostRepo.GetRefOid(refName, ref hostOid);
@@ -764,10 +904,10 @@ class TautManager(
         var tautHeadRefName = GitRefSpecs.RefsToRefsTautened.TransformToTarget(hostHeadRefName);
         TautRepo.SetHead(tautHeadRefName);
 
-        logger.ZLogTrace($"Done tautening ref heads");
+        logger.ZLogTrace($"Done tautening heads");
     }
 
-    void TautenFilesInDiff(Lg2Commit hostCommit, Lg2AttrOptions hostAttrOpts)
+    void TautenFilesInDiff(ILg2Commit hostCommit, Lg2AttrOptions hostAttrOpts)
     {
         var hostParentCommit = hostCommit.GetParent(0);
         var hostParentTree = hostParentCommit.GetTree();
@@ -899,7 +1039,7 @@ class TautManager(
         }
     }
 
-    internal void TautenCommit(Lg2Commit hostCommit)
+    internal void TautenCommit(ILg2Commit hostCommit)
     {
         var hostTree = hostCommit.GetTree();
         var hostTreeOidHex8 = hostTree.GetOidHexDigits(8);
@@ -990,7 +1130,7 @@ class TautManager(
 
     async Task TautenTreeAsync(Lg2Tree hostTree, string hostTreePath, Lg2AttrOptions hostAttrOpts)
     {
-        await Task.Yield(); // prevent it from running synchronously
+        await Task.Yield(); // make it asynchronously recursive
 
         var treeBuilder = TautRepo.NewTreeBuilder();
         var tautenedSet = new HashSet<nuint>();
@@ -1160,8 +1300,8 @@ class TautManager(
             logger.ZLogTrace($"Delete {refName}");
         }
 
-        RegainRefHeads();
+        RegainHeads();
 
-        TautenRefHeads();
+        TautenHeads();
     }
 }

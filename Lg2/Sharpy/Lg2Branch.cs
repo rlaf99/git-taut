@@ -4,9 +4,9 @@ using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
 
-unsafe partial class Lg2Reference
+unsafe partial class Lg2Methods
 {
-    public static bool IsValidBranchName(string name)
+    public static bool Lg2BranchNameIsValid(string name)
     {
         using var u8Name = new Lg2Utf8String(name);
 

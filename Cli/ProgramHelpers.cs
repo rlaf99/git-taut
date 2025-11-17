@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 using ZLogger;
+using static Lg2.Sharpy.Lg2Methods;
 
 namespace ProgramHelpers;
 
@@ -217,7 +218,7 @@ class CommandActionsBase
         }
 
         var currentDir = Directory.GetCurrentDirectory();
-        if (Lg2Repository.TryDiscover(currentDir, out var hostRepo) == false)
+        if (Lg2TryDiscoverRepository(currentDir, out var hostRepo) == false)
         {
             throw new InvalidOperationException($"Not inside a git repository");
         }
@@ -421,7 +422,7 @@ class SiteCommandActions(
 
         tautSetup.GearUpBrandNew(hostRepo, remoteName, remoteUrl, targetSite);
 
-        tautManager.RegainRefHeads();
+        tautManager.RegainHeads();
 
         tautSetup.WrapUpBrandNew();
     }

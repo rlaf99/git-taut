@@ -96,6 +96,8 @@ public unsafe class Lg2Object
 
         return new(this, (git_tag*)Ptr);
     }
+
+    public static implicit operator Lg2OidPlainRef(Lg2Object obj) => obj.GetOidPlainRef();
 }
 
 unsafe partial class Lg2RepositoryExtensions
@@ -114,4 +116,19 @@ unsafe partial class Lg2RepositoryExtensions
 
         return new(pObj);
     }
+
+    public static Lg2Object LookupAnyObject(this Lg2Repository repo, Lg2OidPlainRef oidRef) =>
+        repo.LookupObject(oidRef, Lg2ObjectType.LG2_OBJECT_ANY);
+
+    public static Lg2Object LookupBlobObject(this Lg2Repository repo, Lg2OidPlainRef oidRef) =>
+        repo.LookupObject(oidRef, Lg2ObjectType.LG2_OBJECT_BLOB);
+
+    public static Lg2Object LookupCommitObject(this Lg2Repository repo, Lg2OidPlainRef oidRef) =>
+        repo.LookupObject(oidRef, Lg2ObjectType.LG2_OBJECT_COMMIT);
+
+    public static Lg2Object LookupTreeObject(this Lg2Repository repo, Lg2OidPlainRef oidRef) =>
+        repo.LookupObject(oidRef, Lg2ObjectType.LG2_OBJECT_TREE);
+
+    public static Lg2Object LookupTagObject(this Lg2Repository repo, Lg2OidPlainRef oidRef) =>
+        repo.LookupObject(oidRef, Lg2ObjectType.LG2_OBJECT_TAG);
 }

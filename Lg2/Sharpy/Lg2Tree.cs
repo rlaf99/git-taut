@@ -178,10 +178,15 @@ public unsafe class Lg2TreeEntryOwnedRef<TOwner>
         ownedRef.GetOidPlainRef();
 }
 
+public interface ILg2Tree : ILg2ObjectInfo
+{
+    // XXX: move methods here
+}
+
 public unsafe class Lg2Tree
     : NativeSafePointer<Lg2Tree, git_tree>,
         INativeRelease<git_tree>,
-        ILg2ObjectInfo
+        ILg2Tree
 {
     public Lg2Tree()
         : this(default) { }

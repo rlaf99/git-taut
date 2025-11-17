@@ -106,6 +106,23 @@ static class Lg2RepositoryExtensions
         return tagRefs;
     }
 
+    internal static List<string> GetTagRefNames(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        List<string> refNames = [];
+
+        using (var tagIter = repo.NewRefIteratorGlob(GitRefSpecs.RefsTagsAll))
+        {
+            for (string refName; tagIter.NextName(out refName); )
+            {
+                refNames.Add(refName);
+            }
+        }
+
+        return refNames;
+    }
+
     internal static List<Lg2Reference> GetHeadRefs(this Lg2Repository repo)
     {
         repo.EnsureValid();
@@ -121,5 +138,22 @@ static class Lg2RepositoryExtensions
         }
 
         return tagRefs;
+    }
+
+    internal static List<string> GetHeadRefNames(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        List<string> refNames = [];
+
+        using (var tagIter = repo.NewRefIteratorGlob(GitRefSpecs.RefsHeadsAll))
+        {
+            for (string refName; tagIter.NextName(out refName); )
+            {
+                refNames.Add(refName);
+            }
+        }
+
+        return refNames;
     }
 }

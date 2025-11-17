@@ -23,13 +23,8 @@ public enum Lg2ObjectType
 
 public static unsafe class Lg2ObjectTypeExtensions
 {
-    public static bool IsValid(this Lg2ObjectType objType)
-    {
-        return objType == Lg2ObjectType.LG2_OBJECT_COMMIT
-            || objType == Lg2ObjectType.LG2_OBJECT_TREE
-            || objType == Lg2ObjectType.LG2_OBJECT_BLOB
-            || objType == Lg2ObjectType.LG2_OBJECT_TAG;
-    }
+    public static bool IsInvalid(this Lg2ObjectType objType) =>
+        objType == Lg2ObjectType.LG2_OBJECT_INVALID;
 
     public static bool IsTree(this Lg2ObjectType objType) =>
         objType == Lg2ObjectType.LG2_OBJECT_TREE;
@@ -48,14 +43,6 @@ public static unsafe class Lg2ObjectTypeExtensions
         var result = Marshal.PtrToStringUTF8((nint)pStr)!;
 
         return result;
-    }
-}
-
-static unsafe class RawObjectTypeExtensions
-{
-    internal static Lg2ObjectType GetLg2(this git_object_t objType)
-    {
-        return (Lg2ObjectType)objType;
     }
 }
 

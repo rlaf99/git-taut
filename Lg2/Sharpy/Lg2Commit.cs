@@ -4,10 +4,21 @@ using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
 
+public interface ILg2Commit : ILg2ObjectInfo
+{
+    Lg2Tree GetTree();
+    uint GetParentCount();
+    Lg2SignatureOwnedRef<ILg2Commit> GetAuthor();
+    Lg2SignatureOwnedRef<ILg2Commit> GetCommitter();
+    string GetMessage();
+    Lg2Commit GetParent(uint idx);
+    List<Lg2Commit> GetAllParents();
+}
+
 public unsafe class Lg2Commit
     : NativeSafePointer<Lg2Commit, git_commit>,
         INativeRelease<git_commit>,
-        ILg2ObjectInfo
+        ILg2Commit
 {
     public Lg2Commit()
         : this(default) { }
@@ -24,10 +35,24 @@ public unsafe class Lg2Commit
 
     public Lg2ObjectType GetObjectType() => Lg2ObjectType.LG2_OBJECT_COMMIT;
 
+    public Lg2Tree GetTree() => Ref.GetTree();
+
+    public uint GetParentCount() => Ref.GetParentCount();
+
+    public Lg2SignatureOwnedRef<ILg2Commit> GetAuthor() => Ref.GetAuthor(this);
+
+    public Lg2SignatureOwnedRef<ILg2Commit> GetCommitter() => Ref.GetCommitter(this);
+
+    public string GetMessage() => Ref.GetMessage();
+
+    public Lg2Commit GetParent(uint idx) => Ref.GetParent(idx);
+
+    public List<Lg2Commit> GetAllParents() => Ref.GetAllParents();
+
     public static implicit operator Lg2OidPlainRef(Lg2Commit commit) => commit.GetOidPlainRef();
 }
 
-public unsafe class Lg2CommitOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_commit>, ILg2ObjectInfo
+public unsafe class Lg2CommitOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_commit>, ILg2Commit
     where TOwner : class
 {
     internal Lg2CommitOwnedRef(TOwner owner, git_commit* pNative)
@@ -36,6 +61,20 @@ public unsafe class Lg2CommitOwnedRef<TOwner> : NativeOwnedRef<TOwner, git_commi
     public Lg2ObjectType GetObjectType() => Lg2ObjectType.LG2_OBJECT_COMMIT;
 
     public Lg2OidPlainRef GetOidPlainRef() => Ref.GetOidPlainRef();
+
+    public Lg2Tree GetTree() => Ref.GetTree();
+
+    public uint GetParentCount() => Ref.GetParentCount();
+
+    public Lg2SignatureOwnedRef<ILg2Commit> GetAuthor() => Ref.GetAuthor(this);
+
+    public Lg2SignatureOwnedRef<ILg2Commit> GetCommitter() => Ref.GetCommitter(this);
+
+    public string GetMessage() => Ref.GetMessage();
+
+    public Lg2Commit GetParent(uint idx) => Ref.GetParent(idx);
+
+    public List<Lg2Commit> GetAllParents() => Ref.GetAllParents();
 
     public static implicit operator Lg2OidPlainRef(Lg2CommitOwnedRef<TOwner> commit) =>
         commit.GetOidPlainRef();
@@ -56,6 +95,151 @@ static unsafe class RawCommitExtensions
             return new(pOid);
         }
     }
+
+    internal static Lg2Tree GetTree(this scoped ref git_commit commit)
+    {
+        git_tree* pTree = null;
+
+        fixed (git_commit* pCommit = &commit)
+        {
+            var rc = git_commit_tree(&pTree, pCommit);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+
+        return new(pTree);
+    }
+
+    internal static string GetSummary(this scoped ref git_commit commit)
+    {
+        fixed (git_commit* pCommit = &commit)
+        {
+            var summary = git_commit_summary(pCommit);
+            var result = Marshal.PtrToStringUTF8((nint)summary)!;
+
+            return result;
+        }
+    }
+
+    internal static Lg2SignatureOwnedRef<ILg2Commit> GetAuthor(
+        this scoped ref git_commit commit,
+        ILg2Commit owner
+    )
+    {
+        fixed (git_commit* pCommit = &commit)
+        {
+            var pSig = git_commit_author(pCommit);
+            if (pSig is null)
+            {
+                throw new InvalidOperationException($"Failed to get author from commit");
+            }
+
+            return new(owner, pSig);
+        }
+    }
+
+    internal static Lg2SignatureOwnedRef<ILg2Commit> GetCommitter(
+        this scoped ref git_commit commit,
+        ILg2Commit owner
+    )
+    {
+        fixed (git_commit* pCommit = &commit)
+        {
+            var pSig = git_commit_committer(pCommit);
+            if (pSig is null)
+            {
+                throw new InvalidOperationException($"Failed to get committer from commit");
+            }
+
+            return new(owner, pSig);
+        }
+    }
+
+    internal static DateTimeOffset GetCommitTime(this scoped ref git_commit commit)
+    {
+        fixed (git_commit* pCommit = &commit)
+        {
+            var time = git_commit_time(pCommit);
+            var offset = git_commit_time_offset(pCommit);
+
+            return DateTimeOffset.FromUnixTimeSeconds(time).ToOffset(TimeSpan.FromMinutes(offset));
+        }
+    }
+
+    internal static string GetMessage(this scoped ref git_commit commit)
+    {
+        fixed (git_commit* pCommit = &commit)
+        {
+            var pMessage = git_commit_message(pCommit);
+            if (pMessage is null)
+            {
+                throw new InvalidOperationException($"Failed to get message from commit");
+            }
+
+            var result = Marshal.PtrToStringUTF8((nint)pMessage)!;
+
+            return result;
+        }
+    }
+
+    internal static string GetMessageEncoding(this scoped ref git_commit commit)
+    {
+        fixed (git_commit* pCommit = &commit)
+        {
+            var pEncoding = git_commit_message_encoding(pCommit);
+            if (pEncoding is null)
+            {
+                throw new InvalidOperationException($"Failed to get message encoding from commit");
+            }
+
+            var result = Marshal.PtrToStringUTF8((nint)pEncoding)!;
+
+            return result;
+        }
+    }
+
+    internal static uint GetParentCount(this scoped ref git_commit commit)
+    {
+        fixed (git_commit* pCommit = &commit)
+        {
+            var result = git_commit_parentcount(pCommit);
+
+            return result;
+        }
+    }
+
+    internal static Lg2Commit GetParent(this scoped ref git_commit commit, uint idx)
+    {
+        git_commit* pParent = null;
+
+        fixed (git_commit* pCommit = &commit)
+        {
+            var rc = git_commit_parent(&pParent, pCommit, idx);
+            Lg2Exception.ThrowIfNotOk(rc);
+
+            return new(pParent);
+        }
+    }
+
+    internal static List<Lg2Commit> GetAllParents(this scoped ref git_commit commit)
+    {
+        fixed (git_commit* pCommit = &commit)
+        {
+            var count = git_commit_parentcount(pCommit);
+
+            var result = new List<Lg2Commit>((int)count);
+
+            for (uint i = 0; i < count; i++)
+            {
+                git_commit* pParent = null;
+                var rc = git_commit_parent(&pParent, pCommit, i);
+                Lg2Exception.ThrowIfNotOk(rc);
+
+                result.Add(new(pParent));
+            }
+
+            return result;
+        }
+    }
 }
 
 public static unsafe class Lg2CommitExtensions
@@ -65,7 +249,7 @@ public static unsafe class Lg2CommitExtensions
         commit.EnsureValid();
 
         var summary = git_commit_summary(commit.Ptr);
-        var result = Marshal.PtrToStringUTF8((nint)summary) ?? string.Empty;
+        var result = Marshal.PtrToStringUTF8((nint)summary)!;
 
         return result;
     }
@@ -127,9 +311,9 @@ public static unsafe class Lg2CommitExtensions
             throw new InvalidOperationException($"Failed to get message from commit");
         }
 
-        var result = Marshal.PtrToStringUTF8((nint)pMessage);
+        var result = Marshal.PtrToStringUTF8((nint)pMessage)!;
 
-        return result!;
+        return result;
     }
 
     public static string GetMessageEncoding(this Lg2Commit commit)
@@ -142,9 +326,9 @@ public static unsafe class Lg2CommitExtensions
             throw new InvalidOperationException($"Failed to get message encoding from commit");
         }
 
-        var result = Marshal.PtrToStringUTF8((nint)pEncoding);
+        var result = Marshal.PtrToStringUTF8((nint)pEncoding)!;
 
-        return result!;
+        return result;
     }
 
     public static uint GetParentCount(this Lg2Commit commit)

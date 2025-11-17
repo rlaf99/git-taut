@@ -148,8 +148,8 @@ partial class GitRemoteHelper
 
     void RegainThenListRefs()
     {
-        tautManager.RegainRefHeads();
-        tautManager.RegainRefTags();
+        tautManager.RegainHeads();
+        tautManager.RegainTags();
 
         if (tautManager.TautRepo.TryLookupRef(GitRepoHelpers.HEAD, out var headRef))
         {
@@ -171,9 +171,9 @@ partial class GitRemoteHelper
             }
         }
 
-        var refList = tautManager.TautRepo.GetRefList();
+        var refNames = tautManager.TautRepo.GetRefNames();
 
-        var refHeads = GitRefSpecs.FilterLocalRefHeads(refList);
+        var refHeads = GitRefSpecs.FilterLocalRefHeads(refNames);
 
         foreach (var refHead in refHeads)
         {
@@ -186,7 +186,7 @@ partial class GitRemoteHelper
             SendLineToGit($"{oidText} {refHead}");
         }
 
-        var refTags = GitRefSpecs.FilterLocalRefTags(refList);
+        var refTags = GitRefSpecs.FilterLocalRefTags(refNames);
 
         foreach (var refTag in refTags)
         {
@@ -306,8 +306,8 @@ partial class GitRemoteHelper
 
         tautSetup.GearUpExisting(HostRepo, RemoteName, tautSiteName);
 
-        tautManager.TautenRefHeads();
-        tautManager.TautenRefTags();
+        tautManager.TautenHeads();
+        tautManager.TautenTags();
 
         bool noFetch = config.GetGitListForPushNoFetch();
         if (noFetch)

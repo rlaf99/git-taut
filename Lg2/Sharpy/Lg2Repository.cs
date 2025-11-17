@@ -4,6 +4,40 @@ using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
 
+unsafe partial class Lg2Methods
+{
+    public static bool Lg2TryDiscoverRepository(string path, out Lg2Repository repo)
+    {
+        using var u8Path = new Lg2Utf8String(path);
+        git_buf buf = new();
+
+        try
+        {
+            var rc = git_repository_discover(&buf, u8Path.Ptr, 0, null);
+            if (rc == 0)
+            {
+                git_repository* ptr;
+                rc = git_repository_open(&ptr, buf.ptr);
+                Lg2Exception.ThrowIfNotOk(rc);
+
+                repo = new(ptr);
+
+                return true;
+            }
+            else
+            {
+                repo = new();
+
+                return false;
+            }
+        }
+        finally
+        {
+            git_buf_dispose(&buf);
+        }
+    }
+}
+
 public unsafe class Lg2Repository
     : NativeSafePointer<Lg2Repository, git_repository>,
         INativeRelease<git_repository>
@@ -39,37 +73,6 @@ public unsafe class Lg2Repository
         Lg2Exception.ThrowIfNotOk(rc);
 
         return new(ptr);
-    }
-
-    public static bool TryDiscover(string path, out Lg2Repository repo)
-    {
-        using var u8Path = new Lg2Utf8String(path);
-        git_buf buf = new();
-
-        try
-        {
-            var rc = git_repository_discover(&buf, u8Path.Ptr, 0, null);
-            if (rc == 0)
-            {
-                git_repository* ptr;
-                rc = git_repository_open(&ptr, buf.ptr);
-                Lg2Exception.ThrowIfNotOk(rc);
-
-                repo = new(ptr);
-
-                return true;
-            }
-            else
-            {
-                repo = new();
-
-                return false;
-            }
-        }
-        finally
-        {
-            git_buf_dispose(&buf);
-        }
     }
 }
 
@@ -166,7 +169,7 @@ public static unsafe partial class Lg2RepositoryExtensions
         return new(ptr);
     }
 
-    public static string GetWorkDir(this Lg2Repository repo)
+    public static string GetWorkDirectory(this Lg2Repository repo)
     {
         repo.EnsureValid();
 

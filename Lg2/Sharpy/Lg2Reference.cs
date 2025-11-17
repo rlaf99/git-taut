@@ -5,6 +5,20 @@ using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
 
+unsafe partial class Lg2Methods
+{
+    public static bool Lg2ReferenceNameIsValid(string refName)
+    {
+        using var u8RefName = new Lg2Utf8String(refName);
+
+        int valid = default;
+        var rc = git_reference_name_is_valid(&valid, u8RefName.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+
+        return valid != default;
+    }
+}
+
 public unsafe partial class Lg2Reference
     : NativeSafePointer<Lg2Reference, git_reference>,
         INativeRelease<git_reference>
@@ -18,16 +32,6 @@ public unsafe partial class Lg2Reference
     public static void NativeRelease(git_reference* pNative)
     {
         git_reference_free(pNative);
-    }
-
-    public static bool IsValidName(string refName)
-    {
-        using var u8RefName = new Lg2Utf8String(refName);
-        int valid = default;
-        var rc = git_reference_name_is_valid(&valid, u8RefName.Ptr);
-        Lg2Exception.ThrowIfNotOk(rc);
-
-        return valid != default;
     }
 
     public void SetTarget(Lg2OidPlainRef oidRef, string? logMessage = null)
@@ -434,7 +438,7 @@ unsafe partial class Lg2RepositoryExtensions
         return true;
     }
 
-    public static List<string> GetRefList(this Lg2Repository repo)
+    public static List<string> GetRefNames(this Lg2Repository repo)
     {
         repo.EnsureValid();
 

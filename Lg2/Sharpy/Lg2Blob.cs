@@ -3,10 +3,15 @@ using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
 
+public interface ILg2Blob : ILg2ObjectInfo
+{
+    // XXX: move more methods here
+}
+
 public unsafe class Lg2Blob
     : NativeSafePointer<Lg2Blob, git_blob>,
         INativeRelease<git_blob>,
-        ILg2ObjectInfo
+        ILg2Blob
 {
     public Lg2Blob()
         : this(default) { }
@@ -30,10 +35,7 @@ public unsafe class Lg2Blob
         return new(pOid);
     }
 
-    public Lg2ObjectType GetObjectType()
-    {
-        return Lg2ObjectType.LG2_OBJECT_BLOB;
-    }
+    public Lg2ObjectType GetObjectType() => Lg2ObjectType.LG2_OBJECT_BLOB;
 
     public ReadStream NewReadStream()
     {
@@ -141,6 +143,6 @@ unsafe partial class Lg2RepositoryExtensions
         var rc = git_blob_lookup(&pBlob, repo.Ptr, plainRef.Ptr);
         Lg2Exception.ThrowIfNotOk(rc);
 
-        return new Lg2Blob(pBlob);
+        return new(pBlob);
     }
 }

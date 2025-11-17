@@ -322,3 +322,5 @@ public unsafe class Lg2Utf8String : SafeHandle
 
     internal sbyte* Ptr => (sbyte*)handle;
 }
+
+public static partial class Lg2Methods { }

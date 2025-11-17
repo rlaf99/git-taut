@@ -19,6 +19,8 @@ public unsafe class Lg2AttrOptions
         set { Raw.flags = (uint)value; }
     }
 
+    public void SetCommitId(ILg2ObjectInfo objInfo) => SetCommitId(objInfo.GetOidPlainRef());
+
     public void SetCommitId(Lg2OidPlainRef oidRef)
     {
         oidRef.EnsureValid();
