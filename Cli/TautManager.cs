@@ -41,56 +41,6 @@ class TautManager(
         logger.ZLogTrace($"Initialized {nameof(TautManager)}");
     }
 
-    internal List<string> RegainedTautRefs
-    {
-        get
-        {
-            var iter = TautRepo.NewRefIteratorGlob(GitRefSpecs.RefsRegainedAll);
-
-            List<string> result = [];
-            while (iter.NextName(out var refName))
-            {
-                result.Add(refName);
-            }
-
-            return result;
-        }
-    }
-
-    internal List<string> TautenedTautRefs
-    {
-        get
-        {
-            var iter = TautRepo.NewRefIteratorGlob(GitRefSpecs.RefsTautenedAll);
-
-            List<string> result = [];
-            while (iter.NextName(out var refName))
-            {
-                result.Add(refName);
-            }
-
-            return result;
-        }
-    }
-
-    // NEXT: filter only refs relevant to this taut site
-    List<string> FilterRemoteRefs(List<string> refList)
-    {
-        var result = new List<string>();
-
-        foreach (var refName in refList)
-        {
-            if (GitRefSpecs.RefsToRefsRemote.DstMatches(refName))
-            {
-                continue;
-            }
-
-            result.Add(refName);
-        }
-
-        return result;
-    }
-
     void StoreTautened(ILg2ObjectInfo objInfo, Lg2OidPlainRef target)
     {
         StoreTautened(objInfo.GetOidPlainRef(), target, objInfo.GetObjectType());
@@ -215,50 +165,6 @@ class TautManager(
 
             logger.ZLogTrace($"Done regaining tag {tagName}");
         }
-
-        // foreach (var tagRef in tagRefs)
-        // {
-        //     var tagOid = tagRef.GetTarget();
-
-        //     if (tautMapping.HasRegained(tagOid) == false)
-        //     {
-        //         var tagOidHex8 = tagOid.GetOidHexDigits(8);
-
-        //         logger.ZLogTrace($"Start regaining {tagOidHex8}");
-
-        //         var tautCommit = TautRepo.LookupCommit(tagOid);
-        //         RegainCommit(tautCommit);
-
-        //         logger.ZLogTrace($"Done regaining {tagOidHex8}");
-        //     }
-
-        //     Lg2Oid regainedTagOid = new();
-        //     tautMapping.GetRegained(tagOid, ref regainedTagOid);
-
-        //     var tagName = tagRef.GetName();
-        //     var regainedRefTag = GitRefSpecs.RefsToRefsRegained.TransformToTarget(tagName);
-
-        //     if (TautRepo.TryLookupRef(regainedRefTag, out var regainedTagRef) == false)
-        //     {
-        //         TautRepo.NewRef(regainedRefTag, regainedTagOid, force: false);
-
-        //         logger.ZLogTrace(
-        //             $"Created new tag '{regainedRefTag}' '{regainedTagOid.GetOidHexDigits(8)}'"
-        //         );
-        //     }
-        //     else
-        //     {
-        //         var oldRegainedTagOid = regainedTagRef.GetTarget();
-        //         if (oldRegainedTagOid.Equals(regainedTagOid) == false)
-        //         {
-        //             regainedTagRef.SetTarget(regainedTagOid);
-
-        //             logger.ZLogTrace(
-        //                 $"Updated tag '{regainedRefTag}' from '{oldRegainedTagOid.GetOidHexDigits(8)}' to '{regainedTagOid.GetOidHexDigits(8)}'"
-        //             );
-        //         }
-        //     }
-        // }
 
         logger.ZLogTrace($"Done regaining tags");
     }
@@ -898,13 +804,64 @@ class TautManager(
             }
         }
 
-        // NEXT: do in while handling pushes
-        var hostHeadRef = HostRepo.GetHead();
-        var hostHeadRefName = hostHeadRef.GetName();
-        var tautHeadRefName = GitRefSpecs.RefsToRefsTautened.TransformToTarget(hostHeadRefName);
-        TautRepo.SetHead(tautHeadRefName);
-
         logger.ZLogTrace($"Done tautening heads");
+    }
+
+    internal void TautenHostHead()
+    {
+        logger.ZLogTrace($"Start tautening HEAD");
+
+        if (HostRepo.TryLookupRef(GitRepoHelpers.HEAD, out var headRef))
+        {
+            var refType = headRef.GetRefType();
+            if (refType.IsDirect())
+            {
+                var targetOid = headRef.GetTarget();
+
+                if (tautMapping.HasTautened(targetOid) == false)
+                {
+                    var oidHex8 = targetOid.GetOidHexDigits(8);
+
+                    logger.ZLogTrace($"Start tautening commit {oidHex8}");
+
+                    var commit = TautRepo.LookupCommit(targetOid);
+                    TautenCommit(commit);
+
+                    logger.ZLogTrace($"Done tautening commit {oidHex8}");
+                }
+            }
+        }
+
+        logger.ZLogTrace($"Done tautening HEAD");
+    }
+
+    internal void UpdateTautHead()
+    {
+        if (HostRepo.TryLookupRef(GitRepoHelpers.HEAD, out var hostHeadRef))
+        {
+            var refType = hostHeadRef.GetRefType();
+            if (refType.IsSymbolic())
+            {
+                var symTarget = hostHeadRef.GetSymbolicTarget();
+                var tautHeadRefName = GitRefSpecs.RefsToRefsTautened.TransformToTarget(symTarget);
+                TautRepo.SetHead(tautHeadRefName);
+
+                logger.ZLogTrace($"Set Taut HEAD to {tautHeadRefName}");
+            }
+            else if (refType.IsDirect())
+            {
+                var targetOid = hostHeadRef.GetTarget();
+                Lg2Oid tautenedOid = new();
+                tautMapping.GetTautened(targetOid, ref tautenedOid);
+                TautRepo.NewRef(GitRepoHelpers.HEAD, tautenedOid, force: true);
+
+                logger.ZLogTrace($"Set Taut HEAD to {tautenedOid.GetOidHexDigits(8)}");
+            }
+            else
+            {
+                throw new InvalidOperationException($"Invalid HEAD reference");
+            }
+        }
     }
 
     void TautenFilesInDiff(ILg2Commit hostCommit, Lg2AttrOptions hostAttrOpts)
@@ -1288,13 +1245,13 @@ class TautManager(
 
         tautMapping.Truncate();
 
-        foreach (var refName in RegainedTautRefs)
+        foreach (var refName in TautRepo.GetRegainedTautRefs())
         {
             TautRepo.DeleteRef(refName);
             logger.ZLogTrace($"Delete {refName}");
         }
 
-        foreach (var refName in TautenedTautRefs)
+        foreach (var refName in TautRepo.GetTautenedTautRefs())
         {
             TautRepo.DeleteRef(refName);
             logger.ZLogTrace($"Delete {refName}");

@@ -156,7 +156,7 @@ partial class GitRemoteHelper
             var headRefName = headRef.GetName();
             var headRefType = headRef.GetRefType();
 
-            if (headRefType == Lg2RefType.LG2_REFERENCE_SYMBOLIC)
+            if (headRefType.IsSymbolic())
             {
                 var symTarget = headRef.GetSymbolicTarget();
 
@@ -308,6 +308,7 @@ partial class GitRemoteHelper
 
         tautManager.TautenHeads();
         tautManager.TautenTags();
+        tautManager.TautenHostHead();
 
         bool noFetch = config.GetGitListForPushNoFetch();
         if (noFetch)
@@ -335,6 +336,10 @@ partial class GitRemoteHelper
             using var config = HostRepo.GetConfigSnapshot();
             var tautSiteName = TautSiteConfig.FindSiteNameForRemote(config, RemoteName);
 
+            List<(string srcRefName, string tauntenedSrcRefName, string dstRefName)> parsedRefS =
+                new(_pushBatch.Count);
+            List<string> pushRefSpecs = new(_pushBatch.Count);
+
             foreach (var pushCmd in _pushBatch)
             {
                 logger.ZLogTrace($"Handle '{pushCmd}'");
@@ -346,8 +351,6 @@ partial class GitRemoteHelper
                     throw new InvalidOperationException($"Invalid refspec {refSpecText}");
                 }
 
-                var tautSitePath = HostRepo.GetTautSitePath(tautSiteName);
-
                 var srcRefName = refSpec.GetSrc();
                 var dstRefName = refSpec.GetDst();
 
@@ -355,35 +358,52 @@ partial class GitRemoteHelper
                     srcRefName
                 );
 
-                var refSpecTextToUse = refSpec.ToString(replaceSrc: tauntenedSrcRefName);
+                parsedRefS.Add((srcRefName, tauntenedSrcRefName, dstRefName));
 
-                string[] dryRunOpt = _options.DryRun ? ["--dry-run"] : [];
-                string[] args =
-                [
-                    "--git-dir",
-                    tautSitePath,
-                    "push",
-                    .. dryRunOpt,
-                    _remoteName,
-                    refSpecTextToUse,
-                ];
+                var pushRefSpec = refSpec.ToString(replaceSrc: tauntenedSrcRefName);
 
-                gitCli.Execute(args);
+                pushRefSpecs.Add(pushRefSpec);
+            }
 
+            var tautSitePath = HostRepo.GetTautSitePath(tautSiteName);
+
+            string[] dryRunOpt = _options.DryRun ? ["--dry-run"] : [];
+            string[] args =
+            [
+                "--git-dir",
+                tautSitePath,
+                "push",
+                .. dryRunOpt,
+                _remoteName,
+                .. pushRefSpecs,
+            ];
+
+            gitCli.Execute(args);
+
+            foreach (var parsedRef in parsedRefS)
+            {
                 if (_options.DryRun == false)
                 {
-                    var tauntenedSrcRef = tautManager.TautRepo.LookupRef(tauntenedSrcRefName);
+                    var tauntenedSrcRef = tautManager.TautRepo.LookupRef(
+                        parsedRef.tauntenedSrcRefName
+                    );
                     var tauntenedSrcRefTarget = tauntenedSrcRef.GetTarget();
 
-                    tautManager.TautRepo.NewRef(srcRefName, tauntenedSrcRefTarget, force: true);
+                    tautManager.TautRepo.NewRef(
+                        parsedRef.srcRefName,
+                        tauntenedSrcRefTarget,
+                        force: true
+                    );
 
                     logger.ZLogTrace(
-                        $"Refer '{srcRefName}' to '{tauntenedSrcRefTarget.GetOidHexDigits()}'"
+                        $"Refer '{parsedRef.srcRefName}' to '{tauntenedSrcRefTarget.GetOidHexDigits()}'"
                     );
                 }
 
-                SendLineToGit($"ok {dstRefName}");
+                SendLineToGit($"ok {parsedRef.dstRefName}");
             }
+
+            tautManager.UpdateTautHead();
 
             SendLineToGit();
         }

@@ -399,7 +399,7 @@ public static unsafe class Lg2OdbExtenions
             {
                 Lg2OdbStream strm = new(pOdbStream);
 
-                return new Lg2OdbReadStream(strm, (long)len, type.GetLg2());
+                return new Lg2OdbReadStream(strm, (long)len, (Lg2ObjectType)type);
             }
         }
 
@@ -500,7 +500,7 @@ public static unsafe class Lg2OdbExtenions
 
         Lg2OdbStream strm = new(pOdbStream);
 
-        return new(strm, (long)len, type.GetLg2());
+        return new(strm, (long)len, (Lg2ObjectType)type);
     }
 
     public static Lg2OdbWriteStream OpenWriteStream(
@@ -542,7 +542,7 @@ public unsafe class Lg2OdbObjectReadStream : Stream, ILg2ObjectType
 
         _ptr = (byte*)git_odb_object_data(odbObject.Ptr);
         _len = (long)git_odb_object_size(odbObject.Ptr);
-        _type = git_odb_object_type(odbObject.Ptr).GetLg2();
+        _type = (Lg2ObjectType)git_odb_object_type(odbObject.Ptr);
     }
 
     public override bool CanRead => true;

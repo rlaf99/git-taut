@@ -156,4 +156,38 @@ static class Lg2RepositoryExtensions
 
         return refNames;
     }
+
+    internal static List<string> GetRegainedTautRefs(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        List<string> refNames = [];
+
+        using (var iter = repo.NewRefIteratorGlob(GitRefSpecs.RefsRegainedAll))
+        {
+            while (iter.NextName(out var refName))
+            {
+                refNames.Add(refName);
+            }
+        }
+
+        return refNames;
+    }
+
+    internal static List<string> GetTautenedTautRefs(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        List<string> refNames = [];
+
+        using (var iter = repo.NewRefIteratorGlob(GitRefSpecs.RefsTautenedAll))
+        {
+            while (iter.NextName(out var refName))
+            {
+                refNames.Add(refName);
+            }
+        }
+
+        return refNames;
+    }
 }
