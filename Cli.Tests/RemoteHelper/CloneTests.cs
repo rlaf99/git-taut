@@ -3,7 +3,6 @@ using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using ProgramHelpers;
 using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.RemoteHelper;

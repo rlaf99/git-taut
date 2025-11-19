@@ -1,7 +1,7 @@
 using System.CommandLine;
 using Cli.Tests.TestSupport;
+using Git.Taut;
 using Microsoft.Extensions.Hosting;
-using ProgramHelpers;
 using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.CommandLine;
@@ -39,7 +39,7 @@ public sealed class SiteRunTests(ITestOutputHelper testOutput) : IDisposable
         ProgramCommandLine progCli = new(_host);
 
         string[] cliArgs = ["site", "run", "branch"];
-        var parseResult = progCli.Parse(cliArgs);
+        var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);

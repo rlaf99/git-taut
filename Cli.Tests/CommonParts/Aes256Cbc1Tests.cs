@@ -1,11 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
-using Cli.Tests.TestSupport;
 using Git.Taut;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using ProgramHelpers;
 
 namespace Cli.Tests.CommonParts;
 

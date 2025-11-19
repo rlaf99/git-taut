@@ -44,7 +44,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Cli\Cli.csproj" />
+    <ProjectReference Include="..\Cli.Git.Taut\Cli.Git.Taut.csproj" />
   </ItemGroup>
 
   <ItemGroup>

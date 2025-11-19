@@ -2,8 +2,6 @@ using Git.Taut;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using ProgramHelpers;
 using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.TestSupport;

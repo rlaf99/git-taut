@@ -3,7 +3,6 @@ using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using ProgramHelpers;
 
 namespace Cli.Tests.CommonParts;
 

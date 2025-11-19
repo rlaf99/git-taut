@@ -1,6 +1,5 @@
 using System.CommandLine;
 using System.Diagnostics.CodeAnalysis;
-using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,9 +9,9 @@ using Microsoft.IO;
 using ZLogger;
 using static Lg2.Sharpy.Lg2Methods;
 
-namespace ProgramHelpers;
+namespace Git.Taut;
 
-public sealed class GitTautHostBuilder
+sealed class GitTautHostBuilder
 {
     public static IHost BuildHost()
     {
@@ -34,6 +33,14 @@ static class HostApplicationBuilderExtensions
         builder.AddGitTautLogging();
     }
 
+    internal static void AddForGitRemoteTaut(this HostApplicationBuilder builder)
+    {
+        builder.AddGitTautConfiguration();
+        builder.AddGitTautServices();
+        builder.AddGitRemoteTautCommandActions();
+        builder.AddGitTautLogging();
+    }
+
     internal static void AddGitTautCommandActions(this HostApplicationBuilder builder)
     {
         builder.Services.AddSingleton<GitRemoteHelper>();
@@ -42,6 +49,11 @@ static class HostApplicationBuilderExtensions
 #if DEBUG
         builder.Services.AddSingleton<DebugCommandActions>();
 #endif
+    }
+
+    internal static void AddGitRemoteTautCommandActions(this HostApplicationBuilder builder)
+    {
+        builder.Services.AddSingleton<GitRemoteHelper>();
     }
 
     internal static void AddGitTautConfiguration(this HostApplicationBuilder builder)
@@ -595,7 +607,7 @@ class OtherCommandActions(ILogger<OtherCommandActions> logger) : CommandActionsB
     }
 }
 
-class ProgramCommandLine(IHost host)
+internal class ProgramCommandLine(IHost host)
 {
     internal static Argument<string> RemoteNameArgument = new("remote-name")
     {
@@ -644,17 +656,31 @@ class ProgramCommandLine(IHost host)
     };
 #endif
 
-    internal ParseResult Parse(string[] args, ParserConfiguration? parserConfiguration = null)
+    internal ParseResult ParseForGitTaut(
+        string[] args,
+        ParserConfiguration? parserConfiguration = null
+    )
     {
-        var rootCommand = BuildCommands();
+        var rootCommand = BuildGitTautCommands();
         var parseResult = rootCommand.Parse(args, parserConfiguration);
 
         return parseResult;
     }
 
-    RootCommand BuildCommands()
+    internal ParseResult ParseForGitRemoteTaut(
+        string[] args,
+        ParserConfiguration? parserConfiguration = null
+    )
     {
-        RootCommand rootCommand = new("git-taut command lines");
+        var rootCommand = BuildGitRemoteTautCommands();
+        var parseResult = rootCommand.Parse(args, parserConfiguration);
+
+        return parseResult;
+    }
+
+    RootCommand BuildGitTautCommands()
+    {
+        RootCommand rootCommand = new("git-taut command line");
 
         var siteCommand = CreateCommandSite();
 
@@ -672,6 +698,30 @@ class ProgramCommandLine(IHost host)
 #if DEBUG
         rootCommand.Subcommands.Add(CreateCommandServeHttp());
 #endif
+
+        return rootCommand;
+    }
+
+    RootCommand BuildGitRemoteTautCommands()
+    {
+        RootCommand rootCommand = new("git-remote-taut command line");
+
+        rootCommand.Arguments.Add(RemoteNameArgument);
+        rootCommand.Arguments.Add(RemoteAddressArgument);
+
+        rootCommand.SetAction(
+            (parseResult, cancellation) =>
+            {
+                var cmd = host.Services.GetRequiredService<GitRemoteHelper>();
+
+                var remoteName = parseResult.GetRequiredValue(RemoteNameArgument);
+                var remoteAddress = parseResult.GetRequiredValue(RemoteAddressArgument);
+
+                var result = cmd.WorkWithGitAsync(remoteName, remoteAddress, cancellation);
+
+                return result;
+            }
+        );
 
         return rootCommand;
     }

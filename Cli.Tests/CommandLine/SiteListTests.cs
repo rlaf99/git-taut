@@ -3,7 +3,6 @@ using Cli.Tests.TestSupport;
 using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Hosting;
-using ProgramHelpers;
 using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.CommandLine;
@@ -42,7 +41,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
         ProgramCommandLine progCli = new(_host);
 
         string[] cliArgs = ["site", "list"];
-        var parseResult = progCli.Parse(cliArgs);
+        var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
@@ -78,7 +77,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
 
         string[] targetOpt = ["--target", Repo0];
         string[] cliArgs = ["site", .. targetOpt, "list"];
-        var parseResult = progCli.Parse(cliArgs);
+        var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
@@ -112,7 +111,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
         string[] targetOpt = ["--target", invalidTarget];
 
         string[] cliArgs = ["site", .. targetOpt, "list"];
-        var parseResult = progCli.Parse(cliArgs);
+        var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.NotEqual(0, exitCode);

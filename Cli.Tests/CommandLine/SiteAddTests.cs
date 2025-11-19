@@ -3,7 +3,6 @@ using Cli.Tests.TestSupport;
 using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Hosting;
-using ProgramHelpers;
 using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.CommandLine;
@@ -41,7 +40,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         ProgramCommandLine progCli = new(_host);
 
         string[] cliArgs = ["site", "add", Repo1, Path.Join("..", Repo1)];
-        var parseResult = progCli.Parse(cliArgs);
+        var parseResult = progCli.ParseForGitTaut(cliArgs);
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
 
@@ -67,7 +66,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
 
         var remoteNameToUse = Repo0;
         string[] cliArgs = ["site", "add", remoteNameToUse, Path.Join("..", Repo1)];
-        var parseResult = progCli.Parse(cliArgs);
+        var parseResult = progCli.ParseForGitTaut(cliArgs);
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(1, exitCode);
 
@@ -91,7 +90,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         ProgramCommandLine progCli = new(_host);
 
         string[] cliArgs = ["site", "add", Repo1, Path.Join("..", Repo1), "--link-existing"];
-        var parseResult = progCli.Parse(cliArgs);
+        var parseResult = progCli.ParseForGitTaut(cliArgs);
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(1, exitCode);
 
@@ -126,7 +125,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
                 Path.Join("..", Repo1),
                 "--link-existing",
             ];
-            var parseResult = progCli.Parse(cliArgs);
+            var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             var exitCode = parseResult.Invoke(_invCfg);
             Assert.Equal(0, exitCode);
@@ -143,7 +142,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
                 Path.Join("..", Repo1),
                 "--link-existing",
             ];
-            var parseResult = progCli.Parse(cliArgs);
+            var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             var exitCode = parseResult.Invoke(_invCfg);
             Assert.Equal(1, exitCode);
@@ -178,7 +177,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
             "--link-existing",
         ];
 
-        var parseResult = progCli.Parse(cliArgs);
+        var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);

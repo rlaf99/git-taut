@@ -1,7 +1,7 @@
 using System.CommandLine;
 using Cli.Tests.TestSupport;
+using Git.Taut;
 using Microsoft.Extensions.Hosting;
-using ProgramHelpers;
 using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.CommandLine;
@@ -35,7 +35,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
 
         {
             string[] cliArgs = ["site", "add", Repo0, Path.Join("..", Repo0)];
-            var parseResult = progCli.Parse(cliArgs);
+            var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             InvocationConfiguration invCfg = new()
             {
@@ -53,7 +53,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
 
         {
             string[] cliArgs = ["site", "list"];
-            var parseResult = progCli.Parse(cliArgs);
+            var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             InvocationConfiguration invCfg = new()
             {
@@ -71,7 +71,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
 
         {
             string[] cliArgs = ["site", "remove", "--target", Repo0];
-            var parseResult = progCli.Parse(cliArgs);
+            var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             InvocationConfiguration invCfg = new()
             {
@@ -89,7 +89,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
 
         {
             string[] cliArgs = ["site", "run", "log"];
-            var parseResult = progCli.Parse(cliArgs);
+            var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             InvocationConfiguration invCfg = new()
             {
@@ -107,7 +107,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
 
         {
             string[] cliArgs = ["site", "reveal", "some-path"];
-            var parseResult = progCli.Parse(cliArgs);
+            var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             InvocationConfiguration invCfg = new()
             {
@@ -125,7 +125,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
 
         {
             string[] cliArgs = ["site", "rescan", "--target", "some-target"];
-            var parseResult = progCli.Parse(cliArgs);
+            var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             InvocationConfiguration invCfg = new()
             {

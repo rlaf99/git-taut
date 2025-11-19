@@ -7,7 +7,9 @@
     <AssemblyName>git-taut</AssemblyName>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
     <Version>0.0.1-preview</Version>
+    
     <!-- specify this on command line 
     <PublishAot>true</PublishAot> -->
     <PackAsTool>true</PackAsTool>
@@ -19,14 +21,6 @@
     <!-- <RuntimeIdentifiers>win-x64;linux-x64;osx-arm64</RuntimeIdentifiers>  -->
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Lg2.native" Version="0.191.0" />
-    <PackageReference Include="LightningDB" Version="0.20.0" />
-    <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
-    <PackageReference Include="System.CommandLine" Version="2.0.0" />
-    <PackageReference Include="ZLogger" Version="2.5.10" />
-    <PackageReference Include="ZstdSharp.Port" Version="0.8.6" />
-  </ItemGroup>
 
   <ItemGroup>
     <Compile Remove="dbg\**\*.cs" />
@@ -35,19 +29,32 @@
   <Choose>
     <When Condition="'$(Configuration)' == 'Debug'">
       <ItemGroup>
-        <PackageReference Include="KestrelCgi" Version="0.0.1" />
-        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+        <FrameworkReference Include="Microsoft.AspNetCore.App" Version="10.0.0" />
         <Compile Include="dbg\**\*.cs" />
       </ItemGroup>
     </When>
   </Choose>
 
   <ItemGroup>
+    <PackageReference Include="Lg2.native" Version="0.191.0" />
+    <PackageReference Include="LightningDB" Version="0.20.0" />
+    <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
+    <PackageReference Include="System.CommandLine" Version="2.0.0" />
+    <PackageReference Include="ZLogger" Version="2.5.10" />
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.6" />
+    <PackageReference Include="KestrelCgi" Version="0.0.1" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.0" Condition="'$(Configuration)' == 'Release'"/>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" Condition="'$(Configuration)' == 'Release'" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Lg2\Lg2.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="$(MSBuildProjectName).Tests" />
+    <InternalsVisibleTo Include="git-remote-taut" />
+    <InternalsVisibleTo Include="Cli.Tests" />
+    <!-- <InternalsVisibleTo Include="$(MSBuildProjectName).Tests" /> -->
   </ItemGroup>
 
 </Project>

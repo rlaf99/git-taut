@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace ProgramHelpers;
+namespace Git.Taut;
 
 class GitHttpBackend : IDisposable
 {

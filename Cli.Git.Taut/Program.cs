@@ -1,7 +1,6 @@
 ﻿using System.CommandLine;
+using Git.Taut;
 using Lg2.Sharpy;
-using Microsoft.Extensions.Hosting;
-using ProgramHelpers;
 
 using var lg2Global = new Lg2Global();
 
@@ -20,7 +19,7 @@ using var host = GitTautHostBuilder.BuildHost();
 ProgramCommandLine progCli = new(host);
 
 ParserConfiguration parserConfiguration = new() { ResponseFileTokenReplacer = null };
-var parseResult = progCli.Parse(args, parserConfiguration);
+var parseResult = progCli.ParseForGitTaut(args, parserConfiguration);
 
 InvocationConfiguration invocationConfiguration = new()
 {
