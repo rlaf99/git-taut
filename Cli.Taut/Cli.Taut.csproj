@@ -3,21 +3,26 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <RootNamespace>Git.Remote.Taut</RootNamespace>
-    <AssemblyName>git-remote-taut</AssemblyName>
+    <AssemblyName>git-taut</AssemblyName>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
     <Version>0.0.1-preview</Version>
-
+    
+    <!-- specify this on command line 
+    <PublishAot>true</PublishAot> -->
     <PackAsTool>true</PackAsTool>
-    <ToolCommandName>git-remote-taut</ToolCommandName>
+    <ToolCommandName>git-taut</ToolCommandName>
     <PackageOutputPath>../nupkg</PackageOutputPath>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+
+    <!-- note that this does not seem to be supported by NativeAOT, additionally this creates a tool named git-taut.cmd on windows -->
+    <!-- <RuntimeIdentifiers>win-x64;linux-x64;osx-arm64</RuntimeIdentifiers>  -->
   </PropertyGroup>
 
+
   <ItemGroup>
-    <ProjectReference Include="..\Cli.Git.Taut\Cli.Git.Taut.csproj" />
+    <ProjectReference Include="..\Cli.Common\Cli.Common.csproj" />
   </ItemGroup>
 
 </Project>

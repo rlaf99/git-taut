@@ -23,6 +23,18 @@ sealed class GitTautHostBuilder
     }
 }
 
+sealed class GitRemoteTautHostBuilder
+{
+    public static IHost BuildHost()
+    {
+        var builder = Host.CreateEmptyApplicationBuilder(null);
+
+        builder.AddForGitRemoteTaut();
+
+        return builder.Build();
+    }
+}
+
 static class HostApplicationBuilderExtensions
 {
     internal static void AddForGitTaut(this HostApplicationBuilder builder)
@@ -306,7 +318,7 @@ class DebugCommandActions(ILoggerFactory loggerFactory) : CommandActionsBase
         gitHttp.Start();
 
         var servingUri = gitHttp.GetServingUri();
-        Console.Error.WriteLine($"Serving at {servingUri}");
+        Console.WriteLine($"Serving at {servingUri}");
 
         TaskCompletionSource tcs = new();
 
@@ -375,12 +387,6 @@ class SiteCommandActions(
 
             return Task.FromResult(1);
         }
-        // catch (Lg2Exception ex)
-        // {
-        //     error.WriteLine(ex.Message);
-
-        //     return Task.FromResult(1);
-        // }
 
         logger.ZLogTrace($"Done invoking action {actionName}");
 
@@ -692,11 +698,12 @@ internal class ProgramCommandLine(IHost host)
         siteCommand.Subcommands.Add(CreateCommandSiteRescan());
 
         rootCommand.Subcommands.Add(siteCommand);
-        rootCommand.Subcommands.Add(CreateCommandRemoteHelper());
+        // rootCommand.Subcommands.Add(CreateCommandRemoteHelper());
         rootCommand.Subcommands.Add(CreateCommandShowInternal());
 
 #if DEBUG
         rootCommand.Subcommands.Add(CreateCommandServeHttp());
+        rootCommand.Subcommands.Add(CreateCommandSshBypass());
 #endif
 
         return rootCommand;
@@ -736,12 +743,18 @@ internal class ProgramCommandLine(IHost host)
         command.SetAction(
             (parseResult, cancellation) =>
             {
-                var commands = host.Services.GetRequiredService<DebugCommandActions>();
+                var actions = host.Services.GetRequiredService<DebugCommandActions>();
 
-                return commands.ServeHttpAsync(parseResult, cancellation);
+                return actions.ServeHttpAsync(parseResult, cancellation);
             }
         );
         return command;
+    }
+
+    Command CreateCommandSshBypass()
+    {
+        GitSshBypass sshBypass = new();
+        return sshBypass.BuildCommand();
     }
 #endif
 

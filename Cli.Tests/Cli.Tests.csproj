@@ -44,7 +44,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Cli.Git.Taut\Cli.Git.Taut.csproj" />
+    <ProjectReference Include="..\Cli.Remote.Taut\Cli.Remote.Taut.csproj" />
+    <ProjectReference Include="..\Cli.Taut\Cli.Taut.csproj" />
+    <ProjectReference Include="..\Cli.Common\Cli.Common.csproj" />
   </ItemGroup>
 
   <ItemGroup>

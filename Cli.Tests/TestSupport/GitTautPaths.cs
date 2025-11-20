@@ -10,7 +10,7 @@ public class WithGitTautPathsFixture : IDisposable
 
         var updatedPath = _savedPath ?? string.Empty;
 
-        var scriptPath = Environment.GetEnvironmentVariable("GIT_REMOTE_TAUT_SCRIPT_PATH");
+        var scriptPath = Environment.GetEnvironmentVariable("GIT_REMOTE_TAUT_EXECUTABLE_PATH");
         if (scriptPath is not null)
         {
             updatedPath = string.IsNullOrEmpty(updatedPath)
