@@ -113,6 +113,51 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
     }
 
     [Fact]
+    public void CloneTautRepo0IntoRepo2_ViaSsh()
+    {
+        _planner.SetupRepo0();
+        _planner.SetupRepo1();
+
+        var gitCli = Host.Services.GetRequiredService<GitCli>();
+
+        Directory.SetCurrentDirectory(Scene.DirPath);
+
+        using var repo0 = Lg2Repository.New(Repo0);
+
+        UriBuilder uriBuilder = new()
+        {
+            Scheme = Uri.UriSchemeSsh,
+            Host = "localhost",
+            Path = repo0.GetPath(),
+        };
+
+        var repo0SshUri = uriBuilder.Uri;
+        var tautRepo0Sshuri = $"taut::{repo0SshUri.AbsoluteUri}";
+
+        testOutput.WriteLine($"Clone from {tautRepo0Sshuri}");
+
+        gitCli.Run("clone", "--origin", Repo0, tautRepo0Sshuri, Repo2);
+
+        Directory.SetCurrentDirectory(Repo2);
+
+        UpdateContentAndPush(gitCli);
+
+        using var repo2 = Lg2Repository.New(".");
+        using var repo2Config = repo2.GetConfigSnapshot();
+        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(repo2Config, Repo0);
+
+        Directory.SetCurrentDirectory(Path.Join("..", Repo1));
+        gitCli.Run("pull");
+
+        Directory.SetCurrentDirectory("..");
+        var repo0sitePath = GitRepoHelpers.GetTautSitePath(Repo2Git, repo0SiteName);
+        using var repo0Site = Lg2Repository.New(repo0sitePath);
+        using var repo0Base = Lg2Repository.New(Repo0);
+
+        Assert.True(CompareBranch(repo0Base, repo0Site, "master"));
+    }
+
+    [Fact]
     public void CloneTautRepo0IntoRepo2_WithTags()
     {
         _planner.SetupRepo0();

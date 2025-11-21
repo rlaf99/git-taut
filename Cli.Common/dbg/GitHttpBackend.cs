@@ -1,5 +1,7 @@
+using System.CommandLine;
 using System.Net;
 using KestrelCgi;
+using Lg2.Sharpy;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -9,6 +11,50 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Git.Taut;
+
+class GitHttpBackendCommandBuilder(ILoggerFactory loggerFactory) : CommandActionsBase
+{
+    internal static Option<int> _portToListenOption = new("--port")
+    {
+        DefaultValueFactory = _ => 0,
+        Description = $"The port number to listen on (dynamically assigned if 0)",
+    };
+
+    internal async Task ServeHttpAsync(ParseResult parseResult, CancellationToken cancellation)
+    {
+        using var hostRepo = LocateHostRepo();
+
+        int portNumber = parseResult.GetValue(_portToListenOption);
+
+        GitHttpBackend gitHttp = new(hostRepo.GetPath(), loggerFactory, portNumber);
+
+        gitHttp.Start();
+
+        var servingUri = gitHttp.GetServingUri();
+        Console.WriteLine($"Serving at {servingUri}");
+
+        TaskCompletionSource tcs = new();
+
+        cancellation.Register(() =>
+        {
+            tcs.SetCanceled();
+        });
+
+        await tcs.Task;
+    }
+
+    internal Command BuildCommand()
+    {
+        Command command = new("dbg-serve-http", "Serve a repository through HTTP")
+        {
+            _portToListenOption,
+        };
+
+        command.SetAction(ServeHttpAsync);
+
+        return command;
+    }
+}
 
 class GitHttpBackend : IDisposable
 {

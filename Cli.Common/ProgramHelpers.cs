@@ -58,9 +58,6 @@ static class HostApplicationBuilderExtensions
         builder.Services.AddSingleton<GitRemoteHelper>();
         builder.Services.AddSingleton<SiteCommandActions>();
         builder.Services.AddSingleton<OtherCommandActions>();
-#if DEBUG
-        builder.Services.AddSingleton<DebugCommandActions>();
-#endif
     }
 
     internal static void AddGitRemoteTautCommandActions(this HostApplicationBuilder builder)
@@ -86,6 +83,11 @@ static class HostApplicationBuilderExtensions
         services.AddSingleton<TautAttributes>();
         services.AddSingleton<Aes256Cbc1>();
         services.AddSingleton<RecyclableMemoryStreamManager>();
+
+#if DEBUG
+        services.AddSingleton<GitHttpBackendCommandBuilder>();
+        services.AddSingleton<GitSshBypassCommandBuilder>();
+#endif
     }
 
     internal static void AddGitTautLogging(this HostApplicationBuilder builder)
@@ -303,34 +305,6 @@ class CommandActionsBase
         return OpenTautRepo(tautRepoRelPath);
     }
 }
-
-#if DEBUG
-class DebugCommandActions(ILoggerFactory loggerFactory) : CommandActionsBase
-{
-    internal async Task ServeHttpAsync(ParseResult parseResult, CancellationToken cancellation)
-    {
-        using var hostRepo = LocateHostRepo();
-
-        int portNumber = parseResult.GetValue(ProgramCommandLine.PortToListenOption);
-
-        GitHttpBackend gitHttp = new(hostRepo.GetPath(), loggerFactory, portNumber);
-
-        gitHttp.Start();
-
-        var servingUri = gitHttp.GetServingUri();
-        Console.WriteLine($"Serving at {servingUri}");
-
-        TaskCompletionSource tcs = new();
-
-        cancellation.Register(() =>
-        {
-            tcs.SetCanceled();
-        });
-
-        await tcs.Task;
-    }
-}
-#endif
 
 class SiteCommandActions(
     ILogger<SiteCommandActions> logger,
@@ -654,14 +628,6 @@ internal class ProgramCommandLine(IHost host)
         Description = "Specify the path",
     };
 
-#if DEBUG
-    internal static Option<int> PortToListenOption = new("--port")
-    {
-        DefaultValueFactory = _ => 0,
-        Description = $"The port number to listen on (dynamically assigned if 0)",
-    };
-#endif
-
     internal ParseResult ParseForGitTaut(
         string[] args,
         ParserConfiguration? parserConfiguration = null
@@ -698,7 +664,6 @@ internal class ProgramCommandLine(IHost host)
         siteCommand.Subcommands.Add(CreateCommandSiteRescan());
 
         rootCommand.Subcommands.Add(siteCommand);
-        // rootCommand.Subcommands.Add(CreateCommandRemoteHelper());
         rootCommand.Subcommands.Add(CreateCommandShowInternal());
 
 #if DEBUG
@@ -736,51 +701,18 @@ internal class ProgramCommandLine(IHost host)
 #if DEBUG
     Command CreateCommandServeHttp()
     {
-        Command command = new("dbg-serve-http", "Serve a repository through HTTP");
+        var builder = host.Services.GetRequiredService<GitHttpBackendCommandBuilder>();
 
-        command.Options.Add(PortToListenOption);
-
-        command.SetAction(
-            (parseResult, cancellation) =>
-            {
-                var actions = host.Services.GetRequiredService<DebugCommandActions>();
-
-                return actions.ServeHttpAsync(parseResult, cancellation);
-            }
-        );
-        return command;
+        return builder.BuildCommand();
     }
 
     Command CreateCommandSshBypass()
     {
-        GitSshBypass sshBypass = new();
-        return sshBypass.BuildCommand();
+        var builder = host.Services.GetRequiredService<GitSshBypassCommandBuilder>();
+
+        return builder.BuildCommand();
     }
 #endif
-
-    Command CreateCommandRemoteHelper()
-    {
-        Command command = new("remote-helper", "Interact with Git as a remote helper.");
-
-        command.Arguments.Add(RemoteNameArgument);
-        command.Arguments.Add(RemoteAddressArgument);
-
-        command.SetAction(
-            (parseResult, cancellation) =>
-            {
-                var cmd = host.Services.GetRequiredService<GitRemoteHelper>();
-
-                var remoteName = parseResult.GetRequiredValue(RemoteNameArgument);
-                var remoteAddress = parseResult.GetRequiredValue(RemoteAddressArgument);
-
-                var result = cmd.WorkWithGitAsync(remoteName, remoteAddress, cancellation);
-
-                return result;
-            }
-        );
-
-        return command;
-    }
 
     Command CreateCommandShowInternal()
     {

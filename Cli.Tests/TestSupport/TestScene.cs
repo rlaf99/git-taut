@@ -29,7 +29,7 @@ class TestScene : IDisposable
             if (output is not null)
             {
                 var caseName = TestContext.Current.TestCase?.TestCaseDisplayName;
-                output.WriteLine($"Preserve'{DirPath}' for failed case {caseName}.");
+                output.WriteLine($"Preserve '{DirPath}' for failed case {caseName}.");
             }
         }
     }
