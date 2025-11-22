@@ -100,6 +100,9 @@ git_filemode_t
 git_odb_writepack
 git_odb_write_pack
 
+# use Path.PathSeparator from .NET instead
+GIT_PATH_LIST_SEPARATOR
+
 --methodClassName
 LibGit2Exports
 

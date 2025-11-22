@@ -7,7 +7,7 @@ using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.RemoteHelper;
 
-[Collection("WithGitTautPaths")]
+[Collection("SetCurrentDirectory")]
 public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
 {
     IHost Host => _planner.Host;

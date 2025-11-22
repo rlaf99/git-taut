@@ -244,7 +244,9 @@ class CommandActionsBase
         }
 
         var currentDir = Directory.GetCurrentDirectory();
-        if (Lg2TryDiscoverRepository(currentDir, out var hostRepo) == false)
+        var ceilingDirs = KnownEnvironVars.GetGitCeilingDirectories();
+
+        if (Lg2TryDiscoverRepository(currentDir, out var hostRepo, ceilingDirs) == false)
         {
             throw new InvalidOperationException($"Not inside a git repository");
         }

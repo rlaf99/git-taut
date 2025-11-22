@@ -6,14 +6,29 @@ namespace Lg2.Sharpy;
 
 unsafe partial class Lg2Methods
 {
-    public static bool Lg2TryDiscoverRepository(string path, out Lg2Repository repo)
+    // ceilingDirs is a string of paths separated with Path.PathSeparator
+    public static bool Lg2TryDiscoverRepository(
+        string path,
+        out Lg2Repository repo,
+        string? ceilingDirs = null
+    )
     {
         using var u8Path = new Lg2Utf8String(path);
         git_buf buf = new();
 
         try
         {
-            var rc = git_repository_discover(&buf, u8Path.Ptr, 0, null);
+            int rc;
+
+            if (ceilingDirs is not null)
+            {
+                var u8CeilingDirs = new Lg2Utf8String(ceilingDirs);
+                rc = git_repository_discover(&buf, u8Path.Ptr, 0, u8CeilingDirs.Ptr);
+            }
+            else
+            {
+                rc = git_repository_discover(&buf, u8Path.Ptr, 0, null);
+            }
             if (rc == 0)
             {
                 git_repository* ptr;

@@ -6,7 +6,7 @@ using static Cli.Tests.TestSupport.TestScenePlannerConstants;
 
 namespace Cli.Tests.CommandLine;
 
-[Collection("WithGitTautPaths")]
+[Collection("SetCurrentDirectory")]
 public sealed class SiteRunTests(ITestOutputHelper testOutput) : IDisposable
 {
     IHost _host = GitTautHostBuilder.BuildHost();

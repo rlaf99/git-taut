@@ -10,6 +10,7 @@ usage() {
   echo "  20M = 40960 sectors"
   echo "  30M = 61440 sectors"
   echo "  50M = 102400 sectors"
+  echo " 128M = 262144 sectors"
 }
 
 if [ "$#" -lt 2 ]; then

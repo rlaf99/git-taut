@@ -1783,9 +1783,6 @@ namespace Lg2.Native
         [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_config_backend_from_values(git_config_backend** @out, [NativeTypeName("const char **")] sbyte** values, [NativeTypeName("size_t")] nuint len, git_config_backend_memory_options* opts);
 
-        [NativeTypeName("#define GIT_PATH_LIST_SEPARATOR ';'")]
-        public const int GIT_PATH_LIST_SEPARATOR = (sbyte)(';');
-
         [NativeTypeName("#define GIT_PATH_MAX 4096")]
         public const int GIT_PATH_MAX = 4096;
 

@@ -77,10 +77,7 @@ class Testbed
 
     static CliTestsOptions? GetOptions()
     {
-        if (s_configRoot is null)
-        {
-            s_configRoot = new ConfigurationBuilder().AddEnvironmentVariables().Build();
-        }
+        s_configRoot ??= new ConfigurationBuilder().AddEnvironmentVariables().Build();
 
         return s_configRoot.GetSection(CliTestsOptions.SectionName).Get<CliTestsOptions>();
     }

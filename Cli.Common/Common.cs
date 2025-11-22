@@ -19,6 +19,14 @@ static class KnownEnvironVars
 
     internal const string GitAlternateObjectDirectories = "GIT_ALTERNATE_OBJECT_DIRECTORIES";
 
+    internal const string GitCeilingDirectories = "GIT_CEILING_DIRECTORIES";
+
+    internal static void SetGitCeilingDirectories(string? value) =>
+        Environment.SetEnvironmentVariable(GitCeilingDirectories, value);
+
+    internal static string? GetGitCeilingDirectories() =>
+        Environment.GetEnvironmentVariable(GitCeilingDirectories);
+
     internal static bool TryGetGitDir(out string gitDir)
     {
         var value = Environment.GetEnvironmentVariable(GitDir);

@@ -1,0 +1,5 @@
+[user]
+	name = test
+	email = test@localhost
+[advice]
+	defaultBranchName = false

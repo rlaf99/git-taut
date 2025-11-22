@@ -6,7 +6,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Cli.Tests.CommonParts;
 
-[Collection("WithGitTautPaths")]
+[Collection("SetCurrentDirectory")]
 public class TauteningTests : IDisposable
 {
     ITestOutputHelper _output;
