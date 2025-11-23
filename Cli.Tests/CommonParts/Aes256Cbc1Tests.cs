@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
+using Cli.Tests.TestSupport;
 using Git.Taut;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -9,7 +10,7 @@ namespace Cli.Tests.CommonParts;
 
 public sealed partial class Aes256Cbc1Tests : IDisposable
 {
-    IHost _host = GitTautHostBuilder.BuildHost();
+    IHost _host;
 
     [AllowNull]
     Aes256Cbc1 _cihper;
@@ -31,8 +32,16 @@ Or else receivest with pleasure thine annoy?
         return [];
     }
 
-    public Aes256Cbc1Tests()
+    public void Dispose()
     {
+        _cihper = null;
+        _host.Dispose();
+    }
+
+    public Aes256Cbc1Tests(ITestOutputHelper testOutput)
+    {
+        _host = TestHostBuilder.BuildHost(testOutput);
+
         _cihper = _host.Services.GetRequiredService<Aes256Cbc1>();
 
         UserKeyHolder keyHolder = new();
@@ -42,18 +51,19 @@ Or else receivest with pleasure thine annoy?
         _cihper.Init(keyHolder);
     }
 
-    public void Dispose()
+    public class TestNotInitialized(ITestOutputHelper testOutput) : IDisposable
     {
-        _cihper = null;
-    }
+        IHost _host = TestHostBuilder.BuildHost(testOutput);
 
-    public class TestNotInitialized()
-    {
+        public void Dispose()
+        {
+            _host.Dispose();
+        }
+
         [Fact]
         public void NotInitialized()
         {
-            var host = GitTautHostBuilder.BuildHost();
-            var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
+            var cipher = _host.Services.GetRequiredService<Aes256Cbc1>();
             Assert.Throws<InvalidOperationException>(() => cipher.EnsureInitialized());
             Assert.Throws<InvalidOperationException>(() => cipher.GetCipherTextLength(100));
         }
@@ -61,8 +71,7 @@ Or else receivest with pleasure thine annoy?
         [Fact]
         public void InvalidInitialization()
         {
-            var host = GitTautHostBuilder.BuildHost();
-            var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
+            var cipher = _host.Services.GetRequiredService<Aes256Cbc1>();
 
             UserKeyHolder keyHolder = new();
 
@@ -82,14 +91,19 @@ Or else receivest with pleasure thine annoy?
         }
     }
 
-    public class TestNameEncryption
+    public class TestNameEncryption(ITestOutputHelper testOutput) : IDisposable
     {
+        IHost _host = TestHostBuilder.BuildHost(testOutput);
+
+        public void Dispose()
+        {
+            _host.Dispose();
+        }
+
         [Fact]
         public void EncryptDecrypt()
         {
-            using var host = GitTautHostBuilder.BuildHost();
-
-            var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
+            var cipher = _host.Services.GetRequiredService<Aes256Cbc1>();
 
             UserKeyHolder keyHolder = new();
             keyHolder.DeriveCrudeKey(GetUserPasswordData(), GetUserPasswordSalt());
@@ -112,9 +126,7 @@ Or else receivest with pleasure thine annoy?
         [Fact]
         public void EncryptDecrypt_InvalidCrc()
         {
-            using var host = GitTautHostBuilder.BuildHost();
-
-            var cipher = host.Services.GetRequiredService<Aes256Cbc1>();
+            var cipher = _host.Services.GetRequiredService<Aes256Cbc1>();
 
             UserKeyHolder keyHolder = new();
             keyHolder.DeriveCrudeKey(GetUserPasswordData(), GetUserPasswordSalt());

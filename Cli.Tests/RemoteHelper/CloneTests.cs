@@ -14,7 +14,7 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
 
     TestScene Scene => _planner.Scene;
 
-    TestScenePlanner _planner = new(GitTautHostBuilder.BuildHost());
+    TestScenePlanner _planner = new(TestHostBuilder.BuildHost(testOutput));
 
     public void Dispose()
     {

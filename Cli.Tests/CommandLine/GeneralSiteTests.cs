@@ -10,7 +10,7 @@ namespace Cli.Tests.CommandLine;
 [Collection("SetCurrentDirectory")]
 public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost _host = GitTautHostBuilder.BuildHost();
+    IHost _host = TestHostBuilder.BuildHost(testOutput);
 
     TestScene _scene = new();
 

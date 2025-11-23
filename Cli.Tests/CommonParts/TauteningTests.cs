@@ -7,35 +7,27 @@ using Microsoft.Extensions.Hosting;
 namespace Cli.Tests.CommonParts;
 
 [Collection("SetCurrentDirectory")]
-public class TauteningTests : IDisposable
+public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
 {
-    ITestOutputHelper _output;
-    IHost _host;
-
-    TestScene _scene;
-
-    public TauteningTests(ITestOutputHelper output)
-    {
-        _output = output;
-        _host = GitTautHostBuilder.BuildHost();
-
-        _scene = new TestScene();
-        _scene.SetupRepo0(_host);
-        _scene.SetupRepo1(_host);
-    }
+    IHost _host = TestHostBuilder.BuildHost(testOutput);
+    TestScene _scene = new TestScene();
 
     public void Dispose()
     {
         var tautSetup = _host.Services.GetRequiredService<TautSetup>();
         tautSetup.Dispose();
 
-        _scene.PreserveContentWhenFailed(_output);
+        _host.Dispose();
+        _scene.PreserveContentWhenFailed(testOutput);
         _scene.Dispose();
     }
 
     [Fact]
     public void CheckTautAttr()
     {
+        _scene.SetupRepo0(_host);
+        _scene.SetupRepo1(_host);
+
         Directory.SetCurrentDirectory(_scene.DirPath);
 
         var gitCli = _host.Services.GetRequiredService<GitCli>();
@@ -81,6 +73,9 @@ public class TauteningTests : IDisposable
     [Fact]
     public void TautenCommitIntoSame()
     {
+        _scene.SetupRepo0(_host);
+        _scene.SetupRepo1(_host);
+
         Directory.SetCurrentDirectory(_scene.DirPath);
 
         var gitCli = _host.Services.GetRequiredService<GitCli>();
@@ -121,6 +116,9 @@ public class TauteningTests : IDisposable
     [Fact]
     public void TautenCommitIntoDifferent()
     {
+        _scene.SetupRepo0(_host);
+        _scene.SetupRepo1(_host);
+
         Directory.SetCurrentDirectory(_scene.DirPath);
 
         var gitCli = _host.Services.GetRequiredService<GitCli>();

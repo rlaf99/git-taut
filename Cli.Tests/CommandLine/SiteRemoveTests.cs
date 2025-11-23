@@ -10,7 +10,7 @@ namespace Cli.Tests.CommandLine;
 [Collection("SetCurrentDirectory")]
 public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost _host = GitTautHostBuilder.BuildHost();
+    IHost _host = TestHostBuilder.BuildHost(testOutput);
 
     InvocationConfiguration _invCfg = new()
     {
