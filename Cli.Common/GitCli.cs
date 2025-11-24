@@ -114,7 +114,7 @@ class GitCli(ILogger<GitCli> logger)
 
     internal void Execute(
         Action<StreamWriter>? inputProvider,
-        Action<string>? dataReceiver,
+        Action<string>? outputDataReceiver,
         Action<string>? errorDataReceiver,
         params string[] args
     )
@@ -141,9 +141,9 @@ class GitCli(ILogger<GitCli> logger)
 
         void OutputDataReceiver(object sender, DataReceivedEventArgs args)
         {
-            if (args.Data is not null && dataReceiver is not null)
+            if (args.Data is not null && outputDataReceiver is not null)
             {
-                dataReceiver(args.Data);
+                outputDataReceiver(args.Data);
             }
         }
 

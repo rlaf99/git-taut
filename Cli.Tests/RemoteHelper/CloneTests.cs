@@ -1,28 +1,22 @@
 using Cli.Tests.TestSupport;
 using Git.Taut;
 using Lg2.Sharpy;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using static Cli.Tests.TestSupport.TestScenePlannerConstants;
+using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.RemoteHelper;
 
 [Collection("SetCurrentDirectory")]
 public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost Host => _planner.Host;
-
-    TestScene Scene => _planner.Scene;
-
-    TestScenePlanner _planner = new(TestHostBuilder.BuildHost(testOutput));
+    TestScenePlan _plan = new(testOutput);
 
     public void Dispose()
     {
-        _planner.PreserveContentWhenFailed(testOutput);
-        _planner.Dispose();
+        _plan.PreserveContentWhenFailed(testOutput);
+        _plan.Dispose();
     }
 
-    void UpdateContentAndPush(GitCli gitCli)
+    void UpdateContentAndPush()
     {
         string a_md = "a.md";
         string b_tt = "b.tt";
@@ -33,9 +27,9 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
         File.AppendAllText(a_md, a_md_content);
         File.AppendAllText(b_tt, b_tt_content);
 
-        gitCli.Run("add", "--all");
-        gitCli.Run("commit", "-m", $"{nameof(UpdateContentAndPush)}");
-        gitCli.Run("push");
+        _plan.RunGit("add", "--all");
+        _plan.RunGit("commit", "-m", $"{nameof(UpdateContentAndPush)}");
+        _plan.RunGit("push");
     }
 
     bool CompareBranch(Lg2Repository repo1, Lg2Repository repo2, string branch)
@@ -49,24 +43,22 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
     [Fact]
     public void CloneTautRepo0IntoRepo2()
     {
-        _planner.SetupRepo0();
-        _planner.SetupRepo1();
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
 
-        var gitCli = Host.Services.GetRequiredService<GitCli>();
-
-        Directory.SetCurrentDirectory(Scene.DirPath);
-        gitCli.Run("clone", "--origin", Repo0, $"taut::{Repo0}", Repo2);
+        Directory.SetCurrentDirectory(_plan.DirPath);
+        _plan.RunGit("clone", "--origin", Repo0, $"taut::{Repo0}", Repo2);
 
         Directory.SetCurrentDirectory(Repo2);
 
-        UpdateContentAndPush(gitCli);
+        UpdateContentAndPush();
 
         using var repo2 = Lg2Repository.New(".");
         using var repo2Config = repo2.GetConfigSnapshot();
         var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(repo2Config, Repo0);
 
         Directory.SetCurrentDirectory(Path.Join("..", Repo1));
-        gitCli.Run("pull");
+        _plan.RunGit("pull");
 
         Directory.SetCurrentDirectory("..");
         var repo0sitePath = GitRepoHelpers.GetTautSitePath(Repo2Git, repo0SiteName);
@@ -79,30 +71,28 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
     [Fact]
     public void CloneTautRepo0IntoRepo2_ViaHttp()
     {
-        _planner.SetupRepo0();
-        _planner.SetupRepo1();
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
 
-        using var repo0Http = _planner.ServeRepo0();
+        using var repo0Http = _plan.ServeRepo0();
 
         var repo0HttpUri = repo0Http.GetServingUri();
 
         testOutput.WriteLine($"Serving {Repo0} at {repo0HttpUri.AbsoluteUri}");
 
-        var gitCli = Host.Services.GetRequiredService<GitCli>();
-
-        Directory.SetCurrentDirectory(Scene.DirPath);
-        gitCli.Run("clone", "--origin", Repo0, $"taut::{repo0HttpUri.AbsoluteUri}", Repo2);
+        Directory.SetCurrentDirectory(_plan.DirPath);
+        _plan.RunGit("clone", "--origin", Repo0, $"taut::{repo0HttpUri.AbsoluteUri}", Repo2);
 
         Directory.SetCurrentDirectory(Repo2);
 
-        UpdateContentAndPush(gitCli);
+        UpdateContentAndPush();
 
         using var repo2 = Lg2Repository.New(".");
         using var repo2Config = repo2.GetConfigSnapshot();
         var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(repo2Config, Repo0);
 
         Directory.SetCurrentDirectory(Path.Join("..", Repo1));
-        gitCli.Run("pull");
+        _plan.RunGit("pull");
 
         Directory.SetCurrentDirectory("..");
         var repo0sitePath = GitRepoHelpers.GetTautSitePath(Repo2Git, repo0SiteName);
@@ -115,12 +105,10 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
     [Fact]
     public void CloneTautRepo0IntoRepo2_ViaSsh()
     {
-        _planner.SetupRepo0();
-        _planner.SetupRepo1();
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
 
-        var gitCli = Host.Services.GetRequiredService<GitCli>();
-
-        Directory.SetCurrentDirectory(Scene.DirPath);
+        Directory.SetCurrentDirectory(_plan.DirPath);
 
         using var repo0 = Lg2Repository.New(Repo0);
 
@@ -136,18 +124,18 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
 
         testOutput.WriteLine($"Clone from {tautRepo0Sshuri}");
 
-        gitCli.Run("clone", "--origin", Repo0, tautRepo0Sshuri, Repo2);
+        _plan.RunGit("clone", "--origin", Repo0, tautRepo0Sshuri, Repo2);
 
         Directory.SetCurrentDirectory(Repo2);
 
-        UpdateContentAndPush(gitCli);
+        UpdateContentAndPush();
 
         using var repo2 = Lg2Repository.New(".");
         using var repo2Config = repo2.GetConfigSnapshot();
         var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(repo2Config, Repo0);
 
         Directory.SetCurrentDirectory(Path.Join("..", Repo1));
-        gitCli.Run("pull");
+        _plan.RunGit("pull");
 
         Directory.SetCurrentDirectory("..");
         var repo0sitePath = GitRepoHelpers.GetTautSitePath(Repo2Git, repo0SiteName);
@@ -160,28 +148,26 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
     [Fact]
     public void CloneTautRepo0IntoRepo2_WithTags()
     {
-        _planner.SetupRepo0();
-        _planner.SetupRepo1();
-        _planner.ConfigRepo0WithTags();
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
+        _plan.ConfigRepo0WithTags();
 
-        var gitCli = Host.Services.GetRequiredService<GitCli>();
-
-        Directory.SetCurrentDirectory(Scene.DirPath);
-        gitCli.Run("clone", "--origin", Repo0, $"taut::{Repo0}", Repo2);
+        Directory.SetCurrentDirectory(_plan.DirPath);
+        _plan.RunGit("clone", "--origin", Repo0, $"taut::{Repo0}", Repo2);
 
         Directory.SetCurrentDirectory(Repo2);
 
-        UpdateContentAndPush(gitCli);
+        UpdateContentAndPush();
 
-        gitCli.Run("tag", "tag1", "HEAD");
-        gitCli.Run("push");
+        _plan.RunGit("tag", "tag1", "HEAD");
+        _plan.RunGit("push");
 
         using var repo2 = Lg2Repository.New(".");
         using var repo2Config = repo2.GetConfigSnapshot();
         var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(repo2Config, Repo0);
 
         Directory.SetCurrentDirectory(Path.Join("..", Repo1));
-        gitCli.Run("pull");
+        _plan.RunGit("pull");
 
         Directory.SetCurrentDirectory("..");
         var repo0sitePath = GitRepoHelpers.GetTautSitePath(Repo2Git, repo0SiteName);
@@ -194,22 +180,20 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
     [Fact]
     public void AddTautRepo0IntoRepo2()
     {
-        _planner.SetupRepo0();
-        _planner.SetupRepo1();
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
 
-        var gitCli = Host.Services.GetRequiredService<GitCli>();
-
-        Directory.SetCurrentDirectory(Scene.DirPath);
-        gitCli.Run("init", Repo2);
+        Directory.SetCurrentDirectory(_plan.DirPath);
+        _plan.RunGit("init", Repo2);
 
         Directory.SetCurrentDirectory(Repo2);
-        gitCli.Run("taut", "site", "add", Repo0, Path.Join("..", Repo0));
+        _plan.RunGit("taut", "site", "add", Repo0, Path.Join("..", Repo0));
 
         using var repo2 = Lg2Repository.New(".");
         using var repo2Config = repo2.GetConfigSnapshot();
         var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(repo2Config, Repo0);
 
-        gitCli.Run("pull", Repo0);
+        _plan.RunGit("pull", Repo0);
 
         Directory.SetCurrentDirectory("..");
 
@@ -223,14 +207,12 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
     [Fact]
     public void AddTautRepo1IntoRepo2_WithLinkToRepo0()
     {
-        _planner.SetupRepo0();
-        _planner.SetupRepo1();
-        _planner.SetupRepo2();
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
+        _plan.SetupRepo2();
 
-        var gitCli = Host.Services.GetRequiredService<GitCli>();
-
-        Directory.SetCurrentDirectory(Path.Join(Scene.DirPath, Repo2));
-        gitCli.Run(
+        Directory.SetCurrentDirectory(Path.Join(_plan.DirPath, Repo2));
+        _plan.RunGit(
             "taut",
             "site",
             "--target",

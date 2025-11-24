@@ -3,16 +3,16 @@ using Cli.Tests.TestSupport;
 using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Hosting;
-using static Cli.Tests.TestSupport.TestScenePlannerConstants;
+using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.CommandLine;
 
 [Collection("SetCurrentDirectory")]
 public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost _host = TestHostBuilder.BuildHost(testOutput);
+    IHost _host => _plan.Host;
 
-    TestScene _scene = new();
+    TestScenePlan _plan = new(testOutput);
 
     InvocationConfiguration _invCfg = new()
     {
@@ -22,22 +22,21 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
 
     public void Dispose()
     {
-        _host.Dispose();
-        _scene.PreserveContentWhenFailed(testOutput);
-        _scene.Dispose();
+        _plan.PreserveContentWhenFailed(testOutput);
+        _plan.Dispose();
     }
 
     [Fact]
     public void AddRepo1()
     {
-        _scene.SetupRepo0(_host);
-        _scene.SetupRepo1(_host);
-        _scene.SetupRepo2(_host);
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
+        _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_scene.DirPath, Repo2);
+        var repo2Path = Path.Join(_plan.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
-        ProgramCommandLine progCli = new(_host);
+        ProgramCommandLine progCli = new(_plan.Host);
 
         string[] cliArgs = ["site", "add", Repo1, Path.Join("..", Repo1)];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
@@ -55,14 +54,14 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
     [Fact]
     public void AddRepo1_RemoteNameExited()
     {
-        _scene.SetupRepo0(_host);
-        _scene.SetupRepo1(_host);
-        _scene.SetupRepo2(_host);
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
+        _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_scene.DirPath, Repo2);
+        var repo2Path = Path.Join(_plan.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
-        ProgramCommandLine progCli = new(_host);
+        ProgramCommandLine progCli = new(_plan.Host);
 
         var remoteNameToUse = Repo0;
         string[] cliArgs = ["site", "add", remoteNameToUse, Path.Join("..", Repo1)];
@@ -80,14 +79,14 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
     [Fact]
     public void AddRepo1_LinkRepo0_TargetNotExists()
     {
-        _scene.SetupRepo0(_host);
-        _scene.SetupRepo1(_host);
-        _scene.SetupRepo2(_host);
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
+        _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_scene.DirPath, Repo2);
+        var repo2Path = Path.Join(_plan.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
-        ProgramCommandLine progCli = new(_host);
+        ProgramCommandLine progCli = new(_plan.Host);
 
         string[] cliArgs = ["site", "add", Repo1, Path.Join("..", Repo1), "--link-existing"];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
@@ -105,14 +104,14 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
     [Fact]
     public void AddRepo1_LinkRepo0_TargetLinkedToOther()
     {
-        _scene.SetupRepo0(_host);
-        _scene.SetupRepo1(_host);
-        _scene.SetupRepo2(_host);
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
+        _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_scene.DirPath, Repo2);
+        var repo2Path = Path.Join(_plan.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
-        ProgramCommandLine progCli = new(_host);
+        ProgramCommandLine progCli = new(_plan.Host);
 
         {
             string[] targetOpt = ["--target", Repo0];
@@ -156,14 +155,14 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
     [Fact]
     public void AddRepo1_LinkRepo0()
     {
-        _scene.SetupRepo0(_host);
-        _scene.SetupRepo1(_host);
-        _scene.SetupRepo2(_host);
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
+        _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_scene.DirPath, Repo2);
+        var repo2Path = Path.Join(_plan.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
-        ProgramCommandLine progCli = new(_host);
+        ProgramCommandLine progCli = new(_plan.Host);
 
         string[] targetOpt = ["--target", Repo0];
 

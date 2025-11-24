@@ -1,38 +1,36 @@
-using System.Collections;
 using System.CommandLine;
 using Cli.Tests.TestSupport;
 using Git.Taut;
 using Microsoft.Extensions.Hosting;
-using static Cli.Tests.TestSupport.TestScenePlannerConstants;
+using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.CommandLine;
 
 [Collection("SetCurrentDirectory")]
 public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost _host = TestHostBuilder.BuildHost(testOutput);
+    IHost _host => _plan.Host;
 
-    TestScene _scene = new();
+    TestScenePlan _plan = new(testOutput);
 
     public void Dispose()
     {
-        _host.Dispose();
-        _scene.PreserveContentWhenFailed(testOutput);
-        _scene.Dispose();
+        _plan.PreserveContentWhenFailed(testOutput);
+        _plan.Dispose();
     }
 
     [Fact]
     public void InvalidHostRepository()
     {
-        _scene.SetupRepo0(_host);
+        _plan.SetupRepo0();
 
         const string dir0 = "dir0";
 
-        Directory.SetCurrentDirectory(_scene.DirPath);
+        Directory.SetCurrentDirectory(_plan.DirPath);
         Directory.CreateDirectory(dir0);
         Directory.SetCurrentDirectory(dir0);
 
-        ProgramCommandLine progCli = new(_host);
+        ProgramCommandLine progCli = new(_plan.Host);
 
         {
             string[] cliArgs = ["site", "add", Repo0, Path.Join("..", Repo0)];

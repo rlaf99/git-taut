@@ -1,17 +1,14 @@
 using System.CommandLine;
 using Cli.Tests.TestSupport;
 using Git.Taut;
-using Microsoft.Extensions.Hosting;
-using static Cli.Tests.TestSupport.TestScenePlannerConstants;
+using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.CommandLine;
 
 [Collection("SetCurrentDirectory")]
 public sealed class SiteRunTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost _host = TestHostBuilder.BuildHost(testOutput);
-
-    TestScene _scene = new();
+    TestScenePlan _plan = new(testOutput);
 
     InvocationConfiguration _invCfg = new()
     {
@@ -21,22 +18,21 @@ public sealed class SiteRunTests(ITestOutputHelper testOutput) : IDisposable
 
     public void Dispose()
     {
-        _host.Dispose();
-        _scene.PreserveContentWhenFailed(testOutput);
-        _scene.Dispose();
+        _plan.PreserveContentWhenFailed(testOutput);
+        _plan.Dispose();
     }
 
     [Fact]
     public void RunBranch()
     {
-        _scene.SetupRepo0(_host);
-        _scene.SetupRepo1(_host);
-        _scene.SetupRepo2(_host);
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
+        _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_scene.DirPath, Repo2);
+        var repo2Path = Path.Join(_plan.DirPath, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
-        ProgramCommandLine progCli = new(_host);
+        ProgramCommandLine progCli = new(_plan.Host);
 
         string[] cliArgs = ["site", "run", "branch"];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
