@@ -1,3 +1,4 @@
+using System.Reflection.Metadata.Ecma335;
 using System.Runtime.InteropServices;
 using Lg2.Native;
 using static Lg2.Native.LibGit2Exports;
@@ -115,6 +116,15 @@ unsafe partial class Lg2RepositoryExtensions
 
         return result;
     }
+
+    public static Lg2Reference LookupLocalBranch(this Lg2Repository repo, string branchName) =>
+        repo.LookupBranch(branchName, Lg2BranchType.LG2_BRANCH_LOCAL);
+
+    public static Lg2Reference LookupRemoteBranch(this Lg2Repository repo, string branchName) =>
+        repo.LookupBranch(branchName, Lg2BranchType.LG2_BRANCH_REMOTE);
+
+    public static Lg2Reference LookupAnyBranch(this Lg2Repository repo, string branchName) =>
+        repo.LookupBranch(branchName, Lg2BranchType.LG2_BRANCH_ALL);
 
     public static Lg2Reference LookupBranch(
         this Lg2Repository repo,

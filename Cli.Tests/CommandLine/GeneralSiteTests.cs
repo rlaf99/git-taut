@@ -26,7 +26,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
 
         const string dir0 = "dir0";
 
-        Directory.SetCurrentDirectory(_plan.DirPath);
+        Directory.SetCurrentDirectory(_plan.Location);
         Directory.CreateDirectory(dir0);
         Directory.SetCurrentDirectory(dir0);
 

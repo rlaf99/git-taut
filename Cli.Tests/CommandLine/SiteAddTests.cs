@@ -10,8 +10,6 @@ namespace Cli.Tests.CommandLine;
 [Collection("SetCurrentDirectory")]
 public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost _host => _plan.Host;
-
     TestScenePlan _plan = new(testOutput);
 
     InvocationConfiguration _invCfg = new()
@@ -33,7 +31,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.DirPath, Repo2);
+        var repo2Path = Path.Join(_plan.Location, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_plan.Host);
@@ -58,7 +56,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.DirPath, Repo2);
+        var repo2Path = Path.Join(_plan.Location, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_plan.Host);
@@ -83,7 +81,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.DirPath, Repo2);
+        var repo2Path = Path.Join(_plan.Location, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_plan.Host);
@@ -108,7 +106,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.DirPath, Repo2);
+        var repo2Path = Path.Join(_plan.Location, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_plan.Host);
@@ -159,7 +157,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.DirPath, Repo2);
+        var repo2Path = Path.Join(_plan.Location, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_plan.Host);

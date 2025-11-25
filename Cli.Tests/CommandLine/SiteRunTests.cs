@@ -29,7 +29,7 @@ public sealed class SiteRunTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.DirPath, Repo2);
+        var repo2Path = Path.Join(_plan.Location, Repo2);
         Directory.SetCurrentDirectory(repo2Path);
 
         ProgramCommandLine progCli = new(_plan.Host);

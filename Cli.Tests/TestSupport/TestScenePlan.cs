@@ -55,26 +55,49 @@ class TestScenePlan(ITestOutputHelper testOutput) : TestScene
 
         base.Dispose(disposing);
     }
+
+    internal void AddFile(string dirPath, string filename, string content)
+    {
+        var filePath = Path.Join(dirPath, filename);
+
+        File.WriteAllText(filePath, content);
+    }
+
+    string? _repo0Root;
+    string? _repo1Root;
+    string? _repo2Root;
+    string? _repo9Root;
+
+    internal string Repo0Root => _repo0Root ??= Path.Join(Location, Repo0);
+    internal string Repo1Root => _repo1Root ??= Path.Join(Location, Repo1);
+    internal string Repo2Root => _repo2Root ??= Path.Join(Location, Repo2);
+    internal string Repo9Root => _repo9Root ??= Path.Join(Location, Repo9);
+
+    string? _repo0GitDir;
+    string? _repo1GitDir;
+    string? _repo2GitDir;
+    string? _repo9GitDir;
+
+    internal string Repo0GitDir => _repo0GitDir ??= Path.Join(Location, Repo0);
+    internal string Repo1GitDir => _repo1GitDir ??= Path.Join(Location, Repo1, ".git");
+    internal string Repo2GitDir => _repo2GitDir ??= Path.Join(Location, Repo2, ".git");
+    internal string Repo9GitDir => _repo9GitDir ??= Path.Join(Location, Repo9, ".git");
 }
 
 static class TestScenePlanExtensions
 {
     public static void SetupRepo0(this TestScenePlan plan)
     {
-        using var pushDir = new PushDirectory(plan.DirPath);
-
-        plan.RunGit("init", "--bare", Repo0);
+        plan.RunGit("init", "--bare", plan.Repo0Root);
     }
 
     public static GitHttpBackend ServeRepo0(this TestScenePlan plan)
     {
-        var repo0Path = Path.Join(plan.DirPath, Repo0);
-
-        plan.RunGit("--git-dir", repo0Path, "config", "http.receivepack", "true");
+        plan.RunGit("-C", plan.Repo0Root, "config", "http.receivepack", "true");
 
         var loggerFactory = plan.Host.Services.GetRequiredService<ILoggerFactory>();
 
-        GitHttpBackend gitHttp = new(repo0Path, loggerFactory);
+        GitHttpBackend gitHttp = new(plan.Repo0Root, loggerFactory);
 
         gitHttp.Start();
 
@@ -83,23 +106,16 @@ static class TestScenePlanExtensions
 
     public static void ConfigRepo0WithTags(this TestScenePlan plan)
     {
-        using var pushDir = new PushDirectory(Path.Join(plan.DirPath, Repo0));
-
-        plan.RunGit("tag", "tag0", "HEAD");
+        plan.RunGit("-C", plan.Repo0Root, "tag", "tag0", "HEAD");
     }
 
     public static void SetupRepo1(this TestScenePlan plan)
     {
-        using var pushDir = new PushDirectory(plan.DirPath);
+        plan.RunGit("-C", plan.Location, "clone", Repo0, Repo1);
 
-        plan.RunGit("clone", "repo0", "repo1");
-
-        var repo1Path = Path.Join(plan.DirPath, "repo1");
-
-        Directory.SetCurrentDirectory(repo1Path);
-
-        File.WriteAllText("README", "repo1");
-        File.WriteAllText(
+        plan.AddFile(plan.Repo1Root, "README", "repo1");
+        plan.AddFile(
+            plan.Repo1Root,
             ".gitattributes",
             """
             *.tt taut
@@ -108,34 +124,26 @@ static class TestScenePlanExtensions
             """
         );
 
-        plan.RunGit("add", "--all");
-        plan.RunGit("commit", "-m", "repo1");
-        plan.RunGit("push");
+        plan.RunGit("-C", plan.Repo1Root, "add", "--all");
+        plan.RunGit("-C", plan.Repo1Root, "commit", "-m", "repo1");
+        plan.RunGit("-C", plan.Repo1Root, "push");
     }
 
     public static void SetupRepo2(this TestScenePlan plan)
     {
-        using var pushDir = new PushDirectory(plan.DirPath);
-
-        plan.RunGit("clone", "--origin", Repo0, "taut::repo0", Repo2);
+        plan.RunGit("-C", plan.Location, "clone", "--origin", Repo0, $"taut::{Repo0}", Repo2);
     }
 
     public static void ConfigRepo2AddingRepo1(this TestScenePlan plan)
     {
-        using var pushDir = new PushDirectory(plan.DirPath);
-
-        Directory.SetCurrentDirectory(Repo2);
-
-        plan.RunGit("taut", "site", "add", Repo1, Path.Join("..", Repo1));
+        plan.RunGit("-C", plan.Repo2Root, "taut", "site", "add", Repo1, Path.Join("..", Repo1));
     }
 
     public static void ConfigRepo2AddingRepo1WithLinkToRepo0(this TestScenePlan plan)
     {
-        using var pushDir = new PushDirectory(plan.DirPath);
-
-        Directory.SetCurrentDirectory(Repo2);
-
         plan.RunGit(
+            "-C",
+            plan.Repo2Root,
             "taut",
             "site",
             "--target",
@@ -149,8 +157,6 @@ static class TestScenePlanExtensions
 
     public static void SetupRepo9(this TestScenePlan plan)
     {
-        using var pushDir = new PushDirectory(plan.DirPath);
-
-        plan.RunGit("clone", Repo0, Repo9);
+        plan.RunGit("-C", plan.Location, "clone", Repo0, Repo9);
     }
 }

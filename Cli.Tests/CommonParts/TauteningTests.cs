@@ -28,7 +28,7 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo0();
         _plan.SetupRepo1();
 
-        Directory.SetCurrentDirectory(_plan.DirPath);
+        Directory.SetCurrentDirectory(_plan.Location);
 
         var gitCli = _host.Services.GetRequiredService<GitCli>();
 
@@ -76,7 +76,7 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo0();
         _plan.SetupRepo1();
 
-        Directory.SetCurrentDirectory(_plan.DirPath);
+        Directory.SetCurrentDirectory(_plan.Location);
 
         var gitCli = _host.Services.GetRequiredService<GitCli>();
 
@@ -119,7 +119,7 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo0();
         _plan.SetupRepo1();
 
-        Directory.SetCurrentDirectory(_plan.DirPath);
+        Directory.SetCurrentDirectory(_plan.Location);
 
         var gitCli = _host.Services.GetRequiredService<GitCli>();
 

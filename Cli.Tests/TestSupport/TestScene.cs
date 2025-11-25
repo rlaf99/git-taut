@@ -6,7 +6,7 @@ class TestScene : IDisposable
 
     readonly TempPath _path;
 
-    public string DirPath => _path.Value;
+    public string Location => _path.Value;
 
     public TestScene()
     {
@@ -25,7 +25,7 @@ class TestScene : IDisposable
             if (output is not null)
             {
                 var caseName = TestContext.Current.TestCase?.TestCaseDisplayName;
-                output.WriteLine($"Preserve '{DirPath}' for failed case {caseName}.");
+                output.WriteLine($"Preserve '{Location}' for failed case {caseName}.");
             }
         }
     }
@@ -37,7 +37,7 @@ class TestScene : IDisposable
         if (output is not null)
         {
             var caseName = TestContext.Current.TestCase?.TestCaseDisplayName;
-            output.WriteLine($"Preserve'{DirPath}' for case {caseName} as asked.");
+            output.WriteLine($"Preserve'{Location}' for case {caseName} as asked.");
         }
     }
 
