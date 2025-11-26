@@ -2,7 +2,6 @@ using System.CommandLine;
 using Cli.Tests.TestSupport;
 using Git.Taut;
 using Lg2.Sharpy;
-using Microsoft.Extensions.Hosting;
 using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.CommandLine;

@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 
 namespace Git.Taut;
 
-class GitHttpBackendCommandBuilder(ILoggerFactory loggerFactory) : CommandActionsBase
+class GitHttpBackendCommandBuilder(ILoggerFactory loggerFactory, CommandActionHelpers actionHelpers)
 {
     internal static Option<int> _portToListenOption = new("--port")
     {
@@ -22,7 +22,7 @@ class GitHttpBackendCommandBuilder(ILoggerFactory loggerFactory) : CommandAction
 
     internal async Task ServeHttpAsync(ParseResult parseResult, CancellationToken cancellation)
     {
-        using var hostRepo = LocateHostRepo();
+        using var hostRepo = actionHelpers.LocateHostRepo();
 
         int portNumber = parseResult.GetValue(_portToListenOption);
 

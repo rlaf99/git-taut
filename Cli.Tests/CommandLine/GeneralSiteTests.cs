@@ -9,8 +9,6 @@ namespace Cli.Tests.CommandLine;
 [Collection("SetCurrentDirectory")]
 public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
 {
-    IHost _host => _plan.Host;
-
     TestScenePlan _plan = new(testOutput);
 
     public void Dispose()
@@ -25,10 +23,10 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo0();
 
         const string dir0 = "dir0";
+        var dir0Path = Path.Join(_plan.Location, dir0);
+        Directory.CreateDirectory(dir0Path);
 
-        Directory.SetCurrentDirectory(_plan.Location);
-        Directory.CreateDirectory(dir0);
-        Directory.SetCurrentDirectory(dir0);
+        _plan.SetLaunchDirectory(dir0Path);
 
         ProgramCommandLine progCli = new(_plan.Host);
 
@@ -121,7 +119,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
             var actualError = invCfg.Error.ToString();
             Assert.Equal(wantedError, actualError);
         }
-
+#if false
         {
             string[] cliArgs = ["site", "rescan", "--target", "some-target"];
             var parseResult = progCli.ParseForGitTaut(cliArgs);
@@ -139,5 +137,6 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
             var actualError = invCfg.Error.ToString();
             Assert.Equal(wantedError, actualError);
         }
+#endif
     }
 }

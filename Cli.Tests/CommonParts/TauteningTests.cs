@@ -3,6 +3,7 @@ using Git.Taut;
 using Lg2.Sharpy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.CommonParts;
 
@@ -28,15 +29,9 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo0();
         _plan.SetupRepo1();
 
-        Directory.SetCurrentDirectory(_plan.Location);
+        _plan.RunGit("-C", _plan.Location, "clone", $"taut::{Repo0}", Repo2);
 
-        var gitCli = _host.Services.GetRequiredService<GitCli>();
-
-        gitCli.Run("clone", "taut::repo0", "repo2");
-
-        Directory.SetCurrentDirectory("repo2");
-
-        var repo2 = Lg2Repository.New(".");
+        using var repo2 = Lg2Repository.New(_plan.Repo2Root);
 
         var repo2Head = repo2.GetHead();
 
@@ -76,23 +71,17 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo0();
         _plan.SetupRepo1();
 
-        Directory.SetCurrentDirectory(_plan.Location);
+        _plan.RunGit("-C", _plan.Location, "clone", $"taut::{Repo0}", Repo2);
 
-        var gitCli = _host.Services.GetRequiredService<GitCli>();
-
-        gitCli.Run("clone", "taut::repo0", "repo2");
-
-        var hostRepo = Lg2Repository.New("repo2");
-
-        Directory.SetCurrentDirectory("repo2");
+        using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
 
         string a_md = "a.md";
         string a_md_content = "Not encrypted";
 
-        File.AppendAllText(a_md, a_md_content);
+        _plan.AddFile(_plan.Repo2Root, a_md, a_md_content);
 
-        gitCli.Run("add", "--all");
-        gitCli.Run("commit", "-m", a_md);
+        _plan.RunGit("-C", _plan.Repo2Root, "add", "--all");
+        _plan.RunGit("-C", _plan.Repo2Root, "commit", "-m", a_md);
 
         var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
@@ -119,23 +108,17 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo0();
         _plan.SetupRepo1();
 
-        Directory.SetCurrentDirectory(_plan.Location);
+        _plan.RunGit("-C", _plan.Location, "clone", $"taut::{Repo0}", Repo2);
 
-        var gitCli = _host.Services.GetRequiredService<GitCli>();
-
-        gitCli.Run("clone", "taut::repo0", "repo2");
-
-        var hostRepo = Lg2Repository.New("repo2");
-
-        Directory.SetCurrentDirectory("repo2");
+        using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
 
         string a_tt = "a.tt";
         string a_tt_content = "Encrypted";
 
-        File.AppendAllText(a_tt, a_tt_content);
+        _plan.AddFile(_plan.Repo2Root, a_tt, a_tt_content);
 
-        gitCli.Run("add", "--all");
-        gitCli.Run("commit", "-m", a_tt);
+        _plan.RunGit("-C", _plan.Repo2Root, "add", "--all");
+        _plan.RunGit("-C", _plan.Repo2Root, "commit", "-m", a_tt);
 
         var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 

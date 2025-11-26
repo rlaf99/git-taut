@@ -55,13 +55,14 @@ static class HostApplicationBuilderExtensions
 
     internal static void AddGitTautCommandActions(this HostApplicationBuilder builder)
     {
-        builder.Services.AddSingleton<GitRemoteHelper>();
+        builder.Services.AddSingleton<CommandActionHelpers>();
         builder.Services.AddSingleton<SiteCommandActions>();
         builder.Services.AddSingleton<OtherCommandActions>();
     }
 
     internal static void AddGitRemoteTautCommandActions(this HostApplicationBuilder builder)
     {
+        builder.Services.AddSingleton<CommandActionHelpers>();
         builder.Services.AddSingleton<GitRemoteHelper>();
     }
 
@@ -133,7 +134,7 @@ static class HostApplicationBuilderExtensions
     }
 }
 
-class CommandActionsBase
+class CommandActionHelpers
 {
     internal record ResolveTargetOptionResult(
         string SiteName,
@@ -243,31 +244,16 @@ class CommandActionsBase
             return Lg2Repository.New(gitDir);
         }
 
-        var currentDir = Directory.GetCurrentDirectory();
+        var launchDir = LaunchDirectory ?? Directory.GetCurrentDirectory();
+
         var ceilingDirs = KnownEnvironVars.GetGitCeilingDirectories();
 
-        if (Lg2TryDiscoverRepository(currentDir, out var hostRepo, ceilingDirs) == false)
+        if (Lg2TryDiscoverRepository(launchDir, out var hostRepo, ceilingDirs) == false)
         {
             throw new InvalidOperationException($"Not inside a git repository");
         }
 
         return hostRepo;
-    }
-
-    internal Lg2Repository OpenTautRepo(string repoPath)
-    {
-        try
-        {
-            var tautRepo = Lg2Repository.New(repoPath);
-
-            return tautRepo;
-        }
-        catch (Exception)
-        {
-            Console.Error.WriteLine($"Cannot open taut repo at path '{repoPath}'");
-
-            throw new OperationCanceledException();
-        }
     }
 
     internal string ResolveLocalUrl(string remoteAddress)
@@ -295,17 +281,7 @@ class CommandActionsBase
         return remoteUrl;
     }
 
-    internal Lg2Repository LocateTautRepo()
-    {
-        var currentDir = Directory.GetCurrentDirectory();
-
-        var hostRepo = LocateHostRepo();
-
-        var tautRepoFullPath = GitRepoHelpers.GetTautHomePath(hostRepo.GetPath());
-        var tautRepoRelPath = Path.GetRelativePath(currentDir, tautRepoFullPath);
-
-        return OpenTautRepo(tautRepoRelPath);
-    }
+    internal string? LaunchDirectory { get; set; }
 }
 
 class SiteCommandActions(
@@ -314,17 +290,18 @@ class SiteCommandActions(
     TautSetup tautSetup,
     TautManager tautManager,
     TautMapping tautMapping,
-    Aes256Cbc1 cipher
-) : CommandActionsBase
+    Aes256Cbc1 cipher,
+    CommandActionHelpers actionHelpers
+)
 {
     internal void Run(ParseResult parseResult)
     {
         var cmdName = parseResult.GetRequiredValue(ProgramCommandLine.CommandNameArgument);
         var cmdArgs = parseResult.GetValue(ProgramCommandLine.CommandArgsArgument) ?? [];
 
-        var hostRepo = LocateHostRepo();
+        var hostRepo = actionHelpers.LocateHostRepo();
 
-        var result = ResolveTargetOption(parseResult, hostRepo, followHead: true);
+        var result = actionHelpers.ResolveTargetOption(parseResult, hostRepo, followHead: true);
 
         tautSetup.GearUpExisting(hostRepo, remoteName: null, result.SiteName);
 
@@ -376,7 +353,7 @@ class SiteCommandActions(
 
         var linkExisting = parseResult.GetValue(ProgramCommandLine.LinkExistingOption);
 
-        var hostRepo = LocateHostRepo();
+        var hostRepo = actionHelpers.LocateHostRepo();
 
         if (hostRepo.TryLookupRemote(remoteName, out _))
         {
@@ -388,7 +365,11 @@ class SiteCommandActions(
         string? targetSite = null;
         if (parseResult.GetValue(ProgramCommandLine.SiteTargetOption) is not null)
         {
-            var result = ResolveTargetOption(parseResult, hostRepo, followHead: false);
+            var result = actionHelpers.ResolveTargetOption(
+                parseResult,
+                hostRepo,
+                followHead: false
+            );
             targetSite = result.SiteName;
         }
 
@@ -412,7 +393,7 @@ class SiteCommandActions(
             }
         }
 
-        string remoteUrl = ResolveLocalUrl(remoteAddress);
+        string remoteUrl = actionHelpers.ResolveLocalUrl(remoteAddress);
 
         tautSetup.GearUpBrandNew(hostRepo, remoteName, remoteUrl, targetSite);
 
@@ -423,13 +404,17 @@ class SiteCommandActions(
 
     internal void List(ParseResult parseResult)
     {
-        var hostRepo = LocateHostRepo();
+        var hostRepo = actionHelpers.LocateHostRepo();
 
         string? tautSiteName = null;
 
         if (parseResult.GetValue(ProgramCommandLine.SiteTargetOption) is not null)
         {
-            var result = ResolveTargetOption(parseResult, hostRepo, followHead: false);
+            var result = actionHelpers.ResolveTargetOption(
+                parseResult,
+                hostRepo,
+                followHead: false
+            );
             tautSiteName = result.SiteName;
         }
 
@@ -443,9 +428,13 @@ class SiteCommandActions(
 
     internal void Remove(ParseResult parseResult)
     {
-        var hostRepo = LocateHostRepo();
+        var hostRepo = actionHelpers.LocateHostRepo();
 
-        var resolvedTarget = ResolveTargetOption(parseResult, hostRepo, followHead: false);
+        var resolvedTarget = actionHelpers.ResolveTargetOption(
+            parseResult,
+            hostRepo,
+            followHead: false
+        );
         var tautSiteName = resolvedTarget.SiteName;
 
         using (var config = hostRepo.GetConfig())
@@ -490,9 +479,9 @@ class SiteCommandActions(
     {
         var path = parseResult.GetRequiredValue(ProgramCommandLine.PathArgument);
 
-        var hostRepo = LocateHostRepo();
+        var hostRepo = actionHelpers.LocateHostRepo();
 
-        var result = ResolveTargetOption(parseResult, hostRepo, followHead: true);
+        var result = actionHelpers.ResolveTargetOption(parseResult, hostRepo, followHead: true);
 
         tautSetup.GearUpExisting(hostRepo, null, result.SiteName);
 
@@ -559,8 +548,12 @@ class SiteCommandActions(
 
     internal void Rescan(ParseResult parseResult)
     {
-        var hostRepo = LocateHostRepo();
-        var tautSiteName = ResolveTargetOption(parseResult, hostRepo, followHead: false);
+        var hostRepo = actionHelpers.LocateHostRepo();
+        var tautSiteName = actionHelpers.ResolveTargetOption(
+            parseResult,
+            hostRepo,
+            followHead: false
+        );
 
         throw new NotImplementedException();
         // using (var tautRepo = LocateTautRepo())
@@ -572,7 +565,7 @@ class SiteCommandActions(
     }
 }
 
-class OtherCommandActions(ILogger<OtherCommandActions> logger) : CommandActionsBase
+class OtherCommandActions(ILogger<OtherCommandActions> logger)
 {
     internal void ShowInternal(ParseResult parseResult)
     {
@@ -663,7 +656,7 @@ internal class ProgramCommandLine(IHost host)
         siteCommand.Subcommands.Add(CreateCommandSiteList());
         siteCommand.Subcommands.Add(CreateCommandSiteRemove());
         siteCommand.Subcommands.Add(CreateCommandSiteReveal());
-        siteCommand.Subcommands.Add(CreateCommandSiteRescan());
+        // siteCommand.Subcommands.Add(CreateCommandSiteRescan());
 
         rootCommand.Subcommands.Add(siteCommand);
         rootCommand.Subcommands.Add(CreateCommandShowInternal());

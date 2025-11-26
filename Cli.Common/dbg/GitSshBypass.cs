@@ -5,7 +5,7 @@ using ZLogger;
 
 namespace Git.Taut;
 
-class GitSshBypassCommandBuilder(ILoggerFactory loggerFactory, GitCli gitCli) : CommandActionsBase
+class GitSshBypassCommandBuilder(ILoggerFactory loggerFactory, GitCli gitCli)
 {
     internal static Option<string> _optionOption = new("--option", "-o"); // { Arity = ArgumentArity.ZeroOrMore };
     internal static Argument<string> _addressArgument = new("address");

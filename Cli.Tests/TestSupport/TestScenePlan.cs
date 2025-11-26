@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Git.Taut;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -86,6 +87,13 @@ class TestScenePlan(ITestOutputHelper testOutput) : TestScene
 
 static class TestScenePlanExtensions
 {
+    public static void SetLaunchDirectory(this TestScenePlan plan, string? dirPath)
+    {
+        var actionHelpers = plan.Host.Services.GetRequiredService<CommandActionHelpers>();
+
+        actionHelpers.LaunchDirectory = dirPath;
+    }
+
     public static void SetupRepo0(this TestScenePlan plan)
     {
         plan.RunGit("init", "--bare", plan.Repo0Root);
