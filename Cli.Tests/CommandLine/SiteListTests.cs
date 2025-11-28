@@ -6,7 +6,6 @@ using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.CommandLine;
 
-[Collection("SetCurrentDirectory")]
 public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
 {
     TestScenePlan _plan = new(testOutput);
@@ -31,8 +30,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo2();
         _plan.ConfigRepo2AddingRepo1();
 
-        var repo2Path = Path.Join(_plan.Location, Repo2);
-        Directory.SetCurrentDirectory(repo2Path);
+        _plan.SetLaunchDirectory(_plan.Repo2Root);
 
         ProgramCommandLine progCli = new(_plan.Host);
 
@@ -42,7 +40,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
 
-        using var hostRepo = Lg2Repository.New(".");
+        using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
         using var hostConfig = hostRepo.GetConfigSnapshot();
 
         var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
@@ -66,8 +64,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo2();
         _plan.ConfigRepo2AddingRepo1();
 
-        var repo2Path = Path.Join(_plan.Location, Repo2);
-        Directory.SetCurrentDirectory(repo2Path);
+        _plan.SetLaunchDirectory(_plan.Repo2Root);
 
         ProgramCommandLine progCli = new(_plan.Host);
 
@@ -78,7 +75,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
 
-        using var hostRepo = Lg2Repository.New(".");
+        using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
         using var hostConfig = hostRepo.GetConfigSnapshot();
 
         var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
@@ -97,8 +94,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.Location, Repo2);
-        Directory.SetCurrentDirectory(repo2Path);
+        _plan.SetLaunchDirectory(_plan.Repo2Root);
 
         ProgramCommandLine progCli = new(_plan.Host);
 

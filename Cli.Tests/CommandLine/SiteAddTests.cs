@@ -6,7 +6,6 @@ using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.CommandLine;
 
-[Collection("SetCurrentDirectory")]
 public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
 {
     TestScenePlan _plan = new(testOutput);
@@ -30,17 +29,16 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.Location, Repo2);
-        Directory.SetCurrentDirectory(repo2Path);
+        _plan.SetLaunchDirectory(_plan.Repo2Root);
 
         ProgramCommandLine progCli = new(_plan.Host);
 
-        string[] cliArgs = ["site", "add", Repo1, Path.Join("..", Repo1)];
+        string[] cliArgs = ["site", "add", Repo1, _plan.Repo1Root];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
 
-        using var hostRepo = Lg2Repository.New(".");
+        using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
         using var hostConfig = hostRepo.GetConfigSnapshot();
 
         Assert.True(TautSiteConfig.TryLoadByRemoteName(hostConfig, Repo1, out var repo1SiteConfig));
@@ -55,13 +53,12 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.Location, Repo2);
-        Directory.SetCurrentDirectory(repo2Path);
+        _plan.SetLaunchDirectory(_plan.Repo2Root);
 
         ProgramCommandLine progCli = new(_plan.Host);
 
         var remoteNameToUse = Repo0;
-        string[] cliArgs = ["site", "add", remoteNameToUse, Path.Join("..", Repo1)];
+        string[] cliArgs = ["site", "add", remoteNameToUse, _plan.Repo1Root];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(1, exitCode);
@@ -80,12 +77,11 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.Location, Repo2);
-        Directory.SetCurrentDirectory(repo2Path);
+        _plan.SetLaunchDirectory(_plan.Repo2Root);
 
         ProgramCommandLine progCli = new(_plan.Host);
 
-        string[] cliArgs = ["site", "add", Repo1, Path.Join("..", Repo1), "--link-existing"];
+        string[] cliArgs = ["site", "add", Repo1, _plan.Repo1Root, "--link-existing"];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(1, exitCode);
@@ -105,8 +101,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.Location, Repo2);
-        Directory.SetCurrentDirectory(repo2Path);
+        _plan.SetLaunchDirectory(_plan.Repo2Root);
 
         ProgramCommandLine progCli = new(_plan.Host);
 
@@ -118,7 +113,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
                 .. targetOpt,
                 "add",
                 Repo1,
-                Path.Join("..", Repo1),
+                _plan.Repo1Root,
                 "--link-existing",
             ];
             var parseResult = progCli.ParseForGitTaut(cliArgs);
@@ -135,7 +130,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
                 .. targetOpt,
                 "add",
                 Repo1 + "_again",
-                Path.Join("..", Repo1),
+                _plan.Repo1Root,
                 "--link-existing",
             ];
             var parseResult = progCli.ParseForGitTaut(cliArgs);
@@ -156,22 +151,13 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.Location, Repo2);
-        Directory.SetCurrentDirectory(repo2Path);
+        _plan.SetLaunchDirectory(_plan.Repo2Root);
 
         ProgramCommandLine progCli = new(_plan.Host);
 
         string[] targetOpt = ["--target", Repo0];
 
-        string[] cliArgs =
-        [
-            "site",
-            .. targetOpt,
-            "add",
-            Repo1,
-            Path.Join("..", Repo1),
-            "--link-existing",
-        ];
+        string[] cliArgs = ["site", .. targetOpt, "add", Repo1, _plan.Repo1Root, "--link-existing"];
 
         var parseResult = progCli.ParseForGitTaut(cliArgs);
 
@@ -180,7 +166,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
 
         testOutput.DumpError(_invCfg);
 
-        using var hostRepo = Lg2Repository.New(".");
+        using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
         using var hostConfig = hostRepo.GetConfigSnapshot();
 
         var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);

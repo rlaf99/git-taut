@@ -1,11 +1,9 @@
 using System.CommandLine;
 using Cli.Tests.TestSupport;
 using Git.Taut;
-using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.CommandLine;
 
-[Collection("SetCurrentDirectory")]
 public sealed class SiteRunTests(ITestOutputHelper testOutput) : IDisposable
 {
     TestScenePlan _plan = new(testOutput);

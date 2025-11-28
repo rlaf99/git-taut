@@ -2,12 +2,10 @@ using System.CommandLine;
 using Cli.Tests.TestSupport;
 using Git.Taut;
 using Lg2.Sharpy;
-using Microsoft.Extensions.Hosting;
 using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.CommandLine;
 
-[Collection("SetCurrentDirectory")]
 public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
 {
     InvocationConfiguration _invCfg = new()
@@ -32,8 +30,7 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.Location, Repo2);
-        Directory.SetCurrentDirectory(repo2Path);
+        _plan.SetLaunchDirectory(_plan.Repo2Root);
 
         ProgramCommandLine progCli = new(_plan.Host);
 
@@ -58,13 +55,12 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo1();
         _plan.SetupRepo2();
 
-        var repo2Path = Path.Join(_plan.Location, Repo2);
-        Directory.SetCurrentDirectory(repo2Path);
-
-        using var hostRepo = Lg2Repository.New(".");
+        using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
         using var hostConfig = hostRepo.GetConfig();
 
         var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
+
+        _plan.SetLaunchDirectory(_plan.Repo2Root);
 
         ProgramCommandLine progCli = new(_plan.Host);
 
@@ -89,14 +85,13 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo2();
         _plan.ConfigRepo2AddingRepo1WithLinkToRepo0();
 
-        var repo2Path = Path.Join(_plan.Location, Repo2);
-        Directory.SetCurrentDirectory(repo2Path);
-
-        using var hostRepo = Lg2Repository.New(".");
+        using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
         using var hostConfig = hostRepo.GetConfig();
 
         var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
         var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo1);
+
+        _plan.SetLaunchDirectory(_plan.Repo2Root);
 
         ProgramCommandLine progCli = new(_plan.Host);
 
@@ -123,13 +118,12 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo2();
         _plan.ConfigRepo2AddingRepo1WithLinkToRepo0();
 
-        var repo2Path = Path.Join(_plan.Location, Repo2);
-        Directory.SetCurrentDirectory(repo2Path);
-
-        using var hostRepo = Lg2Repository.New(".");
+        using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
         using var hostConfig = hostRepo.GetConfig();
 
         var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo1);
+
+        _plan.SetLaunchDirectory(_plan.Repo2Root);
 
         ProgramCommandLine progCli = new(_plan.Host);
 

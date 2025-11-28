@@ -467,7 +467,11 @@ class SiteCommandActions(
             GitRepoHelpers.DeleteGitDir(tautSitePath);
         }
 
+        var launchDir = actionHelpers.LaunchDirectory ?? Directory.GetCurrentDirectory();
+
         gitCli.Execute(
+            "-C",
+            launchDir,
             "config",
             "remove-section",
             "--local",

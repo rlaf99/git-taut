@@ -5,7 +5,6 @@ using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.RemoteHelper;
 
-[Collection("SetCurrentDirectory")]
 public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
 {
     TestScenePlan _plan = new(testOutput);

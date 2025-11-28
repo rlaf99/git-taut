@@ -7,7 +7,6 @@ using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.CommonParts;
 
-[Collection("SetCurrentDirectory")]
 public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
 {
     IHost _host => _plan.Host;
