@@ -41,16 +41,16 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
 
     void AssertSiteHeadRef(Lg2Repository repo)
     {
-        var headRef = repo.GetHead();
+        var headRef = repo.LookupRef(GitRepoHelpers.HEAD);
         var headRefName = headRef.GetName();
         var headRefType = headRef.GetRefType();
 
-        Assert.Equal("HEAD", headRefName);
+        Assert.Equal(GitRepoHelpers.HEAD, headRefName);
 
         Assert.True(headRefType.IsSymbolic());
 
         var symTarget = headRef.GetSymbolicTarget();
-        Assert.Equal("refs/heads/master", symTarget);
+        Assert.Equal(GitRefSpecs.RefsHeadsMaster, symTarget);
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
         using var repo0Base = Lg2Repository.New(_plan.Repo0Root);
 
         AssertSameBranchId(repo0Base, repo2SiteRepo0, "master");
-        // AssertSiteHeadRef(repo2SiteRepo0);
+        AssertSiteHeadRef(repo2SiteRepo0);
     }
 
     [Fact]
@@ -112,6 +112,7 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
         using var repo0Base = Lg2Repository.New(_plan.Repo0Root);
 
         AssertSameBranchId(repo0Base, repo2SiteRepo0, "master");
+        AssertSiteHeadRef(repo2SiteRepo0);
     }
 
     [Fact]
@@ -143,10 +144,11 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
         _plan.RunGit("-C", _plan.Repo1Root, "pull");
 
         var repo2SiteRepo0Root = GitRepoHelpers.GetTautSitePath(_plan.Repo2GitDir, repo0SiteName);
-        using var repo0Site = Lg2Repository.New(repo2SiteRepo0Root);
+        using var repo2SiteRepo0 = Lg2Repository.New(repo2SiteRepo0Root);
         using var repo0Base = Lg2Repository.New(_plan.Repo0Root);
 
-        AssertSameBranchId(repo0Base, repo0Site, "master");
+        AssertSameBranchId(repo0Base, repo2SiteRepo0, "master");
+        AssertSiteHeadRef(repo2SiteRepo0);
     }
 
     [Fact]
@@ -169,11 +171,12 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
 
         _plan.RunGit("-C", _plan.Repo1Root, "pull");
 
-        var repo0sitePath = GitRepoHelpers.GetTautSitePath(_plan.Repo2GitDir, repo0SiteName);
-        using var repo0Site = Lg2Repository.New(repo0sitePath);
+        var repo2SiteRepo0Root = GitRepoHelpers.GetTautSitePath(_plan.Repo2GitDir, repo0SiteName);
+        using var repo2SiteRepo0 = Lg2Repository.New(repo2SiteRepo0Root);
         using var repo0Base = Lg2Repository.New(_plan.Repo0Root);
 
-        AssertSameBranchId(repo0Base, repo0Site, "master");
+        AssertSameBranchId(repo0Base, repo2SiteRepo0, "master");
+        AssertSiteHeadRef(repo2SiteRepo0);
     }
 
     [Fact]
@@ -192,11 +195,12 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
 
         _plan.RunGit("-C", _plan.Repo2Root, "pull", Repo0);
 
-        var repo0sitePath = GitRepoHelpers.GetTautSitePath(_plan.Repo2GitDir, repo0SiteName);
-        using var repo0Site = Lg2Repository.New(repo0sitePath);
+        var repo2SiteRepo0Root = GitRepoHelpers.GetTautSitePath(_plan.Repo2GitDir, repo0SiteName);
+        using var repo2SiteRepo0 = Lg2Repository.New(repo2SiteRepo0Root);
         using var repo0Base = Lg2Repository.New(_plan.Repo0Root);
 
-        AssertSameBranchId(repo0Base, repo0Site, "master");
+        AssertSameBranchId(repo0Base, repo2SiteRepo0, "master");
+        AssertSiteHeadRef(repo2SiteRepo0);
     }
 
     [Fact]
@@ -231,5 +235,6 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
         using var repo1Base = Lg2Repository.New(_plan.Repo1Root);
 
         AssertSameBranchId(repo1Base, repo2SiteRepo1, "master");
+        AssertSiteHeadRef(repo2SiteRepo1);
     }
 }

@@ -341,14 +341,27 @@ unsafe partial class Lg2RepositoryExtensions
         return new(pRef);
     }
 
-    public static Lg2Reference LookupRef(this Lg2Repository repo, string refName)
+    public static Lg2Reference LookupRef(
+        this Lg2Repository repo,
+        string refName,
+        bool shorthand = false
+    )
     {
         repo.EnsureValid();
 
         using var u8RefName = new Lg2Utf8String(refName);
         git_reference* ptr = null;
-        var rc = git_reference_lookup(&ptr, repo.Ptr, u8RefName.Ptr);
-        Lg2Exception.ThrowIfNotOk(rc);
+
+        if (shorthand)
+        {
+            var rc = git_reference_dwim(&ptr, repo.Ptr, u8RefName.Ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
+        else
+        {
+            var rc = git_reference_lookup(&ptr, repo.Ptr, u8RefName.Ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+        }
 
         return new(ptr);
     }
@@ -356,14 +369,24 @@ unsafe partial class Lg2RepositoryExtensions
     public static bool TryLookupRef(
         this Lg2Repository repo,
         string refName,
-        out Lg2Reference reference
+        out Lg2Reference reference,
+        bool shorthand = false
     )
     {
         repo.EnsureValid();
 
         using var u8RefName = new Lg2Utf8String(refName);
+
         git_reference* ptr = null;
-        var rc = git_reference_lookup(&ptr, repo.Ptr, u8RefName.Ptr);
+        var rc = (int)GIT_ERROR;
+        if (shorthand)
+        {
+            rc = git_reference_dwim(&ptr, repo.Ptr, u8RefName.Ptr);
+        }
+        else
+        {
+            rc = git_reference_lookup(&ptr, repo.Ptr, u8RefName.Ptr);
+        }
 
         if (rc != 0)
         {
@@ -378,30 +401,6 @@ unsafe partial class Lg2RepositoryExtensions
         else
         {
             reference = new Lg2Reference(ptr);
-            return true;
-        }
-    }
-
-    public static bool TryObtainRef(
-        this Lg2Repository repo,
-        string shorthand,
-        out Lg2Reference reference
-    )
-    {
-        repo.EnsureValid();
-
-        using var u8Shorthand = new Lg2Utf8String(shorthand);
-        git_reference* pRef = null;
-        var rc = git_reference_dwim(&pRef, repo.Ptr, u8Shorthand.Ptr);
-
-        if (rc != (int)GIT_OK)
-        {
-            reference = new Lg2Reference(default);
-            return false;
-        }
-        else
-        {
-            reference = new Lg2Reference(pRef);
             return true;
         }
     }

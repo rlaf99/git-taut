@@ -432,4 +432,15 @@ class TautSiteConfig
             $"Taut site name is not found for remote '{remoteName}'"
         );
     }
+
+    internal static Lg2Repository OpenSiteForRemote(Lg2Repository hostRepo, string remoteName)
+    {
+        using var hostConfig = hostRepo.GetConfigSnapshot();
+        var siteName = FindSiteNameForRemote(hostConfig, remoteName);
+        var sitePath = GitRepoHelpers.GetTautSitePath(hostRepo.GetPath(), siteName);
+
+        var result = Lg2Repository.New(sitePath);
+
+        return result;
+    }
 }

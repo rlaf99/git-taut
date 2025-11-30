@@ -1,4 +1,3 @@
-using System.CommandLine;
 using Git.Taut;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -15,29 +14,25 @@ static class TestScenePlanConstants
     internal const string Repo3 = "repo3";
     internal const string Repo9 = "repo9";
 
-    internal static readonly string Repo0Git = Path.Join(Repo0, ".git");
-    internal static readonly string Repo1Git = Path.Join(Repo1, ".git");
-    internal static readonly string Repo2Git = Path.Join(Repo2, ".git");
-    internal static readonly string Repo3Git = Path.Join(Repo3, ".git");
-    internal static readonly string Repo9Git = Path.Join(Repo9, ".git");
+    internal static readonly string Repo0Git = Path.Join(Repo0, GitRepoHelpers.DotGit);
+    internal static readonly string Repo1Git = Path.Join(Repo1, GitRepoHelpers.DotGit);
+    internal static readonly string Repo2Git = Path.Join(Repo2, GitRepoHelpers.DotGit);
+    internal static readonly string Repo3Git = Path.Join(Repo3, GitRepoHelpers.DotGit);
+    internal static readonly string Repo9Git = Path.Join(Repo9, GitRepoHelpers.DotGit);
+
+    internal const string Master = "master";
+    internal const string Branch1 = "branch1";
+    internal const string Branch2 = "branch2";
+    internal const string Tag1 = "tag1";
+    internal const string Tag2 = "tag2";
+    internal const string AnnotatedTag1 = "annotated-tag1";
+    internal const string AnnotatedTag2 = "annotated-tag2";
 }
 
 class TestScenePlan(ITestOutputHelper testOutput) : TestScene
 {
     readonly IHost _host = TestHostBuilder.BuildHost(testOutput);
     internal IHost Host => _host;
-
-    internal void RunGit(params string[] args)
-    {
-        var gitCli = _host.Services.GetRequiredService<GitCli>();
-
-        gitCli.Execute(
-            inputProvider: null,
-            outputDataReceiver: line => testOutput.WriteLine(line),
-            errorDataReceiver: line => testOutput.WriteLine(line),
-            args
-        );
-    }
 
     bool _disposed;
 
@@ -55,6 +50,18 @@ class TestScenePlan(ITestOutputHelper testOutput) : TestScene
         }
 
         base.Dispose(disposing);
+    }
+
+    internal void RunGit(params string[] args)
+    {
+        var gitCli = _host.Services.GetRequiredService<GitCli>();
+
+        gitCli.Execute(
+            inputProvider: null,
+            outputDataReceiver: line => testOutput.WriteLine(line),
+            errorDataReceiver: line => testOutput.WriteLine(line),
+            args
+        );
     }
 
     internal void AddFile(string dirPath, string filename, string content)
@@ -80,9 +87,29 @@ class TestScenePlan(ITestOutputHelper testOutput) : TestScene
     string? _repo9GitDir;
 
     internal string Repo0GitDir => _repo0GitDir ??= Path.Join(Location, Repo0);
-    internal string Repo1GitDir => _repo1GitDir ??= Path.Join(Location, Repo1, ".git");
-    internal string Repo2GitDir => _repo2GitDir ??= Path.Join(Location, Repo2, ".git");
-    internal string Repo9GitDir => _repo9GitDir ??= Path.Join(Location, Repo9, ".git");
+    internal string Repo1GitDir =>
+        _repo1GitDir ??= Path.Join(Location, Repo1, GitRepoHelpers.DotGit);
+    internal string Repo2GitDir =>
+        _repo2GitDir ??= Path.Join(Location, Repo2, GitRepoHelpers.DotGit);
+    internal string Repo9GitDir =>
+        _repo9GitDir ??= Path.Join(Location, Repo9, GitRepoHelpers.DotGit);
+
+    internal void RunGitOnRepo0(params string[] args) => RunGit(["-C", Repo0Root, .. args]);
+
+    internal void RunGitOnRepo1(params string[] args) => RunGit(["-C", Repo1Root, .. args]);
+
+    internal void RunGitOnRepo2(params string[] args) => RunGit(["-C", Repo2Root, .. args]);
+
+    internal void RunGitOnRepo9(params string[] args) => RunGit(["-C", Repo9Root, .. args]);
+
+    internal void AddFileOnRepo1(string filename, string content) =>
+        AddFile(Repo1Root, filename, content);
+
+    internal void AddFileOnRepo2(string filename, string content) =>
+        AddFile(Repo2Root, filename, content);
+
+    internal void AddFileOnRepo9(string filename, string content) =>
+        AddFile(Repo9Root, filename, content);
 }
 
 static class TestScenePlanExtensions
@@ -114,17 +141,18 @@ static class TestScenePlanExtensions
 
     public static void ConfigRepo0WithTags(this TestScenePlan plan)
     {
-        plan.RunGit("-C", plan.Repo0Root, "tag", "tag0", "HEAD");
+        plan.RunGit("-C", plan.Repo0Root, "tag", "tag0", GitRepoHelpers.HEAD);
     }
 
     public static void SetupRepo1(this TestScenePlan plan)
     {
         plan.RunGit("-C", plan.Location, "clone", Repo0, Repo1);
 
-        plan.AddFile(plan.Repo1Root, "README", "repo1");
+        plan.AddFile(plan.Repo1Root, "README", Repo1);
+
         plan.AddFile(
             plan.Repo1Root,
-            ".gitattributes",
+            GitRepoHelpers.DotGitAttributes,
             """
             *.tt taut
             tt taut
@@ -133,7 +161,7 @@ static class TestScenePlanExtensions
         );
 
         plan.RunGit("-C", plan.Repo1Root, "add", "--all");
-        plan.RunGit("-C", plan.Repo1Root, "commit", "-m", "repo1");
+        plan.RunGit("-C", plan.Repo1Root, "commit", "-m", Repo1);
         plan.RunGit("-C", plan.Repo1Root, "push");
     }
 

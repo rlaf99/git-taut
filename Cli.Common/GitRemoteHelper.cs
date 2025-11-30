@@ -387,6 +387,7 @@ partial class GitRemoteHelper
                     var tauntenedSrcRef = tautManager.TautRepo.LookupRef(
                         parsedRef.tauntenedSrcRefName
                     );
+
                     var tauntenedSrcRefTarget = tauntenedSrcRef.GetTarget();
 
                     tautManager.TautRepo.NewRef(
@@ -396,14 +397,14 @@ partial class GitRemoteHelper
                     );
 
                     logger.ZLogTrace(
-                        $"Refer '{parsedRef.srcRefName}' to '{tauntenedSrcRefTarget.GetOidHexDigits()}'"
+                        $"Set taut site ref '{parsedRef.srcRefName}' to '{tauntenedSrcRefTarget.GetOidHexDigits()}'"
                     );
                 }
 
                 SendLineToGit($"ok {parsedRef.dstRefName}");
             }
 
-            tautManager.UpdateTautHead();
+            tautManager.UpdateTautSiteHead();
 
             SendLineToGit();
         }

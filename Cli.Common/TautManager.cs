@@ -681,7 +681,7 @@ class TautManager(
             Lg2Oid oid = new();
             tautMapping.GetTautened(tagTargetObj, ref oid);
 
-            var tautenedTagTargetObj = TautRepo.LookupObject(oid, Lg2ObjectType.LG2_OBJECT_TAG);
+            var tautenedTagTargetObj = TautRepo.LookupAnyObject(oid);
 
             TautRepo.NewAnnotatedTag(
                 annotatedTag.GetName(),
@@ -835,7 +835,7 @@ class TautManager(
         logger.ZLogTrace($"Done tautening HEAD");
     }
 
-    internal void UpdateTautHead()
+    internal void UpdateTautSiteHead()
     {
         if (HostRepo.TryLookupRef(GitRepoHelpers.HEAD, out var hostHeadRef))
         {
@@ -843,10 +843,9 @@ class TautManager(
             if (refType.IsSymbolic())
             {
                 var symTarget = hostHeadRef.GetSymbolicTarget();
-                var tautHeadRefName = GitRefSpecs.RefsToRefsTautened.TransformToTarget(symTarget);
-                TautRepo.SetHead(tautHeadRefName);
+                TautRepo.SetHead(symTarget);
 
-                logger.ZLogTrace($"Set Taut HEAD to {tautHeadRefName}");
+                logger.ZLogTrace($"Set taut site HEAD to {symTarget}");
             }
             else if (refType.IsDirect())
             {

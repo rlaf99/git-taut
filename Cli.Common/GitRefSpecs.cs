@@ -12,7 +12,10 @@ static class GitRefSpecs
     public const string RefsRegainedTagsAll = "refs/regained/tags/*";
     public const string RefsRegainedAll = "refs/regained/*";
 
+    public const string RefsHeads = "refs/heads/";
     public const string RefsHeadsAll = "refs/heads/*";
+    public const string RefsHeadsMaster = "refs/heads/master";
+    public const string RefsTags = "refs/tags/";
     public const string RefsTagsAll = "refs/tags/*";
 
     public const string RefsToRefsTautenedText = "refs/*:refs/tautened/*";
