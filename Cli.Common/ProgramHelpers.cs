@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Diagnostics.CodeAnalysis;
 using Lg2.Sharpy;
 using Microsoft.Extensions.Configuration;
@@ -57,7 +58,6 @@ static class HostApplicationBuilderExtensions
     {
         builder.Services.AddSingleton<CommandActionHelpers>();
         builder.Services.AddSingleton<SiteCommandActions>();
-        builder.Services.AddSingleton<OtherCommandActions>();
     }
 
     internal static void AddGitRemoteTautCommandActions(this HostApplicationBuilder builder)
@@ -109,7 +109,7 @@ static class HostApplicationBuilderExtensions
                     (in MessageTemplate template, in LogInfo info) =>
                         template.Format(
                             info.Timestamp.Local.ToString("hh:mm:ss.ffffff"),
-                            ProgramInfo.CommandName,
+                            AppInfo.GitTautCommandName,
                             info.LogLevel
                         )
                 );
@@ -239,14 +239,14 @@ class CommandActionHelpers
 
     internal Lg2Repository LocateHostRepo()
     {
-        if (KnownEnvironVars.TryGetGitDir(out var gitDir))
+        if (AppEnvironment.TryGetGitDir(out var gitDir))
         {
             return Lg2Repository.New(gitDir);
         }
 
         var launchDir = LaunchDirectory ?? Directory.GetCurrentDirectory();
 
-        var ceilingDirs = KnownEnvironVars.GetGitCeilingDirectories();
+        var ceilingDirs = AppEnvironment.GetGitCeilingDirectories();
 
         if (Lg2TryDiscoverRepository(launchDir, out var hostRepo, ceilingDirs) == false)
         {
@@ -569,23 +569,6 @@ class SiteCommandActions(
     }
 }
 
-class OtherCommandActions(ILogger<OtherCommandActions> logger)
-{
-    internal void ShowInternal(ParseResult parseResult)
-    {
-        logger.ZLogTrace($"Start invoking action {nameof(ShowInternal)}");
-
-        var lg2Version = Lg2Global.Version;
-        Console.WriteLine($"Libgit2 version: {lg2Version}");
-        Console.WriteLine($"Cipher schema: {nameof(Aes256Cbc1)}");
-        Console.WriteLine(
-            $"  Maximum plain text length: {Aes256Cbc1.PLAIN_TEXT_MAX_SIZE} Bytes ({Aes256Cbc1.PLAIN_TEXT_MAX_SIZE / 1024 / 1024} MB)"
-        );
-
-        logger.ZLogTrace($"Done invoking action {nameof(ShowInternal)}");
-    }
-}
-
 internal class ProgramCommandLine(IHost host)
 {
     internal static Argument<string> RemoteNameArgument = new("remote-name")
@@ -651,31 +634,65 @@ internal class ProgramCommandLine(IHost host)
 
     RootCommand BuildGitTautCommands()
     {
-        RootCommand rootCommand = new("git-taut command line");
+        RootCommand rootCommand = new($"{AppInfo.GitTautCommandName} command line")
+        {
+            SiteTargetOption,
+        };
 
-        var siteCommand = CreateCommandSite();
-
-        siteCommand.Subcommands.Add(CreateCommandSiteRun());
-        siteCommand.Subcommands.Add(CreateCommandSiteAdd());
-        siteCommand.Subcommands.Add(CreateCommandSiteList());
-        siteCommand.Subcommands.Add(CreateCommandSiteRemove());
-        siteCommand.Subcommands.Add(CreateCommandSiteReveal());
-        // siteCommand.Subcommands.Add(CreateCommandSiteRescan());
-
-        rootCommand.Subcommands.Add(siteCommand);
-        rootCommand.Subcommands.Add(CreateCommandShowInternal());
+        rootCommand.Subcommands.Add(CreateCommandSiteRun());
+        rootCommand.Subcommands.Add(CreateCommandSiteAdd());
+        rootCommand.Subcommands.Add(CreateCommandSiteList());
+        rootCommand.Subcommands.Add(CreateCommandSiteRemove());
+        rootCommand.Subcommands.Add(CreateCommandSiteReveal());
 
 #if DEBUG
         rootCommand.Subcommands.Add(CreateCommandServeHttp());
         rootCommand.Subcommands.Add(CreateCommandSshBypass());
 #endif
 
+        CustomizeVersionOption(rootCommand);
+
         return rootCommand;
+    }
+
+    class CustomVersionOptionAction(SynchronousCommandLineAction? defaultAction)
+        : SynchronousCommandLineAction
+    {
+        public override int Invoke(ParseResult parseResult)
+        {
+            var rc = defaultAction?.Invoke(parseResult) ?? 0;
+
+            if (AppEnvironment.GetGitTautVersionShowMore())
+            {
+                var lg2Version = Lg2Global.Version;
+                Console.WriteLine("== More ==");
+                Console.WriteLine($"Libgit2 version: {lg2Version}");
+                Console.WriteLine($"Cipher schema: {nameof(Aes256Cbc1)}");
+                Console.WriteLine(
+                    $"  Maximum plain text length: {Aes256Cbc1.PLAIN_TEXT_MAX_SIZE} Bytes ({Aes256Cbc1.PLAIN_TEXT_MAX_SIZE / 1024 / 1024} MB)"
+                );
+            }
+
+            return rc;
+        }
+    }
+
+    void CustomizeVersionOption(RootCommand rootCommand)
+    {
+        for (int i = 0; i < rootCommand.Options.Count; i++)
+        {
+            if (rootCommand.Options[i] is VersionOption defaultVersionOption)
+            {
+                var defaultAction = defaultVersionOption.Action as SynchronousCommandLineAction;
+
+                defaultVersionOption.Action = new CustomVersionOptionAction(defaultAction);
+            }
+        }
     }
 
     RootCommand BuildGitRemoteTautCommands()
     {
-        RootCommand rootCommand = new("git-remote-taut command line");
+        RootCommand rootCommand = new($"{AppInfo.GitRemoteTautCommandName} command line");
 
         rootCommand.Arguments.Add(RemoteNameArgument);
         rootCommand.Arguments.Add(RemoteAddressArgument);
@@ -712,27 +729,6 @@ internal class ProgramCommandLine(IHost host)
         return builder.BuildCommand();
     }
 #endif
-
-    Command CreateCommandShowInternal()
-    {
-        Command command = new("show-internal", "Display internal information");
-
-        command.SetAction(parseResult =>
-        {
-            var commands = host.Services.GetRequiredService<OtherCommandActions>();
-
-            commands.ShowInternal(parseResult);
-        });
-
-        return command;
-    }
-
-    Command CreateCommandSite()
-    {
-        Command command = new("site", "Taut site related commands") { SiteTargetOption };
-
-        return command;
-    }
 
     Command CreateCommandSiteRun()
     {

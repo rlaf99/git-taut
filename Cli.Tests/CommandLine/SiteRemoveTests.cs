@@ -34,7 +34,7 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
 
         ProgramCommandLine progCli = new(_plan.Host);
 
-        string[] cliArgs = ["site", "remove"];
+        string[] cliArgs = ["remove"];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
@@ -65,7 +65,7 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
         ProgramCommandLine progCli = new(_plan.Host);
 
         string[] targetOpt = ["--target", Repo0];
-        string[] cliArgs = ["site", .. targetOpt, "remove"];
+        string[] cliArgs = [.. targetOpt, "remove"];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
@@ -96,7 +96,7 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
         ProgramCommandLine progCli = new(_plan.Host);
 
         string[] targetOpt = ["--target", Repo0];
-        string[] cliArgs = ["site", .. targetOpt, "remove"];
+        string[] cliArgs = [.. targetOpt, "remove"];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
@@ -128,7 +128,7 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
         ProgramCommandLine progCli = new(_plan.Host);
 
         string[] targetOpt = ["--target", Repo1];
-        string[] cliArgs = ["site", .. targetOpt, "remove"];
+        string[] cliArgs = [.. targetOpt, "remove"];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);

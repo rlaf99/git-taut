@@ -2,18 +2,21 @@ using Microsoft.Extensions.Configuration;
 
 namespace Git.Taut;
 
-static class ProgramInfo
+static class AppInfo
 {
-    internal const string CommandName = "git-taut";
+    internal const string GitTautCommandName = "git-taut";
+    internal const string GitRemoteTautCommandName = "git-remote-taut";
 }
 
-static class KnownEnvironVars
+static class AppEnvironment
 {
     internal const string GitDir = "GIT_DIR";
 
     internal const string GitInstallRoot = "GIT_INSTALL_ROOT";
 
     internal const string GitTautTrace = "GIT_TAUT_TRACE";
+
+    internal const string GitTautVersionShowMore = "GIT_TAUT_VERSION_SHOW_MORE";
 
     internal const string GitListForPushNoFetch = "GIT_TAUT_LIST_FOR_PUSH_NO_FETCH";
 
@@ -26,6 +29,21 @@ static class KnownEnvironVars
 
     internal static string? GetGitCeilingDirectories() =>
         Environment.GetEnvironmentVariable(GitCeilingDirectories);
+
+    internal static bool GetGitTautVersionShowMore() =>
+        GetBooleanValue(Environment.GetEnvironmentVariable(GitTautVersionShowMore));
+
+    internal static bool GetGitTautTrace(this IConfiguration config)
+    {
+        var val = config[GitTautTrace];
+        return GetBooleanValue(val);
+    }
+
+    internal static bool GetGitListForPushNoFetch(this IConfiguration config)
+    {
+        var val = config[GitListForPushNoFetch];
+        return GetBooleanValue(val);
+    }
 
     internal static bool TryGetGitDir(out string gitDir)
     {
@@ -60,11 +78,8 @@ static class KnownEnvironVars
 
         return gitBin;
     }
-}
 
-static class AppConfigurationExtensions
-{
-    static bool GetBooleanValue(string? val)
+    internal static bool GetBooleanValue(string? val)
     {
         if (val is null)
         {
@@ -77,18 +92,6 @@ static class AppConfigurationExtensions
         }
 
         return true;
-    }
-
-    internal static bool GetGitTautTrace(this IConfiguration config)
-    {
-        var val = config[KnownEnvironVars.GitTautTrace];
-        return GetBooleanValue(val);
-    }
-
-    internal static bool GetGitListForPushNoFetch(this IConfiguration config)
-    {
-        var val = config[KnownEnvironVars.GitListForPushNoFetch];
-        return GetBooleanValue(val);
     }
 }
 

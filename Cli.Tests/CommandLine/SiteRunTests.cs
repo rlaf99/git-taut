@@ -31,7 +31,7 @@ public sealed class SiteRunTests(ITestOutputHelper testOutput) : IDisposable
 
         ProgramCommandLine progCli = new(_plan.Host);
 
-        string[] cliArgs = ["site", "run", "branch"];
+        string[] cliArgs = ["run", "branch"];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);

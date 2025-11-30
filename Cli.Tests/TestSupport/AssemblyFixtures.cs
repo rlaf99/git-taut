@@ -115,12 +115,12 @@ public sealed class EnvInitFixture : IDisposable
 
         Environment.SetEnvironmentVariable("CliTests__TestbedLocation", testbedDir);
 
-        _savedCeilingDirs = KnownEnvironVars.GetGitCeilingDirectories();
+        _savedCeilingDirs = AppEnvironment.GetGitCeilingDirectories();
 
         var updatedCeilingDirs = _savedCeilingDirs ?? string.Empty;
         updatedCeilingDirs = testbedDir + Path.PathSeparator + updatedCeilingDirs;
 
-        KnownEnvironVars.SetGitCeilingDirectories(updatedCeilingDirs);
+        AppEnvironment.SetGitCeilingDirectories(updatedCeilingDirs);
     }
 
     public EnvInitFixture()

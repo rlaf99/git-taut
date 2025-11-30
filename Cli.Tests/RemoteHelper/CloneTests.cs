@@ -187,7 +187,7 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
 
         _plan.RunGit("-C", _plan.Location, "init", Repo2);
 
-        _plan.RunGit("-C", _plan.Repo2Root, "taut", "site", "add", Repo0, Path.Join("..", Repo0));
+        _plan.RunGit("-C", _plan.Repo2Root, "taut", "add", Repo0, Path.Join("..", Repo0));
 
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
         using var repo2Config = repo2.GetConfigSnapshot();
@@ -214,7 +214,6 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
             "-C",
             _plan.Repo2Root,
             "taut",
-            "site",
             "--target",
             Repo0,
             "add",

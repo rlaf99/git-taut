@@ -29,7 +29,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
         ProgramCommandLine progCli = new(_plan.Host);
 
         {
-            string[] cliArgs = ["site", "add", Repo0, Path.Join("..", Repo0)];
+            string[] cliArgs = ["add", Repo0, Path.Join("..", Repo0)];
             var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             InvocationConfiguration invCfg = new()
@@ -47,7 +47,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
         }
 
         {
-            string[] cliArgs = ["site", "list"];
+            string[] cliArgs = ["list"];
             var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             InvocationConfiguration invCfg = new()
@@ -65,7 +65,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
         }
 
         {
-            string[] cliArgs = ["site", "remove", "--target", Repo0];
+            string[] cliArgs = ["remove", "--target", Repo0];
             var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             InvocationConfiguration invCfg = new()
@@ -83,7 +83,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
         }
 
         {
-            string[] cliArgs = ["site", "run", "log"];
+            string[] cliArgs = ["run", "log"];
             var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             InvocationConfiguration invCfg = new()
@@ -101,7 +101,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
         }
 
         {
-            string[] cliArgs = ["site", "reveal", "some-path"];
+            string[] cliArgs = ["reveal", "some-path"];
             var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             InvocationConfiguration invCfg = new()
@@ -119,7 +119,7 @@ public sealed class GeneralSiteTests(ITestOutputHelper testOutput) : IDisposable
         }
 #if false
         {
-            string[] cliArgs = ["site", "rescan", "--target", "some-target"];
+            string[] cliArgs = ["rescan", "--target", "some-target"];
             var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             InvocationConfiguration invCfg = new()

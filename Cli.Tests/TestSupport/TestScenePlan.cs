@@ -172,7 +172,7 @@ static class TestScenePlanExtensions
 
     public static void ConfigRepo2AddingRepo1(this TestScenePlan plan)
     {
-        plan.RunGit("-C", plan.Repo2Root, "taut", "site", "add", Repo1, Path.Join("..", Repo1));
+        plan.RunGit("-C", plan.Repo2Root, "taut", "add", Repo1, Path.Join("..", Repo1));
     }
 
     public static void ConfigRepo2AddingRepo1WithLinkToRepo0(this TestScenePlan plan)
@@ -181,7 +181,6 @@ static class TestScenePlanExtensions
             "-C",
             plan.Repo2Root,
             "taut",
-            "site",
             "--target",
             Repo0,
             "add",

@@ -34,7 +34,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
 
         ProgramCommandLine progCli = new(_plan.Host);
 
-        string[] cliArgs = ["site", "list"];
+        string[] cliArgs = ["list"];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
@@ -69,7 +69,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
         ProgramCommandLine progCli = new(_plan.Host);
 
         string[] targetOpt = ["--target", Repo0];
-        string[] cliArgs = ["site", .. targetOpt, "list"];
+        string[] cliArgs = [.. targetOpt, "list"];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);
@@ -102,7 +102,7 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
 
         string[] targetOpt = ["--target", invalidTarget];
 
-        string[] cliArgs = ["site", .. targetOpt, "list"];
+        string[] cliArgs = [.. targetOpt, "list"];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
 
         var exitCode = parseResult.Invoke(_invCfg);

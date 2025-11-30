@@ -15,7 +15,7 @@ sealed class TautSetup(
     GitCli gitCli
 ) : IDisposable
 {
-    const string defaultDescription = $"Created by {ProgramInfo.CommandName}";
+    const string defaultDescription = $"Created by {AppInfo.GitTautCommandName}";
 
     [AllowNull]
     string _remoteName;

@@ -314,7 +314,7 @@ partial class GitRemoteHelper
         if (noFetch)
         {
             logger.ZLogTrace(
-                $"Skip fetching {_remoteName} as {KnownEnvironVars.GitListForPushNoFetch} is set"
+                $"Skip fetching {_remoteName} as {AppEnvironment.GitListForPushNoFetch} is set"
             );
         }
         else
@@ -543,7 +543,7 @@ partial class GitRemoteHelper
         _remoteAddress = remoteAddress;
 
         logger.ZLogTrace(
-            $"Run {ProgramInfo.CommandName} with '{remoteName}' and '{remoteAddress}'"
+            $"Run {AppInfo.GitRemoteTautCommandName} with '{remoteName}' and '{remoteAddress}'"
         );
 
         EnsureTautHome();
@@ -596,8 +596,8 @@ partial class GitRemoteHelper
     void EnsureTautHome()
     {
         var gitDir =
-            Environment.GetEnvironmentVariable(KnownEnvironVars.GitDir)
-            ?? throw new InvalidOperationException($"{KnownEnvironVars.GitDir} is null");
+            Environment.GetEnvironmentVariable(AppEnvironment.GitDir)
+            ?? throw new InvalidOperationException($"{AppEnvironment.GitDir} is null");
 
         _hostRepo = Lg2Repository.New(gitDir);
 

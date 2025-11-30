@@ -28,15 +28,15 @@ class GitCli(ILogger<GitCli> logger)
     {
         if (string.IsNullOrEmpty(_envAlternateObjDirs))
         {
-            startInfo.Environment.Remove(KnownEnvironVars.GitAlternateObjectDirectories);
+            startInfo.Environment.Remove(AppEnvironment.GitAlternateObjectDirectories);
         }
         else
         {
-            startInfo.Environment[KnownEnvironVars.GitAlternateObjectDirectories] =
+            startInfo.Environment[AppEnvironment.GitAlternateObjectDirectories] =
                 _envAlternateObjDirs;
 
             logger.ZLogTrace(
-                $"Set environment '{KnownEnvironVars.GitAlternateObjectDirectories}' to '{_envAlternateObjDirs}'"
+                $"Set environment '{AppEnvironment.GitAlternateObjectDirectories}' to '{_envAlternateObjDirs}'"
             );
         }
     }

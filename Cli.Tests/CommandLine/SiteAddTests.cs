@@ -33,7 +33,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
 
         ProgramCommandLine progCli = new(_plan.Host);
 
-        string[] cliArgs = ["site", "add", Repo1, _plan.Repo1Root];
+        string[] cliArgs = ["add", Repo1, _plan.Repo1Root];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
@@ -58,7 +58,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         ProgramCommandLine progCli = new(_plan.Host);
 
         var remoteNameToUse = Repo0;
-        string[] cliArgs = ["site", "add", remoteNameToUse, _plan.Repo1Root];
+        string[] cliArgs = ["add", remoteNameToUse, _plan.Repo1Root];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(1, exitCode);
@@ -81,7 +81,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
 
         ProgramCommandLine progCli = new(_plan.Host);
 
-        string[] cliArgs = ["site", "add", Repo1, _plan.Repo1Root, "--link-existing"];
+        string[] cliArgs = ["add", Repo1, _plan.Repo1Root, "--link-existing"];
         var parseResult = progCli.ParseForGitTaut(cliArgs);
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(1, exitCode);
@@ -107,15 +107,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
 
         {
             string[] targetOpt = ["--target", Repo0];
-            string[] cliArgs =
-            [
-                "site",
-                .. targetOpt,
-                "add",
-                Repo1,
-                _plan.Repo1Root,
-                "--link-existing",
-            ];
+            string[] cliArgs = [.. targetOpt, "add", Repo1, _plan.Repo1Root, "--link-existing"];
             var parseResult = progCli.ParseForGitTaut(cliArgs);
 
             var exitCode = parseResult.Invoke(_invCfg);
@@ -126,7 +118,6 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
             string[] targetOpt = ["--target", Repo1];
             string[] cliArgs =
             [
-                "site",
                 .. targetOpt,
                 "add",
                 Repo1 + "_again",
@@ -157,7 +148,7 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
 
         string[] targetOpt = ["--target", Repo0];
 
-        string[] cliArgs = ["site", .. targetOpt, "add", Repo1, _plan.Repo1Root, "--link-existing"];
+        string[] cliArgs = [.. targetOpt, "add", Repo1, _plan.Repo1Root, "--link-existing"];
 
         var parseResult = progCli.ParseForGitTaut(cliArgs);
 
