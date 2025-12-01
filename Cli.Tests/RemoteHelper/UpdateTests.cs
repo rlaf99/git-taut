@@ -69,6 +69,39 @@ public sealed class UpdateTests(ITestOutputHelper testOutput) : IDisposable
     }
 
     [Fact]
+    public void AddPlain_AddTautened_ResetHead()
+    {
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
+        _plan.SetupRepo2();
+
+        using var repo0 = Lg2Repository.New(_plan.Repo0Root);
+        using var repo2 = Lg2Repository.New(_plan.Repo2Root);
+        using var repo2SiteRepo0 = TautSiteConfig.OpenSiteForRemote(repo2, Repo0);
+
+        _plan.AddFileOnRepo2(_a_md, _a_md_content);
+
+        _plan.RunGitOnRepo2("add", "--all");
+        _plan.RunGitOnRepo2("commit", "-m", _a_md);
+
+        var savedTarget = repo2.GetHeadObject();
+
+        _plan.AddFileOnRepo2(_b_tt, _b_tt_content);
+
+        _plan.RunGitOnRepo2("add", "--all");
+        _plan.RunGitOnRepo2("commit", "-m", _b_tt);
+
+        _plan.RunGitOnRepo2("push");
+
+        AssertSameBranchId(repo0, repo2SiteRepo0, Master);
+
+        repo2.Reset(savedTarget, Lg2ResetType.LG2_RESET_HARD);
+        _plan.RunGitOnRepo2("push", "--force");
+
+        AssertSameBranchId(repo0, repo2SiteRepo0, Master);
+    }
+
+    [Fact]
     public void AddPlain_SwitchBranch_AddTautened()
     {
         _plan.SetupRepo0();
@@ -162,6 +195,39 @@ public sealed class UpdateTests(ITestOutputHelper testOutput) : IDisposable
         _plan.RunGitOnRepo2("add", "--all");
         _plan.RunGitOnRepo2("commit", "-m", _a_md);
         _plan.RunGitOnRepo2("push");
+
+        AssertSameBranchId(repo0, repo2SiteRepo0, Master);
+    }
+
+    [Fact]
+    public void AddTautened_AddPlain_ResetHead()
+    {
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
+        _plan.SetupRepo2();
+
+        using var repo0 = Lg2Repository.New(_plan.Repo0Root);
+        using var repo2 = Lg2Repository.New(_plan.Repo2Root);
+        using var repo2SiteRepo0 = TautSiteConfig.OpenSiteForRemote(repo2, Repo0);
+
+        _plan.AddFileOnRepo2(_b_tt, _b_tt_content);
+
+        _plan.RunGitOnRepo2("add", "--all");
+        _plan.RunGitOnRepo2("commit", "-m", _b_tt);
+
+        var savedTarget = repo2.GetHeadObject();
+
+        _plan.AddFileOnRepo2(_a_md, _a_md_content);
+
+        _plan.RunGitOnRepo2("add", "--all");
+        _plan.RunGitOnRepo2("commit", "-m", _a_md);
+
+        _plan.RunGitOnRepo2("push");
+
+        AssertSameBranchId(repo0, repo2SiteRepo0, Master);
+
+        repo2.Reset(savedTarget, Lg2ResetType.LG2_RESET_HARD);
+        _plan.RunGitOnRepo2("push", "--force");
 
         AssertSameBranchId(repo0, repo2SiteRepo0, Master);
     }

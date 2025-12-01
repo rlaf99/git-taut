@@ -134,6 +134,18 @@ public static unsafe partial class Lg2RepositoryExtensions
         return result;
     }
 
+    public static Lg2Object GetHeadObject(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        var headRef = repo.GetHead();
+        var headOid = headRef.GetTarget();
+
+        var result = repo.LookupCommitObject(headOid);
+
+        return result;
+    }
+
     public static void SetHead(this Lg2Repository repo, string refName)
     {
         repo.EnsureValid();

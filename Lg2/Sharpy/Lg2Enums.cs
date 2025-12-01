@@ -286,3 +286,10 @@ public enum Lg2BranchType
     LG2_BRANCH_REMOTE = git_branch_t.GIT_BRANCH_REMOTE,
     LG2_BRANCH_ALL = git_branch_t.GIT_BRANCH_ALL,
 }
+
+public enum Lg2ResetType
+{
+    LG2_RESET_SOFT = git_reset_t.GIT_RESET_SOFT,
+    LG2_RESET_MIXED = git_reset_t.GIT_RESET_MIXED,
+    LG2_RESET_HARD = git_reset_t.GIT_RESET_HARD,
+}

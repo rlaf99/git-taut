@@ -1041,6 +1041,18 @@ namespace Lg2.Native
         public static extern int git_branch_name_is_valid(int* valid, [NativeTypeName("const char *")] sbyte* name);
 
         [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_checkout_options_init(git_checkout_options* opts, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_checkout_head(git_repository* repo, [NativeTypeName("const git_checkout_options *")] git_checkout_options* opts);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_checkout_index(git_repository* repo, git_index* index, [NativeTypeName("const git_checkout_options *")] git_checkout_options* opts);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_checkout_tree(git_repository* repo, [NativeTypeName("const git_object *")] git_object* treeish, [NativeTypeName("const git_checkout_options *")] git_checkout_options* opts);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_index_open(git_index** index_out, [NativeTypeName("const char *")] sbyte* index_path);
 
         [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -1629,6 +1641,15 @@ namespace Lg2.Native
         public static extern sbyte* git_pathspec_match_list_failed_entry([NativeTypeName("const git_pathspec_match_list *")] git_pathspec_match_list* m, [NativeTypeName("size_t")] nuint pos);
 
         [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reset(git_repository* repo, [NativeTypeName("const git_object *")] git_object* target, git_reset_t reset_type, [NativeTypeName("const git_checkout_options *")] git_checkout_options* checkout_opts);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reset_from_annotated(git_repository* repo, [NativeTypeName("const git_annotated_commit *")] git_annotated_commit* target, git_reset_t reset_type, [NativeTypeName("const git_checkout_options *")] git_checkout_options* checkout_opts);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_reset_default(git_repository* repo, [NativeTypeName("const git_object *")] git_object* target, [NativeTypeName("const git_strarray *")] git_strarray* pathspecs);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_revwalk_new(git_revwalk** @out, git_repository* repo);
 
         [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -1860,6 +1881,9 @@ namespace Lg2.Native
 
         [NativeTypeName("#define GIT_BLOB_FILTER_OPTIONS_VERSION 1")]
         public const int GIT_BLOB_FILTER_OPTIONS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_CHECKOUT_OPTIONS_VERSION 1")]
+        public const int GIT_CHECKOUT_OPTIONS_VERSION = 1;
 
         [NativeTypeName("#define GIT_INDEX_ENTRY_NAMEMASK (0x0fff)")]
         public const int GIT_INDEX_ENTRY_NAMEMASK = (0x0fff);

@@ -37,6 +37,8 @@ git_credential_t=uint
 git_repository_open_flag_t=uint
 git_status_t=uint
 git_status_opt_t=uint
+git_checkout_strategy_t=uint
+git_checkout_notify_t=uint
 GIT_STATUS_OPT_DEFAULTS=git_status_opt_t
 
 --traverse
@@ -76,6 +78,8 @@ thirdparty/libgit2/include/git2/credential.h
 thirdparty/libgit2/include/git2/attr.h
 thirdparty/libgit2/include/git2/status.h
 thirdparty/libgit2/include/git2/branch.h
+thirdparty/libgit2/include/git2/reset.h
+thirdparty/libgit2/include/git2/checkout.h
 thirdparty/libgit2/include/git2/sys/credential.h
 thirdparty/libgit2/include/git2/sys/config.h
 
