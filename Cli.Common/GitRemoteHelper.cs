@@ -202,9 +202,7 @@ partial class GitRemoteHelper
 
     HandleGitCommandResult HandleGitCmdList(string input)
     {
-        using var hostConfig = HostRepo.GetConfigSnapshot();
-
-        if (TautSiteConfig.TryFindSiteNameForRemote(hostConfig, _remoteName, out var tautSiteName))
+        if (HostRepo.TryFindTautSiteNameForRemote(RemoteName, out var tautSiteName))
         {
             tautSetup.GearUpExisting(HostRepo, _remoteName, tautSiteName);
 
@@ -300,9 +298,7 @@ partial class GitRemoteHelper
 
     HandleGitCommandResult HandleGitCmdListForPush(string input)
     {
-        using var hostConfig = HostRepo.GetConfigSnapshot();
-
-        var tautSiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, RemoteName);
+        var tautSiteName = HostRepo.FindTautSiteNameForRemote(RemoteName);
 
         tautSetup.GearUpExisting(HostRepo, RemoteName, tautSiteName);
 
@@ -333,8 +329,7 @@ partial class GitRemoteHelper
     {
         void HandleBatch()
         {
-            using var config = HostRepo.GetConfigSnapshot();
-            var tautSiteName = TautSiteConfig.FindSiteNameForRemote(config, RemoteName);
+            var tautSiteName = HostRepo.FindTautSiteNameForRemote(RemoteName);
 
             List<(string srcRefName, string tauntenedSrcRefName, string dstRefName)> parsedRefS =
                 new(_pushBatch.Count);

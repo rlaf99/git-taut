@@ -90,7 +90,7 @@ static class GitRefSpecs
     }
 }
 
-static class Lg2RepositoryExtensions
+static partial class Lg2RepositoryExtensions
 {
     internal static List<Lg2Reference> GetTagRefs(this Lg2Repository repo)
     {

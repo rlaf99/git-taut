@@ -8,6 +8,8 @@ namespace Cli.Tests.TestSupport;
 
 static class TestScenePlanConstants
 {
+    internal const string Origin = "origin";
+
     internal const string Repo0 = "repo0";
     internal const string Repo1 = "repo1";
     internal const string Repo2 = "repo2";
@@ -93,6 +95,8 @@ class TestScenePlan(ITestOutputHelper testOutput) : TestScene
         _repo2GitDir ??= Path.Join(Location, Repo2, GitRepoHelpers.DotGit);
     internal string Repo9GitDir =>
         _repo9GitDir ??= Path.Join(Location, Repo9, GitRepoHelpers.DotGit);
+
+    internal void RunGitOnRoot(params string[] args) => RunGit(["-C", Location, .. args]);
 
     internal void RunGitOnRepo0(params string[] args) => RunGit(["-C", Repo0Root, .. args]);
 

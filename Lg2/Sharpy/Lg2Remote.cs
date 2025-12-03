@@ -66,7 +66,7 @@ public static unsafe class Lg2RemoteExtensions
         return result!;
     }
 
-    public static void SetUrl(this Lg2Remote remote, string url)
+    public static void SetInstanceUrl(this Lg2Remote remote, string url)
     {
         remote.EnsureValid();
 
@@ -142,12 +142,12 @@ unsafe partial class Lg2RepositoryExtensions
         }
     }
 
-    public static void SetRemoteUrl(this Lg2Repository repo, string remoteName, string url)
+    public static void SetRemoteUrl(this Lg2Repository repo, string remoteName, string remoteUrl)
     {
         repo.EnsureValid();
 
         using var u8RemoteName = new Lg2Utf8String(remoteName);
-        using var u8Url = new Lg2Utf8String(url);
+        using var u8Url = new Lg2Utf8String(remoteUrl);
 
         var rc = git_remote_set_url(repo.Ptr, u8RemoteName.Ptr, u8Url.Ptr);
         Lg2Exception.ThrowIfNotOk(rc);

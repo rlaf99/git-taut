@@ -40,10 +40,11 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
 
         using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
         using var hostConfig = hostRepo.GetConfigSnapshot();
+        var remoteRepo1 = hostRepo.LookupRemote(Repo1);
 
-        Assert.True(TautSiteConfig.TryLoadByRemoteName(hostConfig, Repo1, out var repo1SiteConfig));
-        repo1SiteConfig.ResolveRemotes(hostConfig);
-        Assert.Contains(Repo1, repo1SiteConfig.Remotes);
+        Assert.True(
+            TautSiteConfiguration.TryLoadForRemote(hostConfig, remoteRepo1, out var repo1SiteConfig)
+        );
     }
 
     [Fact]
@@ -160,11 +161,12 @@ public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
         using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
         using var hostConfig = hostRepo.GetConfigSnapshot();
 
-        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
-        var repo9SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo1);
-        var repo9SiteConfig = TautSiteConfig.LoadNew(hostConfig, repo9SiteName);
+        var repo0SiteName = hostRepo.FindTautSiteNameForRemote(Repo0);
+        var repo1SiteName = hostRepo.FindTautSiteNameForRemote(Repo1);
 
-        Assert.NotNull(repo9SiteConfig.LinkTo);
-        Assert.Equal(repo0SiteName, repo9SiteConfig.LinkTo.SiteName);
+        var repo1SiteConfig = TautSiteConfiguration.LoadNew(hostConfig, repo1SiteName);
+
+        Assert.NotNull(repo1SiteConfig.LinkTo);
+        Assert.Equal(repo0SiteName, repo1SiteConfig.LinkTo.SiteName);
     }
 }

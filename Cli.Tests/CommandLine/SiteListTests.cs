@@ -41,10 +41,9 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
         Assert.Equal(0, exitCode);
 
         using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
-        using var hostConfig = hostRepo.GetConfigSnapshot();
 
-        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
-        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo1);
+        var repo0SiteName = hostRepo.FindTautSiteNameForRemote(Repo0);
+        var repo1SiteName = hostRepo.FindTautSiteNameForRemote(Repo1);
 
         var wantedOutput =
             $"{repo0SiteName} {Repo0}"
@@ -76,10 +75,9 @@ public sealed class SiteListTests(ITestOutputHelper testOutput) : IDisposable
         Assert.Equal(0, exitCode);
 
         using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
-        using var hostConfig = hostRepo.GetConfigSnapshot();
 
-        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
-        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo1);
+        var repo0SiteName = hostRepo.FindTautSiteNameForRemote(Repo0);
+        var repo1SiteName = hostRepo.FindTautSiteNameForRemote(Repo1);
 
         var wantedOutput = $"{repo0SiteName} {Repo0}" + Environment.NewLine;
 

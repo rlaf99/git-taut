@@ -4,19 +4,21 @@ using Lg2.Sharpy;
 
 namespace Git.Taut;
 
-class TautSiteConfig
+class TautSiteConfiguration
 {
     internal const string SectionName = "taut";
-
+    internal const string RemoteUrlMatchName = "remoteurl";
     internal const string CredentialUrlMatchName = "credentialurl";
     internal const string CredentialUserNameMatchName = "credentialusername";
     internal const string CredentialKeyTraitMatchName = "credentialkeytrait";
-    internal const string RemoteMatchName = "remote";
+
     internal const string LinkToMatchName = "linkto";
 
     internal string SiteName { get; }
 
-    internal TautSiteConfig? LinkTo { get; private set; }
+    internal TautSiteConfiguration? LinkTo { get; private set; }
+
+    internal string RemoteUrl { get; set; } = string.Empty;
 
     internal string CredentialUrl { get; set; } = string.Empty;
 
@@ -24,11 +26,9 @@ class TautSiteConfig
 
     internal string CredentialKeyTrait { get; set; } = string.Empty;
 
-    internal List<string> Remotes { get; private set; } = [];
-
     internal List<string> ReverseLinks { get; private set; } = [];
 
-    internal TautSiteConfig(string tautSiteName, string? tautSiteNameToLink = null)
+    internal TautSiteConfiguration(string tautSiteName, string? tautSiteNameToLink = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(tautSiteName);
 
@@ -49,6 +49,11 @@ class TautSiteConfig
             throw new InvalidOperationException($"{nameof(SiteName)} is empty");
         }
 
+        if (string.IsNullOrEmpty(RemoteUrl))
+        {
+            throw new InvalidOperationException($"{nameof(RemoteUrl)} is empty");
+        }
+
         if (string.IsNullOrEmpty(CredentialUrl))
         {
             throw new InvalidOperationException($"{nameof(CredentialUrl)} is empty");
@@ -58,6 +63,16 @@ class TautSiteConfig
         {
             throw new InvalidOperationException($"{nameof(CredentialKeyTrait)} is empty");
         }
+    }
+
+    internal void SaveRemoteUrl(Lg2Config config)
+    {
+        if (string.IsNullOrEmpty(RemoteUrl))
+        {
+            throw new InvalidOperationException($"{nameof(RemoteUrl)} is empty");
+        }
+
+        config.SetString(FormatItemName(nameof(RemoteUrl)), RemoteUrl);
     }
 
     internal void SaveCredentialUrl(Lg2Config config)
@@ -95,14 +110,6 @@ class TautSiteConfig
         config.SetString(FormatItemName(nameof(CredentialKeyTrait)), CredentialKeyTrait);
     }
 
-    internal void SaveRemotes(Lg2Config config)
-    {
-        foreach (var remoteName in Remotes)
-        {
-            config.SetString(FormatItemName("remote"), remoteName);
-        }
-    }
-
     internal void Save(Lg2Config config)
     {
         EnsureValues();
@@ -116,10 +123,7 @@ class TautSiteConfig
 
         config.SetString(FormatItemName(nameof(CredentialKeyTrait)), CredentialKeyTrait);
 
-        foreach (var remoteName in Remotes)
-        {
-            config.SetString(FormatItemName("remote"), remoteName);
-        }
+        config.SetString(FormatItemName(nameof(RemoteUrl)), RemoteUrl);
     }
 
     internal void Load(Lg2Config config)
@@ -132,13 +136,15 @@ class TautSiteConfig
         }
 
         CredentialKeyTrait = config.GetString(FormatItemName(nameof(CredentialKeyTrait)));
+
+        RemoteUrl = config.GetString(FormatItemName(nameof(RemoteUrl)));
     }
 
-    internal static TautSiteConfig LoadNew(Lg2Config config, string siteName)
+    internal static TautSiteConfiguration LoadNew(Lg2Config config, string siteName)
     {
         ArgumentException.ThrowIfNullOrEmpty(siteName);
 
-        TautSiteConfig result = new(siteName);
+        TautSiteConfiguration result = new(siteName);
 
         string? linkTo = null;
 
@@ -164,8 +170,8 @@ class TautSiteConfig
                     case CredentialUserNameMatchName:
                         result.CredentialUserName = value;
                         break;
-                    case RemoteMatchName:
-                        result.Remotes.Add(value);
+                    case RemoteUrlMatchName:
+                        result.RemoteUrl = value;
                         break;
                     case LinkToMatchName:
                         linkTo = value;
@@ -200,34 +206,6 @@ class TautSiteConfig
         }
     }
 
-    internal void RemoveRemoteFromConfig(Lg2Config config, string remoteName)
-    {
-        if (Remotes.Remove(remoteName) == false)
-        {
-            throw new ArgumentException($"{remoteName} not found", nameof(remoteName));
-        }
-
-        var entryName = FormatItemName("remote");
-        var valuePattern = $@"{remoteName}";
-
-        config.DeleteMultiVar(entryName, valuePattern);
-    }
-
-    internal void ResolveRemotes(Lg2Config config)
-    {
-        {
-            var pattern = $@"{SectionName}\.{SiteName}\.remote";
-            using var cfgIter = config.NewIterator(pattern);
-
-            while (cfgIter.Next(out var entry))
-            {
-                var val = entry.GetValue();
-
-                Remotes.Add(val);
-            }
-        }
-    }
-
     internal void ResolveReverseLinks(Lg2Config config)
     {
         string ExtractSubSection(string itemName)
@@ -256,13 +234,13 @@ class TautSiteConfig
         }
     }
 
-    internal static bool TryLoadBySiteName(
+    internal static bool TryLoad(
         Lg2Config config,
         string siteName,
-        [NotNullWhen(true)] out TautSiteConfig? result
+        [NotNullWhen(true)] out TautSiteConfiguration? result
     )
     {
-        TautSiteConfig siteConfig = new(siteName);
+        TautSiteConfiguration siteConfig = new(siteName);
         try
         {
             siteConfig.Load(config);
@@ -279,20 +257,20 @@ class TautSiteConfig
         return true;
     }
 
-    internal static bool TryLoadByRemoteName(
+    internal static bool TryLoadForRemote(
         Lg2Config config,
-        string remoteName,
-        [NotNullWhen(true)] out TautSiteConfig? result
+        Lg2Remote remote,
+        [NotNullWhen(true)] out TautSiteConfiguration? result
     )
     {
-        if (TryFindSiteNameForRemote(config, remoteName, out var tautSiteName) == false)
+        if (TryFindSiteNameForRemote(config, remote, out var tautSiteName) == false)
         {
             result = null;
 
             return false;
         }
 
-        TautSiteConfig siteConfig = new(tautSiteName);
+        TautSiteConfiguration siteConfig = new(tautSiteName);
         try
         {
             siteConfig.Load(config);
@@ -315,10 +293,10 @@ class TautSiteConfig
         string? targetSiteName = null
     )
     {
-        string ExtractSubSection(string itemName)
+        string ExtractSecondPart(string itemName, string firstPart)
         {
-            var part1 = itemName[(SectionName.Length + 1)..];
-            var variableStart = part1.LastIndexOf('.');
+            var part1 = itemName[(firstPart.Length + 1)..];
+            var variableStart = part1.IndexOf('.');
             var part2 = part1[..variableStart];
 
             return part2;
@@ -334,7 +312,7 @@ class TautSiteConfig
             {
                 var name = entry.GetName();
 
-                var siteName = ExtractSubSection(name);
+                var siteName = ExtractSecondPart(name, SectionName);
 
                 if (targetSiteName is null || targetSiteName == siteName)
                 {
@@ -343,12 +321,27 @@ class TautSiteConfig
             }
         }
 
-        foreach (var tautSiteName in siteNames)
+        Dictionary<string, string> urlToRemoteNames = [];
+
         {
-            writer.Write($"{tautSiteName}");
+            var pattern = $@"remote\.(.*)\.url";
+            using var cfgIter = config.NewIterator(pattern);
+            while (cfgIter.Next(out var entry))
+            {
+                var url = entry.GetValue();
+                var name = entry.GetName();
+                var remoteName = ExtractSecondPart(name, "remote");
+
+                urlToRemoteNames.Add(url, remoteName);
+            }
+        }
+
+        foreach (var siteName in siteNames)
+        {
+            writer.Write($"{siteName}");
 
             {
-                var pattern = $@"{SectionName}\.{tautSiteName}\.linkTo";
+                var pattern = $@"{SectionName}\.{siteName}\.linkTo";
                 using var cfgIter = config.NewIterator(pattern);
 
                 while (cfgIter.Next(out var entry))
@@ -360,14 +353,16 @@ class TautSiteConfig
             }
 
             {
-                var pattern = $@"{SectionName}\.{tautSiteName}\.remote";
+                var pattern = $@"{SectionName}\.{siteName}\.{RemoteUrlMatchName}";
                 using var cfgIter = config.NewIterator(pattern);
 
                 while (cfgIter.Next(out var entry))
                 {
                     var val = entry.GetValue();
-
-                    writer.Write($" {val}");
+                    if (urlToRemoteNames.ContainsKey(val))
+                    {
+                        writer.Write($" {urlToRemoteNames[val]}");
+                    }
                 }
             }
 
@@ -390,16 +385,17 @@ class TautSiteConfig
         return false;
     }
 
-    const string RemoteOfAnySitePattern = $@"{SectionName}\.(.*)\.remote";
-    static Regex RemoteOfAnySiteRegex = new(RemoteOfAnySitePattern);
+    const string SiteNameFromRemoteUrlPattern = $@"{SectionName}\.(.*)\.{RemoteUrlMatchName}";
 
-    internal static bool TryFindSiteNameForRemote(
+    static Regex SiteNameFromRemoteUrlRegex = new(SiteNameFromRemoteUrlPattern);
+
+    internal static bool TryFindSiteNameForRemoteUrl(
         Lg2Config config,
-        string remoteName,
+        string remoteUrl,
         [NotNullWhen(true)] out string? siteName
     )
     {
-        using var cfgIter = config.NewIterator(RemoteOfAnySitePattern);
+        using var cfgIter = config.NewIterator(SiteNameFromRemoteUrlPattern);
 
         siteName = null;
         bool found = false;
@@ -407,10 +403,10 @@ class TautSiteConfig
         while (cfgIter.Next(out var entry))
         {
             var value = entry.GetValue();
-            if (value == remoteName)
+            if (value == remoteUrl)
             {
                 var name = entry.GetName();
-                siteName = RemoteOfAnySiteRegex.Match(name).Groups[1].Value;
+                siteName = SiteNameFromRemoteUrlRegex.Match(name).Groups[1].Value;
 
                 found = true;
 
@@ -421,26 +417,63 @@ class TautSiteConfig
         return found;
     }
 
-    internal static string FindSiteNameForRemote(Lg2Config config, string remoteName)
+    internal static bool TryFindSiteNameForRemote(
+        Lg2Config config,
+        Lg2Remote remote,
+        [NotNullWhen(true)] out string? siteName
+    )
     {
-        if (TryFindSiteNameForRemote(config, remoteName, out var result))
+        var remoteUrl = remote.GetUrl();
+
+        return TryFindSiteNameForRemoteUrl(config, remoteUrl, out siteName);
+    }
+
+    internal static string FindSiteNameForRemote(Lg2Config config, Lg2Remote remote)
+    {
+        var remoteUrl = remote.GetUrl();
+
+        if (TryFindSiteNameForRemoteUrl(config, remoteUrl, out var siteName))
         {
-            return result;
+            return siteName;
         }
 
         throw new InvalidOperationException(
-            $"Taut site name is not found for remote '{remoteName}'"
+            $"Cannot find taut site name for remote '{remote.GetName()}'"
         );
     }
 
-    internal static Lg2Repository OpenSiteForRemote(Lg2Repository hostRepo, string remoteName)
+    internal static Lg2Repository OpenSiteForRemote(Lg2Repository repo, string remoteName)
     {
-        using var hostConfig = hostRepo.GetConfigSnapshot();
-        var siteName = FindSiteNameForRemote(hostConfig, remoteName);
-        var sitePath = GitRepoHelpers.GetTautSitePath(hostRepo.GetPath(), siteName);
+        var siteName = repo.FindTautSiteNameForRemote(remoteName);
+        var sitePath = GitRepoHelpers.GetTautSitePath(repo.GetPath(), siteName);
 
         var result = Lg2Repository.New(sitePath);
 
         return result;
+    }
+}
+
+static partial class Lg2RepositoryExtensions
+{
+    internal static string FindTautSiteNameForRemote(this Lg2Repository repo, string remoteName)
+    {
+        using var config = repo.GetConfigSnapshot();
+        using var remote = repo.LookupRemote(remoteName);
+
+        var result = TautSiteConfiguration.FindSiteNameForRemote(config, remote);
+
+        return result;
+    }
+
+    internal static bool TryFindTautSiteNameForRemote(
+        this Lg2Repository repo,
+        string remoteName,
+        [NotNullWhen(true)] out string? siteName
+    )
+    {
+        using var config = repo.GetConfigSnapshot();
+        using var remote = repo.LookupRemote(remoteName);
+
+        return TautSiteConfiguration.TryFindSiteNameForRemote(config, remote, out siteName);
     }
 }

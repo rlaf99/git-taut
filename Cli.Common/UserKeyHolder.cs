@@ -5,7 +5,7 @@ namespace Git.Taut;
 
 sealed class UserKeyHolder : IDisposable
 {
-    const int KeyIterationCount = 64000;
+    const int CrudeKeyIterationCount = 64000;
     const int KeySize = 32;
 
     [AllowNull]
@@ -24,7 +24,7 @@ sealed class UserKeyHolder : IDisposable
         _crudeKey = Rfc2898DeriveBytes.Pbkdf2(
             passwordData,
             passwordSalt,
-            KeyIterationCount,
+            CrudeKeyIterationCount,
             HashAlgorithmName.SHA256,
             KeySize
         );

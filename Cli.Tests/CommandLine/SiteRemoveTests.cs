@@ -56,9 +56,8 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo2();
 
         using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
-        using var hostConfig = hostRepo.GetConfig();
 
-        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
+        var repo0SiteName = hostRepo.FindTautSiteNameForRemote(Repo0);
 
         _plan.SetLaunchDirectory(_plan.Repo2Root);
 
@@ -71,7 +70,7 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
 
-        Assert.False(TautSiteConfig.TryFindSiteNameForRemote(hostConfig, Repo0, out _));
+        Assert.False(hostRepo.TryFindTautSiteNameForRemote(Repo0, out _));
 
         var repo0SitePath = hostRepo.GetTautSitePath(repo0SiteName);
         Assert.False(Directory.Exists(repo0SitePath));
@@ -88,8 +87,8 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
         using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
         using var hostConfig = hostRepo.GetConfig();
 
-        var repo0SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo0);
-        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo1);
+        var repo0SiteName = hostRepo.FindTautSiteNameForRemote(Repo0);
+        var repo1SiteName = hostRepo.FindTautSiteNameForRemote(Repo1);
 
         _plan.SetLaunchDirectory(_plan.Repo2Root);
 
@@ -119,9 +118,8 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
         _plan.ConfigRepo2AddingRepo1WithLinkToRepo0();
 
         using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
-        using var hostConfig = hostRepo.GetConfig();
 
-        var repo1SiteName = TautSiteConfig.FindSiteNameForRemote(hostConfig, Repo1);
+        var repo1SiteName = hostRepo.FindTautSiteNameForRemote(Repo1);
 
         _plan.SetLaunchDirectory(_plan.Repo2Root);
 
@@ -134,7 +132,7 @@ public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
         var exitCode = parseResult.Invoke(_invCfg);
         Assert.Equal(0, exitCode);
 
-        Assert.False(TautSiteConfig.TryFindSiteNameForRemote(hostConfig, Repo1, out _));
+        Assert.False(hostRepo.TryFindTautSiteNameForRemote(Repo1, out _));
 
         var repo1SitePath = hostRepo.GetTautSitePath(repo1SiteName);
         Assert.False(Directory.Exists(repo1SitePath));

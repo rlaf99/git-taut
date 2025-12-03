@@ -15,9 +15,6 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
 
     public void Dispose()
     {
-        var tautSetup = _host.Services.GetRequiredService<TautSetup>();
-        tautSetup.Dispose();
-
         _plan.PreserveContentWhenFailed(testOutput);
         _plan.Dispose();
     }
@@ -28,7 +25,7 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo0();
         _plan.SetupRepo1();
 
-        _plan.RunGit("-C", _plan.Location, "clone", $"taut::{Repo0}", Repo2);
+        _plan.RunGitOnRoot("clone", $"taut::{Repo0}", Repo2);
 
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
 
@@ -65,12 +62,12 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
     }
 
     [Fact]
-    public void TautenCommitIntoSame()
+    public void TautenCommitIntoSameObject()
     {
         _plan.SetupRepo0();
         _plan.SetupRepo1();
 
-        _plan.RunGit("-C", _plan.Location, "clone", $"taut::{Repo0}", Repo2);
+        _plan.RunGitOnRoot("clone", $"taut::{Repo0}", Repo2);
 
         using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
 
@@ -79,13 +76,12 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
 
         _plan.AddFile(_plan.Repo2Root, a_md, a_md_content);
 
-        _plan.RunGit("-C", _plan.Repo2Root, "add", "--all");
-        _plan.RunGit("-C", _plan.Repo2Root, "commit", "-m", a_md);
+        _plan.RunGitOnRepo2("add", "--all");
+        _plan.RunGitOnRepo2("commit", "-m", a_md);
 
-        var tautSetup = _host.Services.GetRequiredService<TautSetup>();
+        using var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
-        using var config = hostRepo.GetConfigSnapshot();
-        var tautRepoName = TautSiteConfig.FindSiteNameForRemote(config, "origin");
+        var tautRepoName = hostRepo.FindTautSiteNameForRemote(Origin);
         tautSetup.GearUpExisting(hostRepo, "origin", tautRepoName);
 
         var tautManager = _host.Services.GetRequiredService<TautManager>();
@@ -102,12 +98,12 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
     }
 
     [Fact]
-    public void TautenCommitIntoDifferent()
+    public void TautenCommitIntoDifferentObjects()
     {
         _plan.SetupRepo0();
         _plan.SetupRepo1();
 
-        _plan.RunGit("-C", _plan.Location, "clone", $"taut::{Repo0}", Repo2);
+        _plan.RunGitOnRoot("clone", $"taut::{Repo0}", Repo2);
 
         using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
 
@@ -116,13 +112,12 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
 
         _plan.AddFile(_plan.Repo2Root, a_tt, a_tt_content);
 
-        _plan.RunGit("-C", _plan.Repo2Root, "add", "--all");
-        _plan.RunGit("-C", _plan.Repo2Root, "commit", "-m", a_tt);
+        _plan.RunGitOnRepo2("add", "--all");
+        _plan.RunGitOnRepo2("commit", "-m", a_tt);
 
-        var tautSetup = _host.Services.GetRequiredService<TautSetup>();
+        using var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
-        using var config = hostRepo.GetConfigSnapshot();
-        var tautRepoName = TautSiteConfig.FindSiteNameForRemote(config, "origin");
+        var tautRepoName = hostRepo.FindTautSiteNameForRemote(Origin);
         tautSetup.GearUpExisting(hostRepo, "origin", tautRepoName);
 
         var tautManager = _host.Services.GetRequiredService<TautManager>();

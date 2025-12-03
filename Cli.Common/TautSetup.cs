@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Lg2.Sharpy;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
@@ -15,7 +14,7 @@ sealed class TautSetup(
     GitCli gitCli
 ) : IDisposable
 {
-    const string defaultDescription = $"Created by {AppInfo.GitTautCommandName}";
+    const string _defaultDescription = $"Created by {AppInfo.GitTautCommandName}";
 
     [AllowNull]
     string _remoteName;
@@ -39,9 +38,9 @@ sealed class TautSetup(
     internal string KeyValueStoreLocation => _tautRepo.GetObjectInfoDirPath();
 
     [AllowNull]
-    TautSiteConfig? _siteConfig;
+    TautSiteConfiguration? _siteConfig;
 
-    TautSiteConfig SiteConfig => _siteConfig!;
+    TautSiteConfiguration SiteConfig => _siteConfig!;
 
     bool _gearedUp;
 
@@ -114,8 +113,6 @@ sealed class TautSetup(
 
     void EnsureBrandNewSetup(string remoteAddress)
     {
-        SiteConfig.Remotes.Add(RemoteName);
-
         var tautSitePath = HostRepo.GetTautSitePath(SiteConfig.SiteName);
 
         List<string> argList =
@@ -154,8 +151,6 @@ sealed class TautSetup(
         _tautRepo = Lg2Repository.New(tautSitePath);
 
         SetSiteDescription();
-        // SetSiteFetchConfig();
-        // TautAddHostObjects();
         UpdateRemoteUrls();
         UpdateTautConfig();
     }
@@ -169,57 +164,39 @@ sealed class TautSetup(
         using (var writer = File.AppendText(descriptionFile))
         {
             writer.NewLine = "\n";
-            writer.WriteLine(defaultDescription);
+            writer.WriteLine(_defaultDescription);
         }
 
         logger.ZLogTrace($"Updated '{descriptionFile}'");
     }
 
-    // Not used, as `--reference repo` is used when cloning.
-    void TautAddHostObjects()
-    {
-        var tautRepoObjectsDir = GitRepoHelpers.GetObjectDirPath(_tautRepo);
-        var tautRepoObjectsInfoAlternatesFile = GitRepoHelpers.GetObjectsInfoAlternatesFilePath(
-            _tautRepo
-        );
-        var hostRepoObjectsDir = GitRepoHelpers.GetObjectDirPath(_hostRepo);
-
-        var relativePath = Path.GetRelativePath(tautRepoObjectsDir, hostRepoObjectsDir);
-        relativePath = GitRepoHelpers.UseForwardSlash(relativePath);
-
-        using (var writer = File.AppendText(tautRepoObjectsInfoAlternatesFile))
-        {
-            writer.NewLine = "\n";
-            writer.WriteLine(relativePath);
-        }
-
-        logger.ZLogTrace($"Wrote '{relativePath}' to '{tautRepoObjectsInfoAlternatesFile}'");
-    }
-
-    void SetSiteFetchConfig()
-    {
-        using var config = _tautRepo.GetConfig();
-        config.SetString(GitConfigHelpers.Fetch_Prune, "true");
-    }
-
     void UpdateRemoteUrls()
     {
-        using (var remote = TautRepo.LookupRemote(RemoteName))
+        using var remote = TautRepo.LookupRemote(RemoteName);
+
+        var remoteUrl = remote.GetUrl();
+        var remoteUri = new Uri(remoteUrl);
+
+        if (remoteUri.IsFile)
         {
-            var remoteUrl = remote.GetUrl();
-            var remoteUri = new Uri(remoteUrl);
+            TautRepo.SetRemoteUrl(RemoteName, remoteUri.AbsolutePath);
+        }
+        else
+        {
+            TautRepo.SetRemoteUrl(RemoteName, remoteUri.AbsoluteUri);
+        }
 
-            if (remoteUri.IsFile)
-            {
-                TautRepo.SetRemoteUrl(RemoteName, remoteUri.AbsolutePath);
-            }
-            else
-            {
-                TautRepo.SetRemoteUrl(RemoteName, remoteUri.AbsoluteUri);
-            }
+        var hostRemoteUrl = GitRepoHelpers.AddTautRemoteHelperPrefix(remoteUri.AbsoluteUri);
 
-            var hostRemoteUrl = GitRepoHelpers.AddTautRemoteHelperPrefix(remoteUri.AbsoluteUri);
-            _hostRepo.SetRemoteUrl(RemoteName, hostRemoteUrl);
+        SiteConfig.RemoteUrl = hostRemoteUrl;
+
+        if (HostRepo.TryLookupRemote(RemoteName, out _))
+        {
+            HostRepo.SetRemoteUrl(RemoteName, hostRemoteUrl);
+        }
+        else
+        {
+            HostRepo.NewRemote(RemoteName, hostRemoteUrl);
         }
     }
 
@@ -227,7 +204,7 @@ sealed class TautSetup(
     {
         using var hostConfig = HostRepo.GetConfig();
 
-        SiteConfig.SaveRemotes(hostConfig);
+        SiteConfig.SaveRemoteUrl(hostConfig);
 
         if (SiteConfig.LinkTo is not null)
         {
@@ -324,7 +301,7 @@ sealed class TautSetup(
         CheckCredentialKeyTrait(SiteConfig);
     }
 
-    void CheckCredentialKeyTrait(TautSiteConfig tautConfig)
+    void CheckCredentialKeyTrait(TautSiteConfiguration tautConfig)
     {
         tautConfig.EnsureValues();
 

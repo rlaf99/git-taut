@@ -49,7 +49,7 @@ public sealed class UpdateTests(ITestOutputHelper testOutput) : IDisposable
 
         using var repo0 = Lg2Repository.New(_plan.Repo0Root);
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
-        using var repo2SiteRepo0 = TautSiteConfig.OpenSiteForRemote(repo2, Repo0);
+        using var repo2SiteRepo0 = TautSiteConfiguration.OpenSiteForRemote(repo2, Repo0);
 
         _plan.AddFileOnRepo2(_a_md, _a_md_content);
 
@@ -77,7 +77,7 @@ public sealed class UpdateTests(ITestOutputHelper testOutput) : IDisposable
 
         using var repo0 = Lg2Repository.New(_plan.Repo0Root);
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
-        using var repo2SiteRepo0 = TautSiteConfig.OpenSiteForRemote(repo2, Repo0);
+        using var repo2SiteRepo0 = TautSiteConfiguration.OpenSiteForRemote(repo2, Repo0);
 
         _plan.AddFileOnRepo2(_a_md, _a_md_content);
 
@@ -110,7 +110,7 @@ public sealed class UpdateTests(ITestOutputHelper testOutput) : IDisposable
 
         using var repo0 = Lg2Repository.New(_plan.Repo0Root);
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
-        using var repo2SiteRepo0 = TautSiteConfig.OpenSiteForRemote(repo2, Repo0);
+        using var repo2SiteRepo0 = TautSiteConfiguration.OpenSiteForRemote(repo2, Repo0);
 
         _plan.AddFileOnRepo2(_a_md, _a_md_content);
 
@@ -140,7 +140,7 @@ public sealed class UpdateTests(ITestOutputHelper testOutput) : IDisposable
 
         using var repo0 = Lg2Repository.New(_plan.Repo0Root);
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
-        using var repo2SiteRepo0 = TautSiteConfig.OpenSiteForRemote(repo2, Repo0);
+        using var repo2SiteRepo0 = TautSiteConfiguration.OpenSiteForRemote(repo2, Repo0);
 
         _plan.AddFileOnRepo2(_a_md, _a_md_content);
 
@@ -180,7 +180,7 @@ public sealed class UpdateTests(ITestOutputHelper testOutput) : IDisposable
 
         using var repo0 = Lg2Repository.New(_plan.Repo0Root);
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
-        using var repo2SiteRepo0 = TautSiteConfig.OpenSiteForRemote(repo2, Repo0);
+        using var repo2SiteRepo0 = TautSiteConfiguration.OpenSiteForRemote(repo2, Repo0);
 
         _plan.AddFileOnRepo2(_b_tt, _b_tt_content);
 
@@ -208,7 +208,7 @@ public sealed class UpdateTests(ITestOutputHelper testOutput) : IDisposable
 
         using var repo0 = Lg2Repository.New(_plan.Repo0Root);
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
-        using var repo2SiteRepo0 = TautSiteConfig.OpenSiteForRemote(repo2, Repo0);
+        using var repo2SiteRepo0 = TautSiteConfiguration.OpenSiteForRemote(repo2, Repo0);
 
         _plan.AddFileOnRepo2(_b_tt, _b_tt_content);
 
@@ -241,7 +241,7 @@ public sealed class UpdateTests(ITestOutputHelper testOutput) : IDisposable
 
         using var repo0 = Lg2Repository.New(_plan.Repo0Root);
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
-        using var repo2SiteRepo0 = TautSiteConfig.OpenSiteForRemote(repo2, Repo0);
+        using var repo2SiteRepo0 = TautSiteConfiguration.OpenSiteForRemote(repo2, Repo0);
 
         _plan.AddFileOnRepo2(_b_tt, _b_tt_content);
 
@@ -271,7 +271,7 @@ public sealed class UpdateTests(ITestOutputHelper testOutput) : IDisposable
 
         using var repo0 = Lg2Repository.New(_plan.Repo0Root);
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
-        using var repo2SiteRepo0 = TautSiteConfig.OpenSiteForRemote(repo2, Repo0);
+        using var repo2SiteRepo0 = TautSiteConfiguration.OpenSiteForRemote(repo2, Repo0);
 
         _plan.AddFileOnRepo2(_b_tt, _b_tt_content);
 

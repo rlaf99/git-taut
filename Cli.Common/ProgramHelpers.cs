@@ -157,17 +157,20 @@ class CommandActionHelpers
             string? siteName = null;
             bool targetIsRemote = false;
 
-            if (TautSiteConfig.IsExistingSite(config, targetName))
+            if (TautSiteConfiguration.IsExistingSite(config, targetName))
             {
                 siteName = targetName;
             }
             else
             {
-                targetIsRemote = TautSiteConfig.TryFindSiteNameForRemote(
-                    config,
-                    targetName,
-                    out siteName
-                );
+                if (hostRepo.TryLookupRemote(targetName, out var remote))
+                {
+                    targetIsRemote = TautSiteConfiguration.TryFindSiteNameForRemote(
+                        config,
+                        remote,
+                        out siteName
+                    );
+                }
             }
 
             if (siteName is null)
@@ -177,7 +180,7 @@ class CommandActionHelpers
                 );
             }
 
-            var siteConfig = TautSiteConfig.LoadNew(config, siteName);
+            var siteConfig = TautSiteConfiguration.LoadNew(config, siteName);
 
             return new(
                 SiteName: siteConfig.SiteName,
@@ -222,10 +225,11 @@ class CommandActionHelpers
 
         var headRefName = repoHead.GetName();
         var remoteName = hostRepo.GetBranchUpstreamRemoteName(headRefName);
+        var remote = hostRepo.LookupRemote(remoteName);
 
         using (var config = hostRepo.GetConfigSnapshot())
         {
-            if (TautSiteConfig.TryLoadByRemoteName(config, remoteName, out var tautConfig))
+            if (TautSiteConfiguration.TryLoadForRemote(config, remote, out var tautConfig))
             {
                 tautSiteName = tautConfig.SiteName;
 
@@ -383,7 +387,7 @@ class SiteCommandActions(
         if (linkExisting && targetSite is not null)
         {
             using var config = hostRepo.GetConfigSnapshot();
-            var targetSiteConfig = TautSiteConfig.LoadNew(config, targetSite);
+            var targetSiteConfig = TautSiteConfiguration.LoadNew(config, targetSite);
 
             if (targetSiteConfig.LinkTo is not null)
             {
@@ -422,7 +426,7 @@ class SiteCommandActions(
 
         using (var config = hostRepo.GetConfigSnapshot())
         {
-            TautSiteConfig.PrintSites(config, outputWriter, tautSiteName);
+            TautSiteConfiguration.PrintSites(config, outputWriter, tautSiteName);
         }
     }
 
@@ -439,7 +443,7 @@ class SiteCommandActions(
 
         using (var config = hostRepo.GetConfig())
         {
-            var siteConfig = TautSiteConfig.LoadNew(config, tautSiteName);
+            var siteConfig = TautSiteConfiguration.LoadNew(config, tautSiteName);
 
             siteConfig.ResolveReverseLinks(config);
 
@@ -447,18 +451,6 @@ class SiteCommandActions(
             {
                 throw new InvalidOperationException(
                     $"Taut site '{tautSiteName}' is linked by others (e.g., '{siteConfig.ReverseLinks[0]}')"
-                );
-            }
-
-            if (resolvedTarget.TargetIsRemote)
-            {
-                siteConfig.RemoveRemoteFromConfig(config, resolvedTarget.RemoteName!);
-            }
-
-            if (siteConfig.Remotes.Count != 0)
-            {
-                throw new InvalidOperationException(
-                    $"There are other remotes using taut site '{siteConfig.SiteName}'"
                 );
             }
 
@@ -475,7 +467,7 @@ class SiteCommandActions(
             "config",
             "remove-section",
             "--local",
-            $@"{TautSiteConfig.SectionName}.{tautSiteName}"
+            $@"{TautSiteConfiguration.SectionName}.{tautSiteName}"
         );
     }
 
