@@ -80,6 +80,8 @@ thirdparty/libgit2/include/git2/status.h
 thirdparty/libgit2/include/git2/branch.h
 thirdparty/libgit2/include/git2/reset.h
 thirdparty/libgit2/include/git2/checkout.h
+thirdparty/libgit2/include/git2/merge.h
+thirdparty/libgit2/include/git2/oidarray.h
 thirdparty/libgit2/include/git2/sys/credential.h
 thirdparty/libgit2/include/git2/sys/config.h
 

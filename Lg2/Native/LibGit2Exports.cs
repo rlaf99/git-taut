@@ -86,6 +86,9 @@ namespace Lg2.Native
         public static extern void git_oid_shorten_free(git_oid_shorten* os);
 
         [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_oidarray_dispose(git_oidarray* array);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_indexer_options_init(git_indexer_options* opts, [NativeTypeName("unsigned int")] uint version);
 
         [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -1188,6 +1191,54 @@ namespace Lg2.Native
         public static extern void git_index_conflict_iterator_free(git_index_conflict_iterator* iterator);
 
         [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_file_input_init(git_merge_file_input* opts, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_file_options_init(git_merge_file_options* opts, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_options_init(git_merge_options* opts, [NativeTypeName("unsigned int")] uint version);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_analysis(git_merge_analysis_t* analysis_out, git_merge_preference_t* preference_out, git_repository* repo, [NativeTypeName("const git_annotated_commit **")] git_annotated_commit** their_heads, [NativeTypeName("size_t")] nuint their_heads_len);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_analysis_for_ref(git_merge_analysis_t* analysis_out, git_merge_preference_t* preference_out, git_repository* repo, git_reference* our_ref, [NativeTypeName("const git_annotated_commit **")] git_annotated_commit** their_heads, [NativeTypeName("size_t")] nuint their_heads_len);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_base(git_oid* @out, git_repository* repo, [NativeTypeName("const git_oid *")] git_oid* one, [NativeTypeName("const git_oid *")] git_oid* two);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_bases(git_oidarray* @out, git_repository* repo, [NativeTypeName("const git_oid *")] git_oid* one, [NativeTypeName("const git_oid *")] git_oid* two);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_base_many(git_oid* @out, git_repository* repo, [NativeTypeName("size_t")] nuint length, [NativeTypeName("const git_oid[]")] git_oid* input_array);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_bases_many(git_oidarray* @out, git_repository* repo, [NativeTypeName("size_t")] nuint length, [NativeTypeName("const git_oid[]")] git_oid* input_array);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_base_octopus(git_oid* @out, git_repository* repo, [NativeTypeName("size_t")] nuint length, [NativeTypeName("const git_oid[]")] git_oid* input_array);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_file(git_merge_file_result* @out, [NativeTypeName("const git_merge_file_input *")] git_merge_file_input* ancestor, [NativeTypeName("const git_merge_file_input *")] git_merge_file_input* ours, [NativeTypeName("const git_merge_file_input *")] git_merge_file_input* theirs, [NativeTypeName("const git_merge_file_options *")] git_merge_file_options* opts);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_file_from_index(git_merge_file_result* @out, git_repository* repo, [NativeTypeName("const git_index_entry *")] git_index_entry* ancestor, [NativeTypeName("const git_index_entry *")] git_index_entry* ours, [NativeTypeName("const git_index_entry *")] git_index_entry* theirs, [NativeTypeName("const git_merge_file_options *")] git_merge_file_options* opts);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void git_merge_file_result_free(git_merge_file_result* result);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_trees(git_index** @out, git_repository* repo, [NativeTypeName("const git_tree *")] git_tree* ancestor_tree, [NativeTypeName("const git_tree *")] git_tree* our_tree, [NativeTypeName("const git_tree *")] git_tree* their_tree, [NativeTypeName("const git_merge_options *")] git_merge_options* opts);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge_commits(git_index** @out, git_repository* repo, [NativeTypeName("const git_commit *")] git_commit* our_commit, [NativeTypeName("const git_commit *")] git_commit* their_commit, [NativeTypeName("const git_merge_options *")] git_merge_options* opts);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern int git_merge(git_repository* repo, [NativeTypeName("const git_annotated_commit **")] git_annotated_commit** their_heads, [NativeTypeName("size_t")] nuint their_heads_len, [NativeTypeName("const git_merge_options *")] git_merge_options* merge_opts, [NativeTypeName("const git_checkout_options *")] git_checkout_options* checkout_opts);
+
+        [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern int git_refspec_parse(git_refspec** refspec, [NativeTypeName("const char *")] sbyte* input, int is_fetch);
 
         [DllImport("git2", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -1893,6 +1944,18 @@ namespace Lg2.Native
 
         [NativeTypeName("#define GIT_INDEX_ENTRY_STAGESHIFT 12")]
         public const int GIT_INDEX_ENTRY_STAGESHIFT = 12;
+
+        [NativeTypeName("#define GIT_MERGE_FILE_INPUT_VERSION 1")]
+        public const int GIT_MERGE_FILE_INPUT_VERSION = 1;
+
+        [NativeTypeName("#define GIT_MERGE_CONFLICT_MARKER_SIZE 7")]
+        public const int GIT_MERGE_CONFLICT_MARKER_SIZE = 7;
+
+        [NativeTypeName("#define GIT_MERGE_FILE_OPTIONS_VERSION 1")]
+        public const int GIT_MERGE_FILE_OPTIONS_VERSION = 1;
+
+        [NativeTypeName("#define GIT_MERGE_OPTIONS_VERSION 1")]
+        public const int GIT_MERGE_OPTIONS_VERSION = 1;
 
         [NativeTypeName("#define GIT_DEFAULT_PORT \"9418\"")]
         public static ReadOnlySpan<byte> GIT_DEFAULT_PORT => "9418"u8;

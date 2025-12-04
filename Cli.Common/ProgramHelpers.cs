@@ -355,6 +355,13 @@ class SiteCommandActions(
         var remoteName = parseResult.GetRequiredValue(ProgramCommandLine.RemoteNameArgument);
         var remoteAddress = parseResult.GetRequiredValue(ProgramCommandLine.RemoteAddressArgument);
 
+        if (remoteAddress.StartsWith(GitRepoHelpers.TautRemoteHelperPrefix))
+        {
+            throw new InvalidOperationException(
+                $"The remote address should not start with '{GitRepoHelpers.TautRemoteHelperPrefix}'"
+            );
+        }
+
         var linkExisting = parseResult.GetValue(ProgramCommandLine.LinkExistingOption);
 
         var hostRepo = actionHelpers.LocateHostRepo();
