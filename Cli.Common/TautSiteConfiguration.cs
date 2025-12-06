@@ -42,6 +42,9 @@ class TautSiteConfiguration
 
     string FormatItemName(string itemName) => $"{SectionName}.{SiteName}.{itemName}";
 
+    string FormatItemName(string siteName, string itemName) =>
+        $"{SectionName}.{siteName}.{itemName}";
+
     internal void EnsureValues()
     {
         if (string.IsNullOrEmpty(SiteName))
@@ -128,14 +131,31 @@ class TautSiteConfiguration
 
     internal void Load(Lg2Config config)
     {
-        CredentialUrl = config.GetString(FormatItemName(nameof(CredentialUrl)));
-
-        if (config.TryGetString(FormatItemName(nameof(CredentialUserName)), out var credUserName))
+        if (config.TryGetString(FormatItemName(nameof(LinkTo)), out var siteNameToLink))
         {
-            CredentialUserName = credUserName;
-        }
+            LinkTo = new TautSiteConfiguration(siteNameToLink);
+            LinkTo.Load(config);
 
-        CredentialKeyTrait = config.GetString(FormatItemName(nameof(CredentialKeyTrait)));
+            CredentialUrl = LinkTo.CredentialUrl;
+            CredentialUserName = LinkTo.CredentialUserName;
+            CredentialKeyTrait = LinkTo.CredentialKeyTrait;
+        }
+        else
+        {
+            CredentialUrl = config.GetString(FormatItemName(nameof(CredentialUrl)));
+
+            if (
+                config.TryGetString(
+                    FormatItemName(nameof(CredentialUserName)),
+                    out var credUserName
+                )
+            )
+            {
+                CredentialUserName = credUserName;
+            }
+
+            CredentialKeyTrait = config.GetString(FormatItemName(nameof(CredentialKeyTrait)));
+        }
 
         RemoteUrl = config.GetString(FormatItemName(nameof(RemoteUrl)));
     }

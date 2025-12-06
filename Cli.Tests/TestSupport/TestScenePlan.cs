@@ -66,11 +66,18 @@ class TestScenePlan(ITestOutputHelper testOutput) : TestScene
         );
     }
 
-    internal void AddFile(string dirPath, string filename, string content)
+    internal void AddFile(string location, string relativePath, string content)
     {
-        var filePath = Path.Join(dirPath, filename);
+        var filePath = Path.Join(location, relativePath);
 
         File.WriteAllText(filePath, content);
+    }
+
+    internal void AddDirectory(string location, string relativePath)
+    {
+        var dirPath = Path.Join(location, relativePath);
+
+        Directory.CreateDirectory(dirPath);
     }
 
     string? _repo0Root;
@@ -114,6 +121,12 @@ class TestScenePlan(ITestOutputHelper testOutput) : TestScene
 
     internal void AddFileOnRepo9(string filename, string content) =>
         AddFile(Repo9Root, filename, content);
+
+    internal void AddDirectoryOnRepo1(string dirName) => AddDirectory(Repo1Root, dirName);
+
+    internal void AddDirectoryOnRepo2(string dirName) => AddDirectory(Repo2Root, dirName);
+
+    internal void AddDirectoryOnRepo9(string dirName) => AddDirectory(Repo9Root, dirName);
 }
 
 static class TestScenePlanExtensions
@@ -150,17 +163,19 @@ static class TestScenePlanExtensions
 
     public static void SetupRepo1(this TestScenePlan plan)
     {
-        plan.RunGit("-C", plan.Location, "clone", Repo0, Repo1);
+        plan.RunGitOnRoot("clone", Repo0, Repo1);
 
-        plan.AddFile(plan.Repo1Root, "README", Repo1);
+        plan.AddFileOnRepo1("EMPTY", string.Empty);
 
-        plan.AddFile(
-            plan.Repo1Root,
+        plan.AddFileOnRepo1("README", Repo1);
+
+        plan.AddFileOnRepo1(
             GitRepoHelpers.DotGitAttributes,
             """
             *.tt taut
             tt taut
             tt/** taut
+            dd/** taut
             """
         );
 
@@ -171,7 +186,7 @@ static class TestScenePlanExtensions
 
     public static void SetupRepo2(this TestScenePlan plan)
     {
-        plan.RunGit("-C", plan.Location, "clone", "--origin", Repo0, $"taut::{Repo0}", Repo2);
+        plan.RunGitOnRoot("clone", "--origin", Repo0, $"taut::{Repo0}", Repo2);
     }
 
     public static void ConfigRepo2AddingRepo1(this TestScenePlan plan)
@@ -181,9 +196,7 @@ static class TestScenePlanExtensions
 
     public static void ConfigRepo2AddingRepo1WithLinkToRepo0(this TestScenePlan plan)
     {
-        plan.RunGit(
-            "-C",
-            plan.Repo2Root,
+        plan.RunGitOnRepo2(
             "taut",
             "--target",
             Repo0,
@@ -196,6 +209,6 @@ static class TestScenePlanExtensions
 
     public static void SetupRepo9(this TestScenePlan plan)
     {
-        plan.RunGit("-C", plan.Location, "clone", Repo0, Repo9);
+        plan.RunGitOnRoot("clone", "--bare", Repo0, Repo9);
     }
 }

@@ -4,7 +4,7 @@ using Git.Taut;
 
 namespace Cli.Tests.CommandLine;
 
-public sealed class SiteRunTests(ITestOutputHelper testOutput) : IDisposable
+public sealed class TautRunTests(ITestOutputHelper testOutput) : IDisposable
 {
     TestScenePlan _plan = new(testOutput);
 

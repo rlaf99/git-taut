@@ -511,10 +511,7 @@ public static unsafe class Lg2OdbExtenions
     {
         odb.EnsureValid();
 
-        if (objSize <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(objSize), $"Invalid value '{objSize}'");
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(objSize, 0, nameof(objSize));
 
         git_odb_stream* pOdbStream = null;
         var rc = git_odb_open_wstream(&pOdbStream, odb.Ptr, (ulong)objSize, (git_object_t)objType);

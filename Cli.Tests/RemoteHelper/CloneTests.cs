@@ -66,13 +66,13 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
         var repo0SiteName = repo2.FindTautSiteNameForRemote(Repo0);
 
-        _plan.RunGit("-C", _plan.Repo1Root, "pull");
+        _plan.RunGitOnRepo1("pull");
 
         var repo2SiteRepo0Root = GitRepoHelpers.GetTautSitePath(_plan.Repo2GitDir, repo0SiteName);
         using var repo2SiteRepo0 = Lg2Repository.New(repo2SiteRepo0Root);
         using var repo0Base = Lg2Repository.New(_plan.Repo0Root);
 
-        AssertSameBranchId(repo0Base, repo2SiteRepo0, "master");
+        AssertSameBranchId(repo0Base, repo2SiteRepo0, Master);
         AssertSiteHeadRef(repo2SiteRepo0);
     }
 
@@ -88,28 +88,20 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
 
         testOutput.WriteLine($"Serving {Repo0} at {repo0HttpUri.AbsoluteUri}");
 
-        _plan.RunGit(
-            "-C",
-            _plan.Location,
-            "clone",
-            "--origin",
-            Repo0,
-            $"taut::{repo0HttpUri.AbsoluteUri}",
-            Repo2
-        );
+        _plan.RunGitOnRoot("clone", "--origin", Repo0, $"taut::{repo0HttpUri.AbsoluteUri}", Repo2);
 
         UpdateContentAndPush(_plan.Repo2Root);
 
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
         var repo0SiteName = repo2.FindTautSiteNameForRemote(Repo0);
 
-        _plan.RunGit("-C", _plan.Repo1Root, "pull");
+        _plan.RunGitOnRepo1("pull");
 
         var repo2SiteRepo0Root = GitRepoHelpers.GetTautSitePath(_plan.Repo2GitDir, repo0SiteName);
         using var repo2SiteRepo0 = Lg2Repository.New(repo2SiteRepo0Root);
         using var repo0Base = Lg2Repository.New(_plan.Repo0Root);
 
-        AssertSameBranchId(repo0Base, repo2SiteRepo0, "master");
+        AssertSameBranchId(repo0Base, repo2SiteRepo0, Master);
         AssertSiteHeadRef(repo2SiteRepo0);
     }
 
@@ -137,14 +129,14 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
 
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
 
-        _plan.RunGit("-C", _plan.Repo1Root, "pull");
+        _plan.RunGitOnRepo1("pull");
 
         var repo0SiteName = repo2.FindTautSiteNameForRemote(Repo0);
         var repo2SiteRepo0Root = GitRepoHelpers.GetTautSitePath(_plan.Repo2GitDir, repo0SiteName);
         using var repo2SiteRepo0 = Lg2Repository.New(repo2SiteRepo0Root);
         using var repo0Base = Lg2Repository.New(_plan.Repo0Root);
 
-        AssertSameBranchId(repo0Base, repo2SiteRepo0, "master");
+        AssertSameBranchId(repo0Base, repo2SiteRepo0, Master);
         AssertSiteHeadRef(repo2SiteRepo0);
     }
 
@@ -164,14 +156,14 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
 
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
 
-        _plan.RunGit("-C", _plan.Repo1Root, "pull");
+        _plan.RunGitOnRepo1("pull");
 
         var repo0SiteName = repo2.FindTautSiteNameForRemote(Repo0);
         var repo2SiteRepo0Root = GitRepoHelpers.GetTautSitePath(_plan.Repo2GitDir, repo0SiteName);
         using var repo2SiteRepo0 = Lg2Repository.New(repo2SiteRepo0Root);
         using var repo0Base = Lg2Repository.New(_plan.Repo0Root);
 
-        AssertSameBranchId(repo0Base, repo2SiteRepo0, "master");
+        AssertSameBranchId(repo0Base, repo2SiteRepo0, Master);
         AssertSiteHeadRef(repo2SiteRepo0);
     }
 
@@ -204,30 +196,33 @@ public sealed class CloneTests(ITestOutputHelper testOutput) : IDisposable
         _plan.SetupRepo0();
         _plan.SetupRepo1();
         _plan.SetupRepo2();
+        _plan.SetupRepo9();
 
-        _plan.RunGit(
-            "-C",
-            _plan.Repo2Root,
+        _plan.RunGitOnRepo2(
             "taut",
             "--target",
             Repo0,
             "add",
             "--link-existing",
-            Repo1,
-            Path.Join("..", Repo1)
+            Repo9,
+            Path.Join("..", Repo9)
         );
 
         using var repo2 = Lg2Repository.New(_plan.Repo2Root);
-        var repo2SiteRepo1Name = repo2.FindTautSiteNameForRemote(Repo1);
+        var repo2SiteRepo9Name = repo2.FindTautSiteNameForRemote(Repo9);
 
-        var repo2SiteRepo1Root = GitRepoHelpers.GetTautSitePath(
+        var repo2SiteRepo9Root = GitRepoHelpers.GetTautSitePath(
             _plan.Repo2GitDir,
-            repo2SiteRepo1Name
+            repo2SiteRepo9Name
         );
-        using var repo2SiteRepo1 = Lg2Repository.New(repo2SiteRepo1Root);
-        using var repo1Base = Lg2Repository.New(_plan.Repo1Root);
+        using var repo2SiteRepo9 = Lg2Repository.New(repo2SiteRepo9Root);
+        using var repo9Base = Lg2Repository.New(_plan.Repo9Root);
 
-        AssertSameBranchId(repo1Base, repo2SiteRepo1, "master");
-        AssertSiteHeadRef(repo2SiteRepo1);
+        AssertSameBranchId(repo9Base, repo2SiteRepo9, Master);
+        AssertSiteHeadRef(repo2SiteRepo9);
+
+        UpdateContentAndPush(_plan.Repo2Root);
+
+        _plan.RunGitOnRepo2("push", Repo9);
     }
 }

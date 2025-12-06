@@ -6,7 +6,7 @@ using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.CommandLine;
 
-public sealed class SiteAddTests(ITestOutputHelper testOutput) : IDisposable
+public sealed class TautAddTests(ITestOutputHelper testOutput) : IDisposable
 {
     TestScenePlan _plan = new(testOutput);
 

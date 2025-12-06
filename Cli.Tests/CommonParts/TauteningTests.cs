@@ -74,7 +74,7 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
         string a_md = "a.md";
         string a_md_content = "Not encrypted";
 
-        _plan.AddFile(_plan.Repo2Root, a_md, a_md_content);
+        _plan.AddFileOnRepo2(a_md, a_md_content);
 
         _plan.RunGitOnRepo2("add", "--all");
         _plan.RunGitOnRepo2("commit", "-m", a_md);
@@ -82,7 +82,7 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
         using var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
         var tautRepoName = hostRepo.FindTautSiteNameForRemote(Origin);
-        tautSetup.GearUpExisting(hostRepo, "origin", tautRepoName);
+        tautSetup.GearUpExisting(hostRepo, Origin, tautRepoName);
 
         var tautManager = _host.Services.GetRequiredService<TautManager>();
 
@@ -110,7 +110,7 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
         string a_tt = "a.tt";
         string a_tt_content = "Encrypted";
 
-        _plan.AddFile(_plan.Repo2Root, a_tt, a_tt_content);
+        _plan.AddFileOnRepo2(a_tt, a_tt_content);
 
         _plan.RunGitOnRepo2("add", "--all");
         _plan.RunGitOnRepo2("commit", "-m", a_tt);
@@ -118,7 +118,93 @@ public class TauteningTests(ITestOutputHelper testOutput) : IDisposable
         using var tautSetup = _host.Services.GetRequiredService<TautSetup>();
 
         var tautRepoName = hostRepo.FindTautSiteNameForRemote(Origin);
-        tautSetup.GearUpExisting(hostRepo, "origin", tautRepoName);
+        tautSetup.GearUpExisting(hostRepo, Origin, tautRepoName);
+
+        var tautManager = _host.Services.GetRequiredService<TautManager>();
+
+        var hostHeadCommit = tautManager.HostRepo.GetHeadCommit();
+
+        tautManager.TautenCommit(hostHeadCommit);
+
+        var kvStore = _host.Services.GetRequiredService<TautMapping>();
+
+        Lg2Oid resultOid = new();
+        Assert.True(kvStore.TryGetTautened(hostHeadCommit, ref resultOid));
+        Assert.False(hostHeadCommit.GetOidPlainRef().Equals(resultOid));
+
+        var tautenedCommit = tautManager.TautRepo.LookupCommit(resultOid);
+        tautManager.RegainCommit(tautenedCommit);
+    }
+
+    [Fact]
+    public void TautenSubFilesIncludingDirectory()
+    {
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
+
+        _plan.RunGitOnRoot("clone", $"taut::{Repo0}", Repo2);
+
+        var tt = "tt";
+
+        _plan.AddDirectoryOnRepo2(tt);
+
+        var tt_a_md = Path.Join(tt, "a.md");
+        var tt_a_md_content = "Encrypted";
+
+        _plan.AddFileOnRepo2(tt_a_md, tt_a_md_content);
+
+        _plan.RunGitOnRepo2("add", "--all");
+        _plan.RunGitOnRepo2("commit", "-m", tt);
+
+        using var tautSetup = _host.Services.GetRequiredService<TautSetup>();
+
+        using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
+
+        var tautRepoName = hostRepo.FindTautSiteNameForRemote(Origin);
+        tautSetup.GearUpExisting(hostRepo, Origin, tautRepoName);
+
+        var tautManager = _host.Services.GetRequiredService<TautManager>();
+
+        var hostHeadCommit = tautManager.HostRepo.GetHeadCommit();
+
+        tautManager.TautenCommit(hostHeadCommit);
+
+        var kvStore = _host.Services.GetRequiredService<TautMapping>();
+
+        Lg2Oid resultOid = new();
+        Assert.True(kvStore.TryGetTautened(hostHeadCommit, ref resultOid));
+        Assert.False(hostHeadCommit.GetOidPlainRef().Equals(resultOid));
+
+        var tautenedCommit = tautManager.TautRepo.LookupCommit(resultOid);
+        tautManager.RegainCommit(tautenedCommit);
+    }
+
+    [Fact]
+    public void TautenSubFilesExcludsingDirectory()
+    {
+        _plan.SetupRepo0();
+        _plan.SetupRepo1();
+
+        _plan.RunGitOnRoot("clone", $"taut::{Repo0}", Repo2);
+
+        var dd = "dd";
+
+        _plan.AddDirectoryOnRepo2(dd);
+
+        var dd_a_md = Path.Join(dd, "a.md");
+        var dd_a_md_content = "Encrypted";
+
+        _plan.AddFileOnRepo2(dd_a_md, dd_a_md_content);
+
+        _plan.RunGitOnRepo2("add", "--all");
+        _plan.RunGitOnRepo2("commit", "-m", dd);
+
+        using var tautSetup = _host.Services.GetRequiredService<TautSetup>();
+
+        using var hostRepo = Lg2Repository.New(_plan.Repo2Root);
+
+        var tautRepoName = hostRepo.FindTautSiteNameForRemote(Origin);
+        tautSetup.GearUpExisting(hostRepo, Origin, tautRepoName);
 
         var tautManager = _host.Services.GetRequiredService<TautManager>();
 

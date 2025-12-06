@@ -6,7 +6,7 @@ using static Cli.Tests.TestSupport.TestScenePlanConstants;
 
 namespace Cli.Tests.CommandLine;
 
-public sealed class SiteRemoveTests(ITestOutputHelper testOutput) : IDisposable
+public sealed class TautRemoveTests(ITestOutputHelper testOutput) : IDisposable
 {
     InvocationConfiguration _invCfg = new()
     {

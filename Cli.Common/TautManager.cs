@@ -341,6 +341,7 @@ class TautManager(
         {
             logger.ZLogTrace($"Ignore regained tree {tautTreeOidHex8} '{tautTreePath}'");
         }
+        else
         {
             logger.ZLogTrace($"Start regaining tree {tautTreeOidHex8} '{tautTreePath}'");
 
@@ -466,7 +467,7 @@ class TautManager(
                     await RegainTreeAsync(tree);
                 }
 
-                var oid = new Lg2Oid();
+                Lg2Oid oid = new();
                 tautMapping.GetRegained(entry, ref oid);
 
                 if (
