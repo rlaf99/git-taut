@@ -41,7 +41,7 @@ public sealed class TautRemoveTests(ITestOutputHelper testOutput) : IDisposable
         Assert.NotEqual(0, exitCode);
 
         var wantedError =
-            $"Option {ProgramCommandLine.SiteTargetOption.Name} is not specified"
+            $"{ProgramCommandLine.SiteTargetOption.Name} is required but was not provided."
             + Environment.NewLine;
         var actualError = _invCfg.Error.ToString();
 
@@ -74,6 +74,8 @@ public sealed class TautRemoveTests(ITestOutputHelper testOutput) : IDisposable
 
         var repo0SitePath = hostRepo.GetTautSitePath(repo0SiteName);
         Assert.False(Directory.Exists(repo0SitePath));
+
+        Assert.False(hostRepo.TryLookupRemote(Repo0, out _));
     }
 
     [Fact]

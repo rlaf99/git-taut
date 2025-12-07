@@ -138,7 +138,6 @@ class CommandActionHelpers
 {
     internal record ResolveTargetOptionResult(
         string SiteName,
-        string? RemoteName,
         bool TargetIsRemote,
         bool SiteIsFromHead
     );
@@ -150,6 +149,15 @@ class CommandActionHelpers
     )
     {
         var targetName = parseResult.GetValue(ProgramCommandLine.SiteTargetOption);
+        return ResolveTargetOption(hostRepo, targetName, followHead);
+    }
+
+    internal ResolveTargetOptionResult ResolveTargetOption(
+        Lg2Repository hostRepo,
+        string? targetName,
+        bool followHead
+    )
+    {
         if (targetName is not null)
         {
             using var config = hostRepo.GetConfigSnapshot();
@@ -184,7 +192,6 @@ class CommandActionHelpers
 
             return new(
                 SiteName: siteConfig.SiteName,
-                RemoteName: targetIsRemote ? targetName : null,
                 TargetIsRemote: targetIsRemote,
                 SiteIsFromHead: false
             );
@@ -193,12 +200,7 @@ class CommandActionHelpers
         {
             if (TryResolveTautSiteNameFromHead(hostRepo, out var tautSiteName))
             {
-                return new(
-                    SiteName: tautSiteName,
-                    RemoteName: null,
-                    TargetIsRemote: false,
-                    SiteIsFromHead: true
-                );
+                return new(SiteName: tautSiteName, TargetIsRemote: false, SiteIsFromHead: true);
             }
 
             throw new InvalidOperationException($"Cannot resolve taut site name from HEAD");
@@ -439,13 +441,18 @@ class SiteCommandActions(
 
     internal void Remove(ParseResult parseResult)
     {
-        var hostRepo = actionHelpers.LocateHostRepo();
+        using var hostRepo = actionHelpers.LocateHostRepo();
+
+        var targetName = parseResult.GetRequiredValue(ProgramCommandLine.SiteTargetOption);
 
         var resolvedTarget = actionHelpers.ResolveTargetOption(
-            parseResult,
             hostRepo,
+            targetName,
             followHead: false
         );
+
+        var launchDir = actionHelpers.LaunchDirectory ?? Directory.GetCurrentDirectory();
+
         var tautSiteName = resolvedTarget.SiteName;
 
         using (var config = hostRepo.GetConfig())
@@ -464,9 +471,23 @@ class SiteCommandActions(
             var tautSitePath = hostRepo.GetTautSitePath(siteConfig.SiteName);
 
             GitRepoHelpers.DeleteGitDir(tautSitePath);
-        }
 
-        var launchDir = actionHelpers.LaunchDirectory ?? Directory.GetCurrentDirectory();
+            var remoteNames = hostRepo.GetRemoteList();
+
+            foreach (var remoteName in remoteNames)
+            {
+                using var remote = hostRepo.LookupRemote(remoteName);
+
+                var remoteUrl = remote.GetUrl();
+
+                if (remoteUrl == siteConfig.RemoteUrl)
+                {
+                    gitCli.Execute("-C", launchDir, "remote", "remove", remoteName);
+
+                    break;
+                }
+            }
+        }
 
         gitCli.Execute(
             "-C",

@@ -492,7 +492,12 @@ static partial class Lg2RepositoryExtensions
     )
     {
         using var config = repo.GetConfigSnapshot();
-        using var remote = repo.LookupRemote(remoteName);
+
+        if (repo.TryLookupRemote(remoteName, out var remote) == false)
+        {
+            siteName = null;
+            return false;
+        }
 
         return TautSiteConfiguration.TryFindSiteNameForRemote(config, remote, out siteName);
     }

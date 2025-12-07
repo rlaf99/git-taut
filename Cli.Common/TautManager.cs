@@ -59,13 +59,13 @@ class TautManager(
             if (sourceOidText == targetOidText)
             {
                 logger.ZLogTrace(
-                    $"Tautened {objTypeName} {sourceOidText[..8]} into same {objTypeName}"
+                    $"Tautened {objTypeName} {sourceOidText[..7]} into same {objTypeName}"
                 );
             }
             else
             {
                 logger.ZLogTrace(
-                    $"Tautened {objTypeName} {sourceOidText[..8]} into {targetOidText}"
+                    $"Tautened {objTypeName} {sourceOidText[..7]} into {targetOidText}"
                 );
             }
         }
@@ -85,12 +85,12 @@ class TautManager(
 
             if (sourceOidText == targetOidText)
             {
-                logger.ZLogTrace($"Regained {targetOidText} from same {objTypeName}");
+                logger.ZLogTrace($"Regained {targetOidText[..7]} from same {objTypeName}");
             }
             else
             {
                 logger.ZLogTrace(
-                    $"Regained {targetOidText} from {objTypeName} {sourceOidText[..8]}"
+                    $"Regained {targetOidText[..7]} from {objTypeName} {sourceOidText[..7]}"
                 );
             }
         }
@@ -147,7 +147,7 @@ class TautManager(
                 TautRepo.NewRef(regainedTagName, regainedOid, force: false);
 
                 logger.ZLogTrace(
-                    $"Created new tag '{regainedTagName}' '{regainedOid.GetOidHexDigits(8)}"
+                    $"Created new tag '{regainedTagName}' '{regainedOid.GetOidHexDigits(7)}"
                 );
             }
             else
@@ -158,7 +158,7 @@ class TautManager(
                     regaintedTagRef.SetTarget(regainedOid);
 
                     logger.ZLogTrace(
-                        $"Updated tag '{regainedTagName}' from '{oldRegainedOid.GetOidHexDigits(8)}' to '{regainedOid.GetOidHexDigits(8)}'"
+                        $"Updated tag '{regainedTagName}' from '{oldRegainedOid.GetOidHexDigits(7)}' to '{regainedOid.GetOidHexDigits(7)}'"
                     );
                 }
             }
@@ -182,19 +182,19 @@ class TautManager(
 
             if (tautMapping.HasRegained(tagTargetObj) == false)
             {
-                var oidHex8 = tagTargetObj.GetOidHexDigits(8);
+                var oidHex7 = tagTargetObj.GetOidHexDigits(7);
 
-                logger.ZLogTrace($"Start regaining tag object {oidHex8}");
+                logger.ZLogTrace($"Start regaining tag object {oidHex7}");
 
                 await RegainTagTargetAsync(tagTargetObj);
 
-                logger.ZLogTrace($"Done regaining tag object {oidHex8}");
+                logger.ZLogTrace($"Done regaining tag object {oidHex7}");
             }
 
             Lg2Oid oid = new();
             tautMapping.GetRegained(tagTargetObj, ref oid);
 
-            var regainedTagTargetObj = TautRepo.LookupObject(oid, Lg2ObjectType.LG2_OBJECT_TAG);
+            var regainedTagTargetObj = TautRepo.LookupTagObject(oid);
 
             TautRepo.NewAnnotatedTag(
                 annotatedTag.GetName(),
@@ -214,13 +214,13 @@ class TautManager(
 
             if (tautMapping.HasRegained(commitOid) == false)
             {
-                var oidHex8 = commitOid.GetOidHexDigits(8);
+                var oidHex7 = commitOid.GetOidHexDigits(7);
 
-                logger.ZLogTrace($"Start regaining commit {oidHex8}");
+                logger.ZLogTrace($"Start regaining commit {oidHex7}");
 
                 RegainCommit(commit);
 
-                logger.ZLogTrace($"Done regaining commit {oidHex8}");
+                logger.ZLogTrace($"Done regaining commit {oidHex7}");
             }
         }
         else
@@ -266,7 +266,7 @@ class TautManager(
                 Lg2Oid tautOid = new();
                 tautMapping.GetTautened(hostOid, ref tautOid);
 
-                logger.ZLogTrace($"RevWalk.Hide {tautOid.GetOidHexDigits(8)} ({refName})");
+                logger.ZLogTrace($"RevWalk.Hide {tautOid.GetOidHexDigits(7)} ({refName})");
 
                 revWalk.Hide(tautOid);
             }
@@ -283,45 +283,45 @@ class TautManager(
         {
             var tautCommit = TautRepo.LookupCommit(oid);
 
-            var commitOidHex8 = oid.GetOidHexDigits(8);
+            var commitOidHex7 = oid.GetOidHexDigits(7);
             var commitSummary = tautCommit.GetSummary();
 
             if (tautMapping.HasRegained(tautCommit))
             {
-                logger.ZLogTrace($"Ignore regained commit {commitOidHex8} '{commitSummary}'");
+                logger.ZLogTrace($"Ignore regained commit {commitOidHex7} '{commitSummary}'");
 
                 continue;
             }
 
-            logger.ZLogTrace($"Start regaining commit {commitOidHex8} '{commitSummary}'");
+            logger.ZLogTrace($"Start regaining commit {commitOidHex7} '{commitSummary}'");
 
             RegainCommit(tautCommit);
 
-            logger.ZLogTrace($"Done regaining commit {commitOidHex8} '{commitSummary}'");
+            logger.ZLogTrace($"Done regaining commit {commitOidHex7} '{commitSummary}'");
         }
 
         foreach (var refName in headRefNames)
         {
             Lg2Oid tautOid = new();
             TautRepo.GetRefOid(refName, ref tautOid);
-            var tautOidHex8 = tautOid.GetOidHexDigits(8);
+            var tautOidHex7 = tautOid.GetOidHexDigits(7);
 
             Lg2Oid hostOid = new();
             tautMapping.GetRegained(tautOid, ref hostOid);
-            var hostOidHex8 = hostOid.GetOidHexDigits(8);
+            var hostOidHex7 = hostOid.GetOidHexDigits(7);
 
             var regainedRefName = GitRefSpecs.RefsToRefsRegained.TransformToTarget(refName);
 
             if (tautOid.Equals(ref hostOid))
             {
-                var message = $"Regained {refName} {hostOidHex8} from same object";
+                var message = $"Regained {refName} {hostOidHex7} from same object";
 
                 TautRepo.SetRef(regainedRefName, hostOid, message);
                 logger.ZLogTrace($"{message}");
             }
             else
             {
-                var message = $"Regained {refName} {hostOidHex8} from {tautOidHex8}";
+                var message = $"Regained {refName} {hostOidHex7} from {tautOidHex7}";
 
                 TautRepo.SetRef(regainedRefName, hostOid, message);
                 logger.ZLogTrace($"{message}");
@@ -334,21 +334,21 @@ class TautManager(
     internal void RegainCommit(ILg2Commit tautCommit)
     {
         var tautTree = tautCommit.GetTree();
-        var tautTreeOidHex8 = tautTree.GetOidHexDigits(8);
+        var tautTreeOidHex7 = tautTree.GetOidHexDigits(7);
         var tautTreePath = string.Empty;
 
         if (tautMapping.HasRegained(tautTree))
         {
-            logger.ZLogTrace($"Ignore regained tree {tautTreeOidHex8} '{tautTreePath}'");
+            logger.ZLogTrace($"Ignore regained tree {tautTreeOidHex7} '{tautTreePath}'");
         }
         else
         {
-            logger.ZLogTrace($"Start regaining tree {tautTreeOidHex8} '{tautTreePath}'");
+            logger.ZLogTrace($"Start regaining tree {tautTreeOidHex7} '{tautTreePath}'");
 
             var task = RegainTreeAsync(tautTree);
             task.GetAwaiter().GetResult();
 
-            logger.ZLogTrace($"Done regaining tree {tautTreeOidHex8} '{tautTreePath}'");
+            logger.ZLogTrace($"Done regaining tree {tautTreeOidHex7} '{tautTreePath}'");
         }
 
         Lg2Oid oid = new();
@@ -387,11 +387,11 @@ class TautManager(
         StoreRegained(objInfo, objInfo.GetOidPlainRef());
     }
 
-    bool TryDecryptEntryName(
+    bool TryRegainEntryName(
         string entryName,
         Lg2OidPlainRef entryOid,
-        out string entryNameToUse,
-        out Lg2FileMode fileModeToUse
+        out string regainedEntryName,
+        out Lg2FileMode regainedFileMode
     )
     {
         byte[] entryNameData;
@@ -402,8 +402,8 @@ class TautManager(
         }
         catch (FormatException)
         {
-            entryNameToUse = entryName;
-            fileModeToUse = Lg2FileMode.LG2_FILEMODE_UNREADABLE;
+            regainedEntryName = string.Empty;
+            regainedFileMode = Lg2FileMode.LG2_FILEMODE_UNREADABLE;
 
             return false;
         }
@@ -413,7 +413,7 @@ class TautManager(
         var decData = decDataStream.GetBuffer().AsSpan(0, (int)decDataStream.Length);
 
         var entryNameToUseData = decData[..^4];
-        entryNameToUse = Encoding.UTF8.GetString(entryNameToUseData);
+        regainedEntryName = Encoding.UTF8.GetString(entryNameToUseData);
 
         var fileModeData = decData[^4..].ToArray();
         if (BitConverter.IsLittleEndian)
@@ -422,16 +422,16 @@ class TautManager(
         }
         var fileMode = BitConverter.ToInt32(fileModeData);
 
-        fileModeToUse = (Lg2FileMode)fileMode;
+        regainedFileMode = (Lg2FileMode)fileMode;
 
-        if (Enum.IsDefined(fileModeToUse) == false)
+        if (Enum.IsDefined(regainedFileMode) == false)
         {
             throw new InvalidCastException(
                 $"Failed to restore {nameof(Lg2FileMode)} from integer value '{fileMode}'"
             );
         }
 
-        logger.ZLogTrace($"Regained name '{entryNameToUse}' from '{entryName}'");
+        logger.ZLogTrace($"Regained name '{regainedEntryName}' from '{entryName}'");
 
         return true;
     }
@@ -448,18 +448,18 @@ class TautManager(
             var entry = tautTree.GetEntry(i);
             var entryName = entry.GetName();
             var entryObjType = entry.GetObjectType();
-            var entryOidHex8 = entry.GetOidHexDigits(8);
+            var entryOidHex7 = entry.GetOidHexDigits(7);
 
-            bool isTautened = TryDecryptEntryName(
+            bool nameIsTautened = TryRegainEntryName(
                 entryName,
                 entry,
-                out var entryNameToUse,
-                out var entryFileModeToUse
+                out var recoveredEntryName,
+                out var recoveredFileMode
             );
 
             if (entryObjType.IsTree())
             {
-                logger.ZLogTrace($"Start regaining tree {entryOidHex8} '{entryName}'");
+                logger.ZLogTrace($"Start regaining tree {entryOidHex7} '{entryName}'");
 
                 if (tautMapping.HasRegained(entry) == false)
                 {
@@ -470,22 +470,27 @@ class TautManager(
                 Lg2Oid oid = new();
                 tautMapping.GetRegained(entry, ref oid);
 
-                if (
-                    oid.PlainRef.Equals(entry.GetOidPlainRef()) == false
-                    || entryNameToUse != entryName
-                )
+                if (oid.PlainRef.Equals(entry.GetOidPlainRef()) == false || nameIsTautened)
                 {
-                    treeBuilder.Insert(entryNameToUse, oid, entryFileModeToUse);
+                    if (nameIsTautened)
+                    {
+                        treeBuilder.Insert(recoveredEntryName, oid, recoveredFileMode);
+                    }
+                    else
+                    {
+                        treeBuilder.Insert(entryName, oid, entry.GetFileMode());
+                    }
+
                     regainedSet.Add(i);
                 }
 
-                logger.ZLogTrace($"Done regaining tree {entryOidHex8} '{entryName}'");
+                logger.ZLogTrace($"Done regaining tree {entryOidHex7} '{entryName}'");
             }
             else if (entryObjType.IsBlob())
             {
-                logger.ZLogTrace($"Start regaining blob {entryOidHex8} '{entryName}'");
+                logger.ZLogTrace($"Start regaining blob {entryOidHex7} '{entryName}'");
 
-                if (isTautened)
+                if (nameIsTautened)
                 {
                     var blob = TautRepo.LookupBlob(entry);
 
@@ -495,7 +500,7 @@ class TautManager(
                         RegainBlob(blob, ref oid);
                     }
 
-                    treeBuilder.Insert(entryNameToUse, oid, entryFileModeToUse);
+                    treeBuilder.Insert(recoveredEntryName, oid, recoveredFileMode);
                     regainedSet.Add(i);
                 }
                 else
@@ -503,7 +508,7 @@ class TautManager(
                     RegainSameObject(entry);
                 }
 
-                logger.ZLogTrace($"Done regaining blob {entryOidHex8} '{entryName}'");
+                logger.ZLogTrace($"Done regaining blob {entryOidHex7} '{entryName}'");
             }
             else if (entryObjType.IsCommit())
             {
@@ -635,7 +640,7 @@ class TautManager(
                 TautRepo.NewRef(tautenedTagName, tautenedOid, force: false);
 
                 logger.ZLogTrace(
-                    $"Created new tag '{tautenedTagName}' '{tautenedOid.GetOidHexDigits(8)}'"
+                    $"Created new tag '{tautenedTagName}' '{tautenedOid.GetOidHexDigits(7)}'"
                 );
             }
             else
@@ -646,7 +651,7 @@ class TautManager(
                     tautenedTagRef.SetTarget(tautenedOid);
 
                     logger.ZLogTrace(
-                        $"Updated tag '{tautenedTagName}' from '{oldTautenedOid.GetOidHexDigits(8)}' to '{tautenedOid.GetOidHexDigits(8)}'"
+                        $"Updated tag '{tautenedTagName}' from '{oldTautenedOid.GetOidHexDigits(7)}' to '{tautenedOid.GetOidHexDigits(7)}'"
                     );
                 }
             }
@@ -670,13 +675,13 @@ class TautManager(
 
             if (tautMapping.HasTautened(tagTargetObj) == false)
             {
-                var oidHex8 = tagTargetObj.GetOidHexDigits(8);
+                var oidHex7 = tagTargetObj.GetOidHexDigits(7);
 
-                logger.ZLogTrace($"Start tautening tag object {oidHex8}");
+                logger.ZLogTrace($"Start tautening tag object {oidHex7}");
 
                 await TautenTagTargetAsync(tagTargetObj);
 
-                logger.ZLogTrace($"Done tautening tag object {oidHex8}");
+                logger.ZLogTrace($"Done tautening tag object {oidHex7}");
             }
 
             Lg2Oid oid = new();
@@ -702,13 +707,13 @@ class TautManager(
 
             if (tautMapping.HasTautened(commitOid) == false)
             {
-                var oidHex8 = commitOid.GetOidHexDigits(8);
+                var oidHex7 = commitOid.GetOidHexDigits(7);
 
-                logger.ZLogTrace($"Start tautening commit {oidHex8}");
+                logger.ZLogTrace($"Start tautening commit {oidHex7}");
 
                 TautenCommit(commit);
 
-                logger.ZLogTrace($"Done tautening commit {oidHex8}");
+                logger.ZLogTrace($"Done tautening commit {oidHex7}");
             }
         }
         else
@@ -743,7 +748,7 @@ class TautManager(
                 Lg2Oid hostOid = new();
                 tautMapping.GetRegained(tautOid, ref hostOid);
 
-                logger.ZLogTrace($"RevWalk.Hide {hostOid.GetOidHexDigits(8)} ({refName})");
+                logger.ZLogTrace($"RevWalk.Hide {hostOid.GetOidHexDigits(7)} ({refName})");
 
                 revWalk.Hide(hostOid);
             }
@@ -760,45 +765,45 @@ class TautManager(
         {
             var hostCommit = HostRepo.LookupCommit(oid);
 
-            var commitOidHex8 = oid.GetOidHexDigits(8);
+            var commitOidHex7 = oid.GetOidHexDigits(7);
             var commitSummary = hostCommit.GetSummary();
 
             if (tautMapping.HasTautened(hostCommit))
             {
-                logger.ZLogTrace($"Skip tautened commit {commitOidHex8} '{commitSummary}'");
+                logger.ZLogTrace($"Skip tautened commit {commitOidHex7} '{commitSummary}'");
 
                 continue;
             }
 
-            logger.ZLogTrace($"Start tautening commit {commitOidHex8} '{commitSummary}'");
+            logger.ZLogTrace($"Start tautening commit {commitOidHex7} '{commitSummary}'");
 
             TautenCommit(hostCommit);
 
-            logger.ZLogTrace($"Done tautening commit {commitOidHex8} '{commitSummary}'");
+            logger.ZLogTrace($"Done tautening commit {commitOidHex7} '{commitSummary}'");
         }
 
         foreach (var refName in headRefNames)
         {
             Lg2Oid hostOid = new();
             HostRepo.GetRefOid(refName, ref hostOid);
-            var hostOidHex8 = hostOid.GetOidHexDigits(8);
+            var hostOidHex7 = hostOid.GetOidHexDigits(7);
 
             Lg2Oid tautenedOid = new();
             tautMapping.GetTautened(hostOid, ref tautenedOid);
-            var tautenedOidHex8 = tautenedOid.GetOidHexDigits(8);
+            var tautenedOidHex7 = tautenedOid.GetOidHexDigits(7);
 
             var tautenedRefName = GitRefSpecs.RefsToRefsTautened.TransformToTarget(refName);
 
             if (hostOid.Equals(ref tautenedOid))
             {
-                var message = $"Tautened {refName} {tautenedOidHex8} from same object";
+                var message = $"Tautened {refName} {tautenedOidHex7} from same object";
 
                 TautRepo.SetRef(tautenedRefName, tautenedOid, message);
                 logger.ZLogTrace($"{message}");
             }
             else
             {
-                var message = $"Tautened {refName} {tautenedOidHex8} from {hostOidHex8}";
+                var message = $"Tautened {refName} {tautenedOidHex7} from {hostOidHex7}";
 
                 TautRepo.SetRef(tautenedRefName, tautenedOid, message);
                 logger.ZLogTrace($"{message}");
@@ -821,14 +826,14 @@ class TautManager(
 
                 if (tautMapping.HasTautened(targetOid) == false)
                 {
-                    var oidHex8 = targetOid.GetOidHexDigits(8);
+                    var oidHex7 = targetOid.GetOidHexDigits(7);
 
-                    logger.ZLogTrace($"Start tautening commit {oidHex8}");
+                    logger.ZLogTrace($"Start tautening commit {oidHex7}");
 
                     var commit = TautRepo.LookupCommit(targetOid);
                     TautenCommit(commit);
 
-                    logger.ZLogTrace($"Done tautening commit {oidHex8}");
+                    logger.ZLogTrace($"Done tautening commit {oidHex7}");
                 }
             }
         }
@@ -855,7 +860,7 @@ class TautManager(
                 tautMapping.GetTautened(targetOid, ref tautenedOid);
                 TautRepo.NewRef(GitRepoHelpers.HEAD, tautenedOid, force: true);
 
-                logger.ZLogTrace($"Set Taut HEAD to {tautenedOid.GetOidHexDigits(8)}");
+                logger.ZLogTrace($"Set Taut HEAD to {tautenedOid.GetOidHexDigits(7)}");
             }
             else
             {
@@ -999,12 +1004,12 @@ class TautManager(
     internal void TautenCommit(ILg2Commit hostCommit)
     {
         var hostTree = hostCommit.GetTree();
-        var hostTreeOidHex8 = hostTree.GetOidHexDigits(8);
+        var hostTreeOidHex7 = hostTree.GetOidHexDigits(7);
         var hostTreePath = string.Empty;
 
         if (tautMapping.HasTautened(hostTree))
         {
-            logger.ZLogTrace($"Skip tautened tree {hostTreeOidHex8} '{hostTreePath}'");
+            logger.ZLogTrace($"Skip tautened tree {hostTreeOidHex7} '{hostTreePath}'");
         }
         else
         {
@@ -1019,19 +1024,19 @@ class TautManager(
 
             if (hostCommit.GetParentCount() == 1)
             {
-                logger.ZLogTrace($"Start tautening diff for commit {hostTreeOidHex8}");
+                logger.ZLogTrace($"Start tautening diff for commit {hostTreeOidHex7}");
 
                 TautenFilesInDiff(hostCommit, hostAttrOpts);
 
-                logger.ZLogTrace($"Done tautening diff for commit {hostTreeOidHex8}");
+                logger.ZLogTrace($"Done tautening diff for commit {hostTreeOidHex7}");
             }
 
-            logger.ZLogTrace($"Start tautening tree {hostTreeOidHex8} '{hostTreePath}'");
+            logger.ZLogTrace($"Start tautening tree {hostTreeOidHex7} '{hostTreePath}'");
 
             var task = TautenTreeAsync(hostTree, hostTreePath, hostAttrOpts);
             task.GetAwaiter().GetResult();
 
-            logger.ZLogTrace($"Done tautening tree {hostTreeOidHex8} '{hostTreePath}'");
+            logger.ZLogTrace($"Done tautening tree {hostTreeOidHex7} '{hostTreePath}'");
 
             HostRepo.FlushAttrCache();
         }
@@ -1101,7 +1106,7 @@ class TautManager(
                 : string.Join('/', hostTreePath, entryName);
             var entryObjType = entry.GetObjectType();
             var entryFileMode = entry.GetFileModeRaw();
-            var entryOidHex8 = entry.GetOidHexDigits(8);
+            var entryOidHex7 = entry.GetOidHexDigits(7);
 
             var entryNameToUse = entryName;
 
@@ -1111,16 +1116,16 @@ class TautManager(
             {
                 if (tautMapping.HasTautened(entry) == false)
                 {
-                    logger.ZLogTrace($"Start tautening tree {entryOidHex8} '{entryPath}'");
+                    logger.ZLogTrace($"Start tautening tree {entryOidHex7} '{entryPath}'");
 
                     var tree = HostRepo.LookupTree(entry);
                     await TautenTreeAsync(tree, entryPath, hostAttrOpts);
 
-                    logger.ZLogTrace($"Done tautening tree {entryOidHex8} '{entryPath}'");
+                    logger.ZLogTrace($"Done tautening tree {entryOidHex7} '{entryPath}'");
                 }
                 else
                 {
-                    logger.ZLogTrace($"Skip tautened tree {entryOidHex8} '{entryPath}'");
+                    logger.ZLogTrace($"Skip tautened tree {entryOidHex7} '{entryPath}'");
                 }
 
                 Lg2Oid oid = new();
@@ -1144,16 +1149,16 @@ class TautManager(
                     Lg2Oid oid = new();
                     if (tautMapping.TryGetTautened(entry, ref oid) == false)
                     {
-                        logger.ZLogTrace($"Start tautening blob {entryOidHex8} '{entryPath}'");
+                        logger.ZLogTrace($"Start tautening blob {entryOidHex7} '{entryPath}'");
 
                         var blob = HostRepo.LookupBlob(entry);
                         TautenBlob(blob, ref oid, entryPath, hostAttrOpts);
 
-                        logger.ZLogTrace($"Done tautening blob {entryOidHex8} '{entryPath}'");
+                        logger.ZLogTrace($"Done tautening blob {entryOidHex7} '{entryPath}'");
                     }
                     else
                     {
-                        logger.ZLogTrace($"Skip tautened blob {entryOidHex8} '{entryPath}'");
+                        logger.ZLogTrace($"Skip tautened blob {entryOidHex7} '{entryPath}'");
                     }
 
                     entryNameToUse = EncryptEntryName(entryName, entryFileMode, ref oid);
@@ -1163,7 +1168,7 @@ class TautManager(
                 }
                 else
                 {
-                    logger.ZLogTrace($"Pass through blob {entryOidHex8} '{entryPath}'");
+                    logger.ZLogTrace($"Pass through blob {entryOidHex7} '{entryPath}'");
                 }
             }
             else if (entryObjType.IsCommit())

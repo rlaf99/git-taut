@@ -103,6 +103,16 @@ unsafe partial class Lg2RepositoryExtensions
         return new(ptr);
     }
 
+    public static void DeleteRemote(this Lg2Repository repo, string remoteName)
+    {
+        repo.EnsureValid();
+
+        using var u8RemoteName = new Lg2Utf8String(remoteName);
+
+        var rc = git_remote_delete(repo.Ptr, u8RemoteName.Ptr);
+        Lg2Exception.ThrowIfNotOk(rc);
+    }
+
     public static Lg2Remote LookupRemote(this Lg2Repository repo, string remoteName)
     {
         repo.EnsureValid();
@@ -162,5 +172,23 @@ unsafe partial class Lg2RepositoryExtensions
 
         var rc = git_remote_set_pushurl(repo.Ptr, u8RemoteName.Ptr, u8PushUrl.Ptr);
         Lg2Exception.ThrowIfNotOk(rc);
+    }
+
+    public static List<string> GetRemoteList(this Lg2Repository repo)
+    {
+        repo.EnsureValid();
+
+        git_strarray remotes = new();
+        try
+        {
+            var rc = git_remote_list(&remotes, repo.Ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+
+            return remotes.ToList();
+        }
+        finally
+        {
+            git_strarray_dispose(&remotes);
+        }
     }
 }
