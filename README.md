@@ -1,27 +1,59 @@
 [中文](./README.zh-cn.md)
 
-## git-taut (experimental)
+## git-taut (preview)
 
-**git-taut** encrypts your content in Git repository through [Git Remote Helper](gitremote-helpers). 
-The main scenario in mind when designing it is to enable storing some private information in Git without revealing the content if you push it to remote.
+[git-taut] encrypts content in a Git repository through [Git Remote Helper](gitremote-helpers). 
+The main scenario in mind when designing it is to enable storing confidential information in Git without revealing the content if you push it to remote.
 
-Under the hood, **git-taut** mirrors the commit history of original repository into a shadow repository called a **taut site** which resides in the original repository. 
-In a taut site, files as well as their names are encrypted as specified. 
-You push taut sites to remote and keep the original repository local to yourself.
+Under the hood, **git-taut** mirrors the commit history of the original repository into a shadow repository called a **taut site** which resides in the original repository. 
+In a taut site, files as well as their names are encrypted as specified (through `.gitattributes`). 
+You push **taut sites** to remote and keep the original repository local to yourself.
+The remote repository contains encrypted content and is called **tautened repository**.
+
+An example **tautened repository** is available at [git-taut-example-tautened], whereas the corresponding original repository is at [git-taut-example-original].
 
 The function of **git-taut** is provided to Git through a [Git Remote Helper](gitremote-helpers), thus most of the operations are transparent to Git.
 
-The encryption uses [the cipher scheme](./docs/CipherScheme.md). Additionally, [delta-encoding](./docs/DeltaEnconding.md) and [content-compression](./docs/ContentCompression.md) are exploited.
+The encryption uses [the cipher scheme](./docs/CipherScheme.md). 
+Additionally, [delta-encoding](./docs/DeltaEnconding.md) and [content-compression](./docs/ContentCompression.md) are exploited.
 
 ## How to use
 
-**git-taut** comes with two command line executables, `git-taut` and `git-remote-taut`, the former for managing taut sites, whereas the latter for working with Git as a remote helper.
+**git-taut** comes with two command line executables: `git-taut` and `git-remote-taut`, 
+the former for managing **taut sites**, whereas the latter for working with Git as a remote helper.
+
+### Cloning from a tautened repository
+
+Suppose you have an already tautened repository,
+to regain the original repository out of it, 
+all you have to do is clone it with its url prefixed with `taut::`:
+
+```
+git clone taut::url/to/tautened regained
+```
+
+Git then automatically invokes `git-remote-taut` to handle the underlying details.
+
+> If you want to start a new repository, just clone from an empty **tautened repository**.
+
+### Adding a tautened repository
+
+It is also possible to use `git-taut` to add a **tautened repository** to a local repository:
+
+```
+git taut add name url/to/tautened
+```
+
+The above adds a new **taut site** for the local repository corresponding to remote whose name is `name` and url is `taut::url/to/tautened`.
+
+> You can add an empty **tautened repository** as **taut site**, then populate it by pushing the local Git content to it.
 
 ### Setting username and password
 
-Setting up a *taut site* requires you to provide username (optional) and password.
+Setting up a **taut site** requires you to provide username (optional) and password.
 The username is optional, and used as salt when generating encryption keys.
-`git-taut` utilites Git credential helper for retrieving them.
+
+`git-taut` utilizes Git credential helper for retrieving them.
 The prompt will show the location of the *taut site* as URL.
 
 ### Deciding what files to encrypt
@@ -43,7 +75,8 @@ If `taut` attribute is set, then the output shows
 
 #### Example 1: Encrypting files with extension `.a_file`
 
-If a `.gitattribute` contains the following setting, then files with extension `.a_file` in this directory as well as sub-directories will be encrypted.
+If a `.gitattribute` contains the following setting, 
+then files with extension `.a_file` in this directory as well as sub-directories will be encrypted.
 
 ```
 *.a_file taut
@@ -108,3 +141,6 @@ It should be sufficient for the `[GitHubAccessToken]` to only have package read 
 [gitattributes]: https://git-scm.com/docs/gitattributes
 [gitremote-helpers]: https://git-scm.com/docs/gitremote-helpers
 [libgit2]: https://github.com/rlaf99/libgit2/
+[git-taut]: https://github.com/rlaf99/git-taut
+[git-taut-example-tautened]: https://github.com/rlaf99/git-taut-example-tautened
+[git-taut-example-original]: https://github.com/rlaf99/git-taut-example-original
