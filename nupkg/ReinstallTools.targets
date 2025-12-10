@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <Target Name="ReinstallTools">
+        <Message Text="%0AUninstall git-taut"
+                 Importance="high" />
+        <Exec Command="dotnet tool uninstall -g git-taut"
+              ContinueOnError="true" />
+        <Message Text="%0AUninstall git-remote-taut"
+                 Importance="high" />
+        <Exec Command="dotnet tool uninstall -g git-remote-taut"
+              ContinueOnError="true" />
+        <Message Text="%0AInstall git-taut"
+                 Importance="high" />
+        <Exec Command="dotnet tool install -g --source $(MSBuildThisFileDirectory) --prerelease git-taut" />
+        <Message Text="%0AInstall git-remote-taut"
+                 Importance="high" />
+        <Exec Command="dotnet tool install -g --source $(MSBuildThisFileDirectory) --prerelease git-remote-taut" />
+    </Target>
+</Project>

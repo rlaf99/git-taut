@@ -84,7 +84,7 @@ then files with extension `.a_file` in this directory as well as sub-directories
 
 The above set `taut` attribute on all files with extension `.a_file`.
 
-#### Example 2: Ecrypting filers under directory `a_dir`
+#### Example 2: Ecrypting files under directory `a_dir`
 
 To encrypt all files under folder `a_dir`, ensure corresponding `.gitattribute` has the following setting
 

@@ -537,6 +537,12 @@ class SiteCommandActions(
             Lg2Oid targetOid = new();
             tautMapping.GetTautened(entry, ref targetOid);
 
+            if (entry.GetOidPlainRef().Equals(targetOid))
+            {
+                Console.WriteLine($"Object is not tautened");
+                return;
+            }
+
             Console.WriteLine($"Target object id: {targetOid.GetOidHexDigits()}");
 
             using var tautOdb = tautSetup.TautRepo.GetOdb();

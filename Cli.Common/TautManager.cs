@@ -65,7 +65,7 @@ class TautManager(
             else
             {
                 logger.ZLogTrace(
-                    $"Tautened {objTypeName} {sourceOidText[..7]} into {targetOidText}"
+                    $"Tautened {objTypeName} {sourceOidText[..7]} into {targetOidText[..7]}"
                 );
             }
         }
