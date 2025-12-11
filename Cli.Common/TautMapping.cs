@@ -25,7 +25,7 @@ sealed class TautMapping(ILogger<TautMapping> logger) : IDisposable
     [AllowNull]
     string _dbPath;
 
-    internal string DbPath => _dbPath;
+    internal string DbPath => _dbPath!;
 
     bool _initialized;
 
@@ -163,7 +163,7 @@ sealed class TautMapping(ILogger<TautMapping> logger) : IDisposable
             _tautenedDb?.Dispose();
             _regainedDb?.Dispose();
             _dbEnv?.Dispose();
-        } // managed resource
+        }
     }
 
     public void Dispose()

@@ -160,7 +160,7 @@ static partial class Lg2RepositoryExtensions
         return refNames;
     }
 
-    internal static List<string> GetRegainedTautRefs(this Lg2Repository repo)
+    internal static List<string> GetRegainedRefs(this Lg2Repository repo)
     {
         repo.EnsureValid();
 
@@ -177,7 +177,7 @@ static partial class Lg2RepositoryExtensions
         return refNames;
     }
 
-    internal static List<string> GetTautenedTautRefs(this Lg2Repository repo)
+    internal static List<string> GetTautenedRefs(this Lg2Repository repo)
     {
         repo.EnsureValid();
 

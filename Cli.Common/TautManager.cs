@@ -1244,26 +1244,28 @@ class TautManager(
 
     internal void RebuildTautMapping()
     {
-        throw new NotImplementedException();
-
         logger.ZLogTrace($"Rebuilding {nameof(tautMapping)}");
 
         tautMapping.Truncate();
 
-        foreach (var refName in TautRepo.GetRegainedTautRefs())
+        foreach (var refName in TautRepo.GetRegainedRefs())
         {
             TautRepo.DeleteRef(refName);
+
             logger.ZLogTrace($"Delete {refName}");
         }
 
-        foreach (var refName in TautRepo.GetTautenedTautRefs())
+        foreach (var refName in TautRepo.GetTautenedRefs())
         {
             TautRepo.DeleteRef(refName);
+
             logger.ZLogTrace($"Delete {refName}");
         }
 
         RegainHeads();
+        RegainTags();
 
         TautenHeads();
+        TautenTags();
     }
 }

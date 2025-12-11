@@ -136,13 +136,9 @@ static class HostApplicationBuilderExtensions
 
 class CommandActionHelpers
 {
-    internal record ResolveTargetOptionResult(
-        string SiteName,
-        bool TargetIsRemote,
-        bool SiteIsFromHead
-    );
+    internal record ResolvedTarget(string SiteName, bool TargetIsRemote, bool SiteIsFromHead);
 
-    internal ResolveTargetOptionResult ResolveTargetOption(
+    internal ResolvedTarget ResolveTargetOption(
         ParseResult parseResult,
         Lg2Repository hostRepo,
         bool followHead
@@ -152,7 +148,7 @@ class CommandActionHelpers
         return ResolveTargetOption(hostRepo, targetName, followHead);
     }
 
-    internal ResolveTargetOptionResult ResolveTargetOption(
+    internal ResolvedTarget ResolveTargetOption(
         Lg2Repository hostRepo,
         string? targetName,
         bool followHead
@@ -307,9 +303,13 @@ class SiteCommandActions(
 
         var hostRepo = actionHelpers.LocateHostRepo();
 
-        var result = actionHelpers.ResolveTargetOption(parseResult, hostRepo, followHead: true);
+        var resolvedTarget = actionHelpers.ResolveTargetOption(
+            parseResult,
+            hostRepo,
+            followHead: true
+        );
 
-        tautSetup.GearUpExisting(hostRepo, remoteName: null, result.SiteName);
+        tautSetup.GearUpExisting(hostRepo, remoteName: null, resolvedTarget.SiteName);
 
         using (tautSetup)
         {
@@ -378,12 +378,13 @@ class SiteCommandActions(
         string? targetSite = null;
         if (parseResult.GetValue(ProgramCommandLine.SiteTargetOption) is not null)
         {
-            var result = actionHelpers.ResolveTargetOption(
+            var resolvedTarget = actionHelpers.ResolveTargetOption(
                 parseResult,
                 hostRepo,
                 followHead: false
             );
-            targetSite = result.SiteName;
+
+            targetSite = resolvedTarget.SiteName;
         }
 
         if (linkExisting && targetSite is null)
@@ -423,12 +424,13 @@ class SiteCommandActions(
 
         if (parseResult.GetValue(ProgramCommandLine.SiteTargetOption) is not null)
         {
-            var result = actionHelpers.ResolveTargetOption(
+            var resolvedTarget = actionHelpers.ResolveTargetOption(
                 parseResult,
                 hostRepo,
                 followHead: false
             );
-            tautSiteName = result.SiteName;
+
+            tautSiteName = resolvedTarget.SiteName;
         }
 
         var outputWriter = parseResult.InvocationConfiguration.Output;
@@ -505,9 +507,13 @@ class SiteCommandActions(
 
         var hostRepo = actionHelpers.LocateHostRepo();
 
-        var result = actionHelpers.ResolveTargetOption(parseResult, hostRepo, followHead: true);
+        var resolvedTarget = actionHelpers.ResolveTargetOption(
+            parseResult,
+            hostRepo,
+            followHead: true
+        );
 
-        tautSetup.GearUpExisting(hostRepo, null, result.SiteName);
+        tautSetup.GearUpExisting(hostRepo, null, resolvedTarget.SiteName);
 
         if (File.Exists(path))
         {
@@ -578,20 +584,17 @@ class SiteCommandActions(
 
     internal void Rescan(ParseResult parseResult)
     {
-        var hostRepo = actionHelpers.LocateHostRepo();
-        var tautSiteName = actionHelpers.ResolveTargetOption(
+        using var hostRepo = actionHelpers.LocateHostRepo();
+
+        var resolvedTarget = actionHelpers.ResolveTargetOption(
             parseResult,
             hostRepo,
             followHead: false
         );
 
-        throw new NotImplementedException();
-        // using (var tautRepo = LocateTautRepo())
-        // {
-        //     // tautManager.Init(tautRepo.GetPath(), null);
-        // }
+        tautSetup.GearUpExisting(hostRepo, null, resolvedTarget.SiteName);
 
-        // tautManager.RebuildKvStore();
+        tautManager.RebuildTautMapping();
     }
 }
 
@@ -670,6 +673,7 @@ internal class ProgramCommandLine(IHost host)
         rootCommand.Subcommands.Add(CreateCommandSiteList());
         rootCommand.Subcommands.Add(CreateCommandSiteRemove());
         rootCommand.Subcommands.Add(CreateCommandSiteReveal());
+        rootCommand.Subcommands.Add(CreateCommandSiteRescan());
 
 #if DEBUG
         rootCommand.Subcommands.Add(CreateCommandServeHttp());

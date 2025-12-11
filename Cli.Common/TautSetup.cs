@@ -153,11 +153,37 @@ sealed class TautSetup(
         SetSiteDescription();
         UpdateRemoteUrls();
         UpdateTautConfig();
+        UpdateAlternates();
+    }
+
+    void UpdateAlternates()
+    {
+        var alternatesFile = TautRepo.GetObjectsInfoAlternatesFilePath();
+        var lines = File.ReadAllLines(alternatesFile);
+
+        File.Delete(alternatesFile);
+
+        using (var writer = File.AppendText(alternatesFile))
+        {
+            writer.NewLine = "\n";
+
+            var objectDir = TautRepo.GetObjectDirPath();
+
+            foreach (var line in lines)
+            {
+                var relPath = Path.GetRelativePath(objectDir, line);
+                relPath = GitRepoHelpers.UseForwardSlash(relPath);
+
+                writer.WriteLine(relPath);
+            }
+        }
+
+        logger.ZLogTrace($"Updated '{alternatesFile}'");
     }
 
     void SetSiteDescription()
     {
-        var descriptionFile = GitRepoHelpers.GetDescriptionFile(_tautRepo);
+        var descriptionFile = TautRepo.GetDescriptionFile();
 
         File.Delete(descriptionFile);
 
