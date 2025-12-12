@@ -32,7 +32,7 @@
 
   <ItemGroup>
     <PackageReference Include="KestrelCgi" Version="0.0.1" />
-    <PackageReference Include="Lg2.native" Version="0.191.0" />
+    <PackageReference Include="Lg2.native" Version="0.192.0" />
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
     <!-- <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" /> -->
     <PackageReference Include="xunit.v3.mtp-v2" Version="3.2.1" />

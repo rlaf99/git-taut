@@ -32,7 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Lg2.native" Version="0.191.0" />
+    <PackageReference Include="Lg2.native" Version="0.192.0" />
     <PackageReference Include="LightningDB" Version="0.20.0" />
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
     <PackageReference Include="System.CommandLine" Version="2.0.1" />
