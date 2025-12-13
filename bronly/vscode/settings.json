@@ -1,0 +1,10 @@
+{
+    "files.exclude": {
+        "thirdparty/libgit2": true,
+        "thirdparty/lmdb": true
+    },
+    "explorer.excludeGitIgnore": true,
+    "dotnet.formatting.organizeImportsOnFormat": true,
+    "csharp.debug.justMyCode": true,
+    "dotnet.unitTests.runSettingsPath": ".vscode/.runsettings"
+}

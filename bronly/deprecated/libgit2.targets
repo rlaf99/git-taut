@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project>
+    <Target Name="CopyLibgit2"
+            AfterTargets="BeforeResolveReferences">
+        <ItemGroup>
+            <None Include="$(MSBuildThisFileDirectory)install\$(Configuration)\bin\git2.dll"
+                  CopyToOutputDirectory="PreserveNewest"
+                  Condition="'$([MSBuild]::IsOsPlatform(Windows))'" />
+            <None Include="$(MSBuildThisFileDirectory)install\$(Configuration)\lib\libgit2.so"
+                  CopyToOutputDirectory="PreserveNewest"
+                  Condition="'$([MSBuild]::IsOsPlatform(Linux))'" />
+            <None Include="$(MSBuildThisFileDirectory)install\$(Configuration)\lib\libgit2.dylib"
+                  CopyToOutputDirectory="PreserveNewest"
+                  Condition="'$([MSBuild]::IsOsPlatform(OSX))'" />
+        </ItemGroup>
+    </Target>
+    <!-- <Target Name="CopyLibgit2" AfterTargets="Build">F
+        <Copy
+            SourceFiles="$(MSBuildThisFileDirectory)install\$(Configuration)\lib\libgit2.dylib"
+            DestinationFolder=" $(OutDir)"
+            Condition="'$([MSBuild]::IsOsPlatform(OSX))' And '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)'=='Arm64'"
+        />
+    </Target> -->
+</Project>

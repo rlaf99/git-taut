@@ -1,0 +1,14 @@
+[user]
+	name = taut
+	email = taut@localhost
+[advice]
+	defaultBranchName = false
+
+[alias]
+	st = status
+	ci = commit
+	co = checkout
+	br = branch
+	cp = cherry-pick
+	cia = commit --amend
+	sm = submodule
