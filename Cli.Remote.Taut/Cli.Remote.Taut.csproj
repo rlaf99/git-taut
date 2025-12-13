@@ -13,6 +13,13 @@
     <ToolCommandName>git-remote-taut</ToolCommandName>
     <PackageOutputPath>../nupkg</PackageOutputPath>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+
+    <PackageDescription>Git remote helper for git-taut</PackageDescription>
+    <PackageProjectUrl>https://github.com/rlaf99/git-taut</PackageProjectUrl>
+    <PackageTags>git-taut git-remote-taut git-remote-helper</PackageTags>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
   </PropertyGroup>
 
   <ItemGroup>

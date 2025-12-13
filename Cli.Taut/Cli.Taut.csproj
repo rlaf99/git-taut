@@ -18,6 +18,12 @@
 
     <!-- note that this does not seem to be supported by NativeAOT, additionally this creates a tool named git-taut.cmd on windows -->
     <!-- <RuntimeIdentifiers>win-x64;linux-x64;osx-arm64</RuntimeIdentifiers>  -->
+
+    <PackageDescription>Management interface for git-taut</PackageDescription>
+    <PackageProjectUrl>https://github.com/rlaf99/git-taut</PackageProjectUrl>
+    <PackageTags>git-taut git-remote-taut git-remote-helper</PackageTags>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
