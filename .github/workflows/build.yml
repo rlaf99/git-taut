@@ -22,15 +22,29 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+
+      - name: Extract Repository Name
+        id: extract_repo_name
+        run: |
+          # Use shell expansion to remove everything up to the first slash
+          REPO_NAME=${GITHUB_REPOSITORY#*/}
+          echo "repo_name=$REPO_NAME" >> $GITHUB_OUTPUT
+                
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
+        with: 
+          submodules: false
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: Create Packages
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          cd ${{ github.workspace }}
+          dotnet pack 
+
+      - name: Upload NuGet Packages as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.extract_repo_name.outputs.repo_name }}-nupkg
+          path: ${{ github.workspace }}/nupkg/*.nupkg
+          retention-days: 7
+
+
