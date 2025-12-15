@@ -1,0 +1,72 @@
+# This starter workflow is for a CMake project running on multiple platforms. There is a different starter workflow if you just want a single platform.
+# See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
+name: Build NativeAOT
+
+on:
+  workflow_dispatch:
+    inputs:
+      temp_version:
+        description: 'Add temp version suffix'
+        default: false
+        type: boolean
+      target_os:
+        description: 'Select all OSes or a single OS'
+        default: all
+        type: choice
+        options:
+          - all
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+      build_type:
+        description: 'Select build type'
+        default: Release
+        type: choice
+        options:
+          - Release
+          - RelWithDebInfo
+          - Debug
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
+      fail-fast: false
+
+      matrix:
+        os: [windows-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+      with: 
+        submodules: false
+
+    - name: Set runtime id
+      id: variants
+      shell: bash
+      run: |
+        if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+          echo "runtime_id=linux-x64" >> "$GITHUB_OUTPUT"
+        elif [ "${{ matrix.os }}" == "windows-latest" ]; then
+          echo "runtime_id=win-x64" >> "$GITHUB_OUTPUT"
+        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+          echo "runtime_id=osx-arm64" >> "$GITHUB_OUTPUT"
+        else
+          echo "unknown os: ${{ matrix.os }}"
+          exit 1
+        fi
+    
+    - name: Build Cli.Taut
+      run: |
+        cd ${{ github.workspace }}
+        dotnet publish -c Release -r ${{ steps.variants.outputs.runtime_id }} -p:PublishAot=true Cli.Taut
+
+    - name: Upload Cli.Taut as Artifact
+      uses: actions/upload-artifact@v4
+      with:
+          name: ${{ steps.variants.outputs.runtime_id }}
+          path: ${{ github.workspace }}/Cli.Taut/bin/Release/net10.0/${{ steps.variants.outputs.runtime_id }}/publish/
+          retention-days: 7
+
