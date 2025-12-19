@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <GitTautPublishDirectory>
+            $(MSBuildThisFileDirectory)../Cli.Taut/bin/Release/$(TargetFramework)/$(RuntimeIdentifier)/publish/</GitTautPublishDirectory>
+        <GitRemoteTautPublishDirectory>
+            $(MSBuildThisFileDirectory)../Cli.Remote.Taut/bin/Release/$(TargetFramework)/$(RuntimeIdentifier)/publish/</GitRemoteTautPublishDirectory>
+    </PropertyGroup>
+
+    <Target Name="MergePublished">
+        <ItemGroup>
+            <GitRemoteTautPublishedFiles Include="$(GitRemoteTautPublishDirectory)**/*.*" />
+        </ItemGroup>
+
+        <Message
+            Text="Copy files from $(GitRemoteTautPublishDirectory) to $(GitTautPublishDirectory)"
+            Importance="high" />
+        <Copy SourceFiles="@(GitRemoteTautPublishedFiles)"
+            DestinationFolder="$(GitTautPublishDirectory)%(RecursiveDir)"
+            SkipUnchangedFiles="true" />
+
+        <ItemGroup>
+            <GitTautPublishedPdbFiles Include="$(GitTautPublishDirectory)*.pdb" />
+        </ItemGroup>
+
+        <Message Text="Delete pdb files" Importance="high" />
+        <Delete Files="@(GitTautPublishedPdbFiles)" />
+
+        <ItemGroup>
+            <GitTautPublishedDsymDirs Include="$(GitTautPublishDirectory)git-taut.dSYM" />
+            <GitTautPublishedDsymDirs Include="$(GitTautPublishDirectory)git-remote-taut.dSYM" />
+        </ItemGroup>
+
+        <Message Text="Delete dSYM directories" Importance="high" />
+        <RemoveDir Directories="@(GitTautPublishedDsymDirs)" />
+    </Target>
+</Project>
