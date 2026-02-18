@@ -13,6 +13,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Lg2.native" Version="0.192.0" />
+    <PackageReference Include="Lg2.native" Version="0.192.1" />
   </ItemGroup>
 </Project>

@@ -152,6 +152,34 @@ unsafe partial class Lg2RepositoryExtensions
         }
     }
 
+    public static void RenameRemote(
+        this Lg2Repository repo,
+        string remoteName,
+        string newRemoteName
+    )
+    {
+        repo.EnsureValid();
+
+        using var u8RemoteName = new Lg2Utf8String(remoteName);
+        using var u8NewRemoteName = new Lg2Utf8String(newRemoteName);
+
+        git_strarray strarry = new();
+        try
+        {
+            var rc = git_remote_rename(&strarry, repo.Ptr, u8RemoteName.Ptr, u8NewRemoteName.Ptr);
+            Lg2Exception.ThrowIfNotOk(rc);
+
+            if (strarry.count > 0)
+            {
+                throw new InvalidOperationException("Not all refspecs are renamed");
+            }
+        }
+        finally
+        {
+            git_strarray_dispose(&strarry);
+        }
+    }
+
     public static void SetRemoteUrl(this Lg2Repository repo, string remoteName, string remoteUrl)
     {
         repo.EnsureValid();

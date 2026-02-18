@@ -115,15 +115,16 @@ sealed class TautSetup(
     {
         var tautSitePath = HostRepo.GetTautSitePath(SiteConfig.SiteName);
 
+        List<string> referencedRepoPaths = [HostRepo.GetPath()];
+
         List<string> argList =
         [
             "clone",
             "--no-local",
             "--bare",
-            "--origin",
-            RemoteName,
-            "--reference",
-            HostRepo.GetPath(),
+            // git version 2.34.1: fatal: --bare and --origin options are incompatible.
+            // "--origin",
+            // RemoteName,
         ];
 
         if (SiteConfig.LinkTo is not null)
@@ -135,10 +136,15 @@ sealed class TautSetup(
 
             var tautSitePathToLink = HostRepo.GetTautSitePath(SiteConfig.LinkTo.SiteName);
 
-            argList.Add("--reference");
-            argList.Add(tautSitePathToLink);
+            referencedRepoPaths.Add(tautSitePathToLink);
 
             logger.ZLogTrace($"{SiteConfig.SiteName} is linked to {SiteConfig.LinkTo.SiteName}");
+        }
+
+        foreach (var repoPath in referencedRepoPaths)
+        {
+            argList.Add("--reference");
+            argList.Add(repoPath);
         }
 
         argList.Add(remoteAddress);
@@ -150,6 +156,11 @@ sealed class TautSetup(
 
         _tautRepo = Lg2Repository.New(tautSitePath);
 
+        if (RemoteName != "origin")
+        {
+            _tautRepo.RenameRemote("origin", RemoteName);
+        }
+
         SetSiteDescription();
         UpdateRemoteUrls();
         UpdateTautConfig();
@@ -159,26 +170,30 @@ sealed class TautSetup(
     void UpdateAlternates()
     {
         var alternatesFile = TautRepo.GetObjectsInfoAlternatesFilePath();
-        var lines = File.ReadAllLines(alternatesFile);
 
-        File.Delete(alternatesFile);
-
-        using (var writer = File.AppendText(alternatesFile))
+        if (File.Exists(alternatesFile))
         {
-            writer.NewLine = "\n";
+            var lines = File.ReadAllLines(alternatesFile);
 
-            var objectDir = TautRepo.GetObjectDirPath();
+            File.Delete(alternatesFile);
 
-            foreach (var line in lines)
+            using (var writer = File.AppendText(alternatesFile))
             {
-                var relPath = Path.GetRelativePath(objectDir, line);
-                relPath = GitRepoHelpers.UseForwardSlash(relPath);
+                writer.NewLine = "\n";
 
-                writer.WriteLine(relPath);
+                var objectDir = TautRepo.GetObjectDirPath();
+
+                foreach (var line in lines)
+                {
+                    var relPath = Path.GetRelativePath(objectDir, line);
+                    relPath = GitRepoHelpers.UseForwardSlash(relPath);
+
+                    writer.WriteLine(relPath);
+                }
             }
-        }
 
-        logger.ZLogTrace($"Updated '{alternatesFile}'");
+            logger.ZLogTrace($"Updated '{alternatesFile}'");
+        }
     }
 
     void SetSiteDescription()

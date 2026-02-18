@@ -56,11 +56,6 @@ class TestScene : IDisposable
             var workingDir = Directory.GetCurrentDirectory();
             var cleanupDir = Path.GetFullPath(_path.Value);
 
-            // if (workingDir.StartsWith(cleanupDir))
-            // {
-            //     Directory.SetCurrentDirectory(Testbed.GetPath());
-            // }
-
             _path.Clear();
         }
     }

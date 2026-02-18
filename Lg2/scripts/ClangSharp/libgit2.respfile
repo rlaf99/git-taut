@@ -1,4 +1,4 @@
-# Run `ClangSharpPInvokeGenerator @path\to\this_file` at the project root
+# Run `dotnet ClangSharpPInvokeGenerator @path\to\this_file` at the project root
 
 --config
 preview-codegen

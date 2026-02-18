@@ -32,11 +32,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="LightningDB" Version="0.20.0" />
+    <PackageReference Include="LightningDB" Version="0.21.0" />
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
-    <PackageReference Include="System.CommandLine" Version="2.0.1" />
+    <PackageReference Include="System.CommandLine" Version="2.0.3" />
     <PackageReference Include="ZLogger" Version="2.5.10" />
-    <PackageReference Include="ZstdSharp.Port" Version="0.8.6" />
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.7" />
     <PackageReference Include="KestrelCgi" Version="0.0.1" Condition="'$(Configuration)' == 'Debug'" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.0" Condition="'$(Configuration)' == 'Release'" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" Condition="'$(Configuration)' == 'Release'" />

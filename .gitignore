@@ -1,4 +1,6 @@
 
+*.tmp
+
 website/
 .vscode/
 .scratch/

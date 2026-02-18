@@ -1,5 +1,7 @@
 [user]
 	name = test
 	email = test@localhost
+[init]
+	defaultBranch = master
 [advice]
 	defaultBranchName = false

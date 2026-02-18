@@ -491,14 +491,40 @@ class SiteCommandActions(
             }
         }
 
-        gitCli.Execute(
-            "-C",
-            launchDir,
-            "config",
-            "remove-section",
-            "--local",
-            $@"{TautSiteConfiguration.SectionName}.{tautSiteName}"
-        );
+        try
+        {
+            gitCli.Execute(
+                "-C",
+                launchDir,
+                "config",
+                "remove-section",
+                "--local",
+                $@"{TautSiteConfiguration.SectionName}.{tautSiteName}"
+            );
+        }
+        catch (GitCliExitCodeException exitCodeEx)
+        {
+            if (
+                exitCodeEx.ExitCode == 2
+                && exitCodeEx.ErrorLines?.Count > 0
+                && exitCodeEx.ErrorLines[0]
+                    == "error: key does not contain a section: remove-section"
+            )
+            {
+                gitCli.Execute(
+                    "-C",
+                    launchDir,
+                    "config",
+                    "--remove-section",
+                    "--local",
+                    $@"{TautSiteConfiguration.SectionName}.{tautSiteName}"
+                );
+            }
+            else
+            {
+                throw;
+            }
+        }
     }
 
     internal void Reveal(ParseResult parseResult)

@@ -1,5 +1,5 @@
 
-## How to setup testbed
+## How to setup testbed directory
 
 Cli.Tests requires a testbed which is a directory to store temporary files generated during testing.
 
@@ -18,6 +18,14 @@ On macOS, the script [mkramdisk.macos.sh] can assist in ramdisk creation:
 
 ```
 mkramdisk.macos.sh 262144 /path/to/Testbed
+```
+
+On Linux,
+
+```sh
+rmdir Testbed
+mkdir /dev/shm/git-taut-testbed
+ln -s /dev/shm/git-taut-testbed/ Testbed
 ```
 
 [mkramdisk.macos.sh]: ./scripts/mkramdisk.macos.sh

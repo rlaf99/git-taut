@@ -1990,8 +1990,8 @@ namespace Lg2.Native
         [NativeTypeName("#define GIT_ODB_BACKEND_LOOSE_OPTIONS_VERSION 1")]
         public const int GIT_ODB_BACKEND_LOOSE_OPTIONS_VERSION = 1;
 
-        [NativeTypeName("#define LIBGIT2_VERSION \"1.9.1\"")]
-        public static ReadOnlySpan<byte> LIBGIT2_VERSION => "1.9.1"u8;
+        [NativeTypeName("#define LIBGIT2_VERSION \"1.9.2\"")]
+        public static ReadOnlySpan<byte> LIBGIT2_VERSION => "1.9.2"u8;
 
         [NativeTypeName("#define LIBGIT2_VERSION_MAJOR 1")]
         public const int LIBGIT2_VERSION_MAJOR = 1;
@@ -1999,8 +1999,8 @@ namespace Lg2.Native
         [NativeTypeName("#define LIBGIT2_VERSION_MINOR 9")]
         public const int LIBGIT2_VERSION_MINOR = 9;
 
-        [NativeTypeName("#define LIBGIT2_VERSION_REVISION 1")]
-        public const int LIBGIT2_VERSION_REVISION = 1;
+        [NativeTypeName("#define LIBGIT2_VERSION_REVISION 2")]
+        public const int LIBGIT2_VERSION_REVISION = 2;
 
         [NativeTypeName("#define LIBGIT2_VERSION_PATCH 0")]
         public const int LIBGIT2_VERSION_PATCH = 0;
@@ -2012,7 +2012,7 @@ namespace Lg2.Native
         public static ReadOnlySpan<byte> LIBGIT2_SOVERSION => "1.9"u8;
 
         [NativeTypeName("#define LIBGIT2_VERSION_NUMBER (    \\\r\n    (LIBGIT2_VERSION_MAJOR * 1000000) + \\\r\n    (LIBGIT2_VERSION_MINOR * 10000) +   \\\r\n    (LIBGIT2_VERSION_REVISION * 100))")]
-        public const int LIBGIT2_VERSION_NUMBER = ((1 * 1000000) + (9 * 10000) + (1 * 100));
+        public const int LIBGIT2_VERSION_NUMBER = ((1 * 1000000) + (9 * 10000) + (2 * 100));
 
         [NativeTypeName("#define GIT_CONFIG_BACKEND_VERSION 1")]
         public const int GIT_CONFIG_BACKEND_VERSION = 1;

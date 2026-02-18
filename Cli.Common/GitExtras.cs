@@ -8,7 +8,7 @@ static class GitRepoHelpers
     internal const string DotGit = ".git";
     internal const string DotGitAttributes = ".gitattributes";
     internal const string TautHomeName = "taut";
-    internal const string ObjectsDir = "Objects";
+    internal const string ObjectsDir = "objects";
     internal static readonly string ObjectsInfoDir = Path.Join(ObjectsDir, "info");
     internal static readonly string ObjectsInfoAlternatesFile = Path.Join(
         ObjectsInfoDir,

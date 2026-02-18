@@ -138,6 +138,10 @@ dotnet nuget add source --username [GitHubUsername] --password [GitHubAccessToke
 
 It should be sufficient for the `[GitHubAccessToken]` to only have package read permission.
 
+### Restore the tools
+
+There are tools specified in `dotnet-tools.json`, run `dotnet tool restore` to restore them, then invoke them with `dotnet tool command_name`.
+
 [gitattributes]: https://git-scm.com/docs/gitattributes
 [gitremote-helpers]: https://git-scm.com/docs/gitremote-helpers
 [libgit2]: https://github.com/rlaf99/libgit2/

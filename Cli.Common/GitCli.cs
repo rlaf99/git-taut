@@ -10,6 +10,19 @@ class GitCliException : Exception
         : base(message) { }
 }
 
+class GitCliExitCodeException : GitCliException
+{
+    internal readonly int ExitCode;
+    internal readonly List<string>? ErrorLines;
+
+    internal GitCliExitCodeException(int exitCode, List<string>? errorLines = null)
+        : base(string.Empty)
+    {
+        ExitCode = exitCode;
+        ErrorLines = errorLines;
+    }
+}
+
 class GitCli(ILogger<GitCli> logger)
 {
     string _envAlternateObjDirs = string.Empty;
@@ -41,11 +54,11 @@ class GitCli(ILogger<GitCli> logger)
         }
     }
 
-    void EnsureExitCode(int exitCode)
+    void EnsureExitCode(int exitCode, List<string>? errorLines = null)
     {
         if (exitCode != 0)
         {
-            throw new GitCliException($"Process exited with non-zero code {exitCode}");
+            throw new GitCliExitCodeException(exitCode, errorLines);
         }
     }
 
@@ -87,8 +100,15 @@ class GitCli(ILogger<GitCli> logger)
 
         using var process = new Process() { StartInfo = startInfo };
 
-        static void ErrorDataReceiver(object sender, DataReceivedEventArgs args)
+        List<string>? errorLines = null;
+        void ErrorDataReceiver(object sender, DataReceivedEventArgs args)
         {
+            if (args.Data is not null)
+            {
+                errorLines ??= [];
+                errorLines.Add(args.Data);
+            }
+
             Console.Error.WriteLine(args.Data);
         }
 
@@ -109,7 +129,7 @@ class GitCli(ILogger<GitCli> logger)
 
         process.WaitForExit();
 
-        EnsureExitCode(process.ExitCode);
+        EnsureExitCode(process.ExitCode, errorLines);
     }
 
     internal void Execute(
