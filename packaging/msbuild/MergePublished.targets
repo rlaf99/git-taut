@@ -2,9 +2,9 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <GitTautPublishDirectory>
-            $(MSBuildThisFileDirectory)../Cli.Taut/bin/Release/$(TargetFramework)/$(RuntimeIdentifier)/publish/</GitTautPublishDirectory>
+            $(MSBuildThisFileDirectory)../../Cli.Taut/bin/Release/$(TargetFramework)/$(RuntimeIdentifier)/publish/</GitTautPublishDirectory>
         <GitRemoteTautPublishDirectory>
-            $(MSBuildThisFileDirectory)../Cli.Remote.Taut/bin/Release/$(TargetFramework)/$(RuntimeIdentifier)/publish/</GitRemoteTautPublishDirectory>
+            $(MSBuildThisFileDirectory)../../Cli.Remote.Taut/bin/Release/$(TargetFramework)/$(RuntimeIdentifier)/publish/</GitRemoteTautPublishDirectory>
     </PropertyGroup>
 
     <Target Name="MergePublished">

@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_repository_state_t
+    [NativeTypeName("unsigned int")]
+    public enum git_repository_state_t : uint
     {
         GIT_REPOSITORY_STATE_NONE,
         GIT_REPOSITORY_STATE_MERGE,

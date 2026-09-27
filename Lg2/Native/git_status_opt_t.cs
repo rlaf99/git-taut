@@ -1,6 +1,6 @@
 namespace Lg2.Native
 {
-    [NativeTypeName("int")]
+    [NativeTypeName("unsigned int")]
     public enum git_status_opt_t : uint
     {
         GIT_STATUS_OPT_INCLUDE_UNTRACKED = (1U << 0),

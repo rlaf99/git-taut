@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_reset_t
+    [NativeTypeName("unsigned int")]
+    public enum git_reset_t : uint
     {
         GIT_RESET_SOFT = 1,
         GIT_RESET_MIXED = 2,

@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_merge_flag_t
+    [NativeTypeName("unsigned int")]
+    public enum git_merge_flag_t : uint
     {
         GIT_MERGE_FIND_RENAMES = (1 << 0),
         GIT_MERGE_FAIL_ON_CONFLICT = (1 << 1),

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <RootDirectory>$(MSBuildThisFileDirectory)../../</RootDirectory>
+        <BuildDirectory>$(MSBuildThisFileDirectory)../build-appimage</BuildDirectory>
+    </PropertyGroup>
+    <Target Name="BuildGitTautAppImage">
+        <!-- publish -->
+        <Message Text="Build Cli.Taut" Importance="high" />
+        <Exec
+            Command="dotnet publish -c Release -r $(RuntimeIdentifier) -p:PublishAot=true Cli.Taut -o packaging/build-appimage/Cli.Taut"
+            WorkingDirectory="$(RootDirectory)" />
+        <!-- generate -->
+        <Message Text="BUild AppImage" Importance="high" />
+        <Exec
+            Command="linuxdeploy --executable Cli.Taut/git-taut \
+            --library Cli.Taut/libgit2.so --library Cli.Taut/liblmdb.so \
+            --appdir git-taut.AppDir --create-desktop-file --icon-file ../media/git-taut.png \
+            --output appimage"
+            WorkingDirectory="$(BuildDirectory)" />
+    </Target>
+    <Target Name="BuildGitRemoteTautAppImage">
+        <!-- publish -->
+        <Message Text="Build Cli.Remote.Taut" Importance="high" />
+        <Exec
+            Command="dotnet publish -c Release -r $(RuntimeIdentifier) -p:PublishAot=true Cli.Remote.Taut -o packaging/build-appimage/Cli.Remote.Taut"
+            WorkingDirectory="$(RootDirectory)" />
+        <!-- generate -->
+        <Message Text="BUild AppImage" Importance="high" />
+        <Exec
+            Command="linuxdeploy --executable Cli.Remote.Taut/git-remote-taut \
+            --library Cli.Remote.Taut/libgit2.so --library Cli.Remote.Taut/liblmdb.so \
+            --appdir git-remote-taut.AppDir --create-desktop-file --icon-file ../media/git-remote-taut.png \
+            --output appimage"
+            WorkingDirectory="$(BuildDirectory)" />
+    </Target>
+</Project>

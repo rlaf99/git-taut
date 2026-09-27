@@ -1,6 +1,6 @@
 namespace Lg2.Native
 {
-    [NativeTypeName("int")]
+    [NativeTypeName("unsigned int")]
     public enum git_repository_init_flag_t : uint
     {
         GIT_REPOSITORY_INIT_BARE = (1U << 0),

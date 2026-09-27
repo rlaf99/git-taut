@@ -1,6 +1,6 @@
 namespace Lg2.Native
 {
-    [NativeTypeName("int")]
+    [NativeTypeName("unsigned int")]
     public enum git_diff_find_t : uint
     {
         GIT_DIFF_FIND_BY_CONFIG = 0,

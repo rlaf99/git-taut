@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_attr_value_t
+    [NativeTypeName("unsigned int")]
+    public enum git_attr_value_t : uint
     {
         GIT_ATTR_VALUE_UNSPECIFIED = 0,
         GIT_ATTR_VALUE_TRUE,

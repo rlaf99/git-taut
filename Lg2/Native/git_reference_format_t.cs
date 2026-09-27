@@ -1,6 +1,6 @@
 namespace Lg2.Native
 {
-    [NativeTypeName("int")]
+    [NativeTypeName("unsigned int")]
     public enum git_reference_format_t : uint
     {
         GIT_REFERENCE_FORMAT_NORMAL = 0U,

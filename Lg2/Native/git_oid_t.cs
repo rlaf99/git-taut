@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_oid_t
+    [NativeTypeName("unsigned int")]
+    public enum git_oid_t : uint
     {
         GIT_OID_SHA1 = 1,
     }

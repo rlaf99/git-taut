@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_remote_autotag_option_t
+    [NativeTypeName("unsigned int")]
+    public enum git_remote_autotag_option_t : uint
     {
         GIT_REMOTE_DOWNLOAD_TAGS_UNSPECIFIED = 0,
         GIT_REMOTE_DOWNLOAD_TAGS_AUTO,

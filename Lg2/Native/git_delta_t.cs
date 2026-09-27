@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_delta_t
+    [NativeTypeName("unsigned int")]
+    public enum git_delta_t : uint
     {
         GIT_DELTA_UNMODIFIED = 0,
         GIT_DELTA_ADDED = 1,

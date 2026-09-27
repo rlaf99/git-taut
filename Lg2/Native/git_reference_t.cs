@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_reference_t
+    [NativeTypeName("unsigned int")]
+    public enum git_reference_t : uint
     {
         GIT_REFERENCE_INVALID = 0,
         GIT_REFERENCE_DIRECT = 1,

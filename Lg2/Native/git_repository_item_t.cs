@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_repository_item_t
+    [NativeTypeName("unsigned int")]
+    public enum git_repository_item_t : uint
     {
         GIT_REPOSITORY_ITEM_GITDIR,
         GIT_REPOSITORY_ITEM_WORKDIR,

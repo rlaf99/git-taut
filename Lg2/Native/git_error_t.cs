@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_error_t
+    [NativeTypeName("unsigned int")]
+    public enum git_error_t : uint
     {
         GIT_ERROR_NONE = 0,
         GIT_ERROR_NOMEMORY,

@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_cert_ssh_raw_type_t
+    [NativeTypeName("unsigned int")]
+    public enum git_cert_ssh_raw_type_t : uint
     {
         GIT_CERT_SSH_RAW_TYPE_UNKNOWN = 0,
         GIT_CERT_SSH_RAW_TYPE_RSA = 1,

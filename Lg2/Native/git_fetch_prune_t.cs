@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_fetch_prune_t
+    [NativeTypeName("unsigned int")]
+    public enum git_fetch_prune_t : uint
     {
         GIT_FETCH_PRUNE_UNSPECIFIED,
         GIT_FETCH_PRUNE,

@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_sort_t
+    [NativeTypeName("unsigned int")]
+    public enum git_sort_t : uint
     {
         GIT_SORT_NONE = 0,
         GIT_SORT_TOPOLOGICAL = 1 << 0,

@@ -4,7 +4,7 @@ using static Lg2.Native.LibGit2Exports;
 
 namespace Lg2.Sharpy;
 
-public enum Lg2OidType
+public enum Lg2OidType : uint
 {
     LG2_OID_SHA1 = git_oid_t.GIT_OID_SHA1,
 }
@@ -47,12 +47,13 @@ public static unsafe class Lg2ObjectTypeExtensions
 }
 
 [Flags]
-public enum Lg2OdbLookupFlags
+public enum Lg2OdbLookupFlags : uint
 {
     LG2_ODB_LOOKUP_NO_REFRESH = git_odb_lookup_flags_t.GIT_ODB_LOOKUP_NO_REFRESH,
 }
 
-public enum Lg2RefType
+[Flags]
+public enum Lg2RefType : uint
 {
     LG2_REFERENCE_INVALID = git_reference_t.GIT_REFERENCE_INVALID,
     LG2_REFERENCE_DIRECT = git_reference_t.GIT_REFERENCE_DIRECT,
@@ -94,20 +95,20 @@ public enum Lg2FileMode
     LG2_FILEMODE_COMMIT = git_filemode_t.GIT_FILEMODE_COMMIT,
 }
 
-public enum Lg2TreeUpdateAction
+public enum Lg2TreeUpdateType : uint
 {
     LG2_TREE_UPDATE_UPSERT = git_tree_update_t.GIT_TREE_UPDATE_UPSERT,
     LG2_TREE_UPDATE_REMOVE = git_tree_update_t.GIT_TREE_UPDATE_REMOVE,
 }
 
-public enum Lg2TreeWalkMode
+public enum Lg2TreeWalkMode : uint
 {
     LG2_TREEWALK_PRE = git_treewalk_mode.GIT_TREEWALK_PRE,
     LG2_TREEWALK_POST = git_treewalk_mode.GIT_TREEWALK_POST,
 }
 
 [Flags]
-public enum Lg2SortFlags
+public enum Lg2SortFlags : uint
 {
     LG2_SORT_NONE = git_sort_t.GIT_SORT_NONE,
     LG2_SORT_TOPOLOGICAL = git_sort_t.GIT_SORT_TOPOLOGICAL,
@@ -185,7 +186,7 @@ public enum Lg2DiffFindFlags : uint
     LG2_DIFF_FIND_REMOVE_UNMODIFIED = git_diff_find_t.GIT_DIFF_FIND_REMOVE_UNMODIFIED,
 }
 
-public enum Lg2DeltaType
+public enum Lg2DeltaType : uint
 {
     LG2_DELTA_UNMODIFIED = git_delta_t.GIT_DELTA_UNMODIFIED,
     LG2_DELTA_ADDED = git_delta_t.GIT_DELTA_ADDED,
@@ -223,7 +224,7 @@ public static class Lg2DeltaTypeExtensions
     }
 }
 
-public enum Lg2AttrValueType
+public enum Lg2AttrValueType : uint
 {
     LG2_ATTR_VALUE_UNSPECIFIED = git_attr_value_t.GIT_ATTR_VALUE_UNSPECIFIED,
     LG2_ATTR_VALUE_TRUE = git_attr_value_t.GIT_ATTR_VALUE_TRUE,
@@ -271,7 +272,7 @@ public enum Lg2StatusFlags : uint
     LG2_STATUS_CONFLICTED = git_status_t.GIT_STATUS_CONFLICTED,
 }
 
-public enum Lg2IndexStage
+public enum Lg2IndexStageType
 {
     LG2_INDEX_STAGE_ANY = git_index_stage_t.GIT_INDEX_STAGE_ANY,
     LG2_INDEX_STAGE_NORMAL = git_index_stage_t.GIT_INDEX_STAGE_NORMAL,
@@ -280,14 +281,14 @@ public enum Lg2IndexStage
     LG2_INDEX_STAGE_THEIRS = git_index_stage_t.GIT_INDEX_STAGE_THEIRS,
 }
 
-public enum Lg2BranchType
+public enum Lg2BranchType : uint
 {
     LG2_BRANCH_LOCAL = git_branch_t.GIT_BRANCH_LOCAL,
     LG2_BRANCH_REMOTE = git_branch_t.GIT_BRANCH_REMOTE,
     LG2_BRANCH_ALL = git_branch_t.GIT_BRANCH_ALL,
 }
 
-public enum Lg2ResetType
+public enum Lg2ResetType : uint
 {
     LG2_RESET_SOFT = git_reset_t.GIT_RESET_SOFT,
     LG2_RESET_MIXED = git_reset_t.GIT_RESET_MIXED,

@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_merge_file_flag_t
+    [NativeTypeName("unsigned int")]
+    public enum git_merge_file_flag_t : uint
     {
         GIT_MERGE_FILE_DEFAULT = 0,
         GIT_MERGE_FILE_STYLE_MERGE = (1 << 0),

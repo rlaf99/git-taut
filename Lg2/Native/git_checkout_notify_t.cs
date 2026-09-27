@@ -1,6 +1,6 @@
 namespace Lg2.Native
 {
-    [NativeTypeName("int")]
+    [NativeTypeName("unsigned int")]
     public enum git_checkout_notify_t : uint
     {
         GIT_CHECKOUT_NOTIFY_NONE = 0,

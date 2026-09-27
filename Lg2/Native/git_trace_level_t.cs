@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_trace_level_t
+    [NativeTypeName("unsigned int")]
+    public enum git_trace_level_t : uint
     {
         GIT_TRACE_NONE = 0,
         GIT_TRACE_FATAL = 1,

@@ -1,6 +1,6 @@
 namespace Lg2.Native
 {
-    [NativeTypeName("int")]
+    [NativeTypeName("unsigned int")]
     public enum git_index_add_option_t : uint
     {
         GIT_INDEX_ADD_DEFAULT = 0,

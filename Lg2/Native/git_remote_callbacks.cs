@@ -8,7 +8,7 @@ namespace Lg2.Native
         [NativeTypeName("git_transport_message_cb")]
         public delegate* unmanaged[Cdecl]<sbyte*, int, void*, int> sideband_progress;
 
-        [NativeTypeName("int (*)(git_remote_completion_t, void *) __attribute__((cdecl))")]
+        [NativeTypeName("int (*)(git_remote_completion_t, void *)")]
         public delegate* unmanaged[Cdecl]<git_remote_completion_t, void*, int> completion;
 
         [NativeTypeName("git_credential_acquire_cb")]
@@ -20,7 +20,7 @@ namespace Lg2.Native
         [NativeTypeName("git_indexer_progress_cb")]
         public delegate* unmanaged[Cdecl]<git_indexer_progress*, void*, int> transfer_progress;
 
-        [NativeTypeName("int (*)(const char *, const git_oid *, const git_oid *, void *) __attribute__((cdecl))")]
+        [NativeTypeName("int (*)(const char *, const git_oid *, const git_oid *, void *)")]
         public delegate* unmanaged[Cdecl]<sbyte*, git_oid*, git_oid*, void*, int> update_tips;
 
         [NativeTypeName("git_packbuilder_progress")]
@@ -46,7 +46,7 @@ namespace Lg2.Native
         [NativeTypeName("git_url_resolve_cb")]
         public delegate* unmanaged[Cdecl]<git_buf*, sbyte*, int, void*, int> resolve_url;
 
-        [NativeTypeName("int (*)(const char *, const git_oid *, const git_oid *, git_refspec *, void *) __attribute__((cdecl))")]
+        [NativeTypeName("int (*)(const char *, const git_oid *, const git_oid *, git_refspec *, void *)")]
         public delegate* unmanaged[Cdecl]<sbyte*, git_oid*, git_oid*, git_refspec*, void*, int> update_refs;
     }
 }

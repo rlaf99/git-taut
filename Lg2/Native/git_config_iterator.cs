@@ -7,10 +7,10 @@ namespace Lg2.Native
         [NativeTypeName("unsigned int")]
         public uint flags;
 
-        [NativeTypeName("int (*)(git_config_backend_entry **, git_config_iterator *) __attribute__((cdecl))")]
+        [NativeTypeName("int (*)(git_config_backend_entry **, git_config_iterator *)")]
         public delegate* unmanaged[Cdecl]<git_config_backend_entry**, git_config_iterator*, int> next;
 
-        [NativeTypeName("void (*)(git_config_iterator *) __attribute__((cdecl))")]
+        [NativeTypeName("void (*)(git_config_iterator *)")]
         public delegate* unmanaged[Cdecl]<git_config_iterator*, void> free;
     }
 }

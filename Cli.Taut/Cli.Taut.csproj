@@ -7,13 +7,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <Version>0.0.1-preview</Version>
+    <Version>0.0.2-preview</Version>
     
     <!-- specify this on command line 
     <PublishAot>true</PublishAot> -->
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>git-taut</ToolCommandName>
-    <PackageOutputPath>../nupkg</PackageOutputPath>
+    <PackageOutputPath>../packaging/nupkg</PackageOutputPath>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 
     <!-- note that this does not seem to be supported by NativeAOT, additionally this creates a tool named git-taut.cmd on windows -->
@@ -25,6 +25,10 @@
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <LinkerArg Include="$(ExtraLinkerInput)" Condition="'$(ExtraLinkerInput)' != ''" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Include="packaging\README.md" Pack="true" Visible="false" PackagePath="" />

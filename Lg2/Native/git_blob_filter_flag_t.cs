@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_blob_filter_flag_t
+    [NativeTypeName("unsigned int")]
+    public enum git_blob_filter_flag_t : uint
     {
         GIT_BLOB_FILTER_CHECK_FOR_BINARY = (1 << 0),
         GIT_BLOB_FILTER_NO_SYSTEM_ATTRIBUTES = (1 << 1),

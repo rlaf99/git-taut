@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_diff_binary_t
+    [NativeTypeName("unsigned int")]
+    public enum git_diff_binary_t : uint
     {
         GIT_DIFF_BINARY_NONE,
         GIT_DIFF_BINARY_LITERAL,

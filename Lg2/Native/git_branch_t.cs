@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_branch_t
+    [NativeTypeName("unsigned int")]
+    public enum git_branch_t : uint
     {
         GIT_BRANCH_LOCAL = 1,
         GIT_BRANCH_REMOTE = 2,

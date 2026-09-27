@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_configmap_t
+    [NativeTypeName("unsigned int")]
+    public enum git_configmap_t : uint
     {
         GIT_CONFIGMAP_FALSE = 0,
         GIT_CONFIGMAP_TRUE = 1,

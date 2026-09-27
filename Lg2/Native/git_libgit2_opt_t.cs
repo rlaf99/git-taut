@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_libgit2_opt_t
+    [NativeTypeName("unsigned int")]
+    public enum git_libgit2_opt_t : uint
     {
         GIT_OPT_GET_MWINDOW_SIZE,
         GIT_OPT_SET_MWINDOW_SIZE,

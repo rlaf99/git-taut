@@ -1883,7 +1883,7 @@ namespace Lg2.Native
         public const int GIT_ODB_OPTIONS_VERSION = 1;
 
         [NativeTypeName("#define GIT_OBJECT_SIZE_MAX UINT64_MAX")]
-        public const ulong GIT_OBJECT_SIZE_MAX = 0xffffffffffffffffUL;
+        public const ulong GIT_OBJECT_SIZE_MAX = 18446744073709551615UL;
 
         [NativeTypeName("#define GIT_COMMIT_CREATE_OPTIONS_VERSION 1")]
         public const int GIT_COMMIT_CREATE_OPTIONS_VERSION = 1;
@@ -1978,7 +1978,7 @@ namespace Lg2.Native
         [NativeTypeName("#define GIT_REMOTE_CONNECT_OPTIONS_VERSION 1")]
         public const int GIT_REMOTE_CONNECT_OPTIONS_VERSION = 1;
 
-        [NativeTypeName("#define GIT_STATUS_OPT_DEFAULTS (GIT_STATUS_OPT_INCLUDE_IGNORED | \\\r\n\tGIT_STATUS_OPT_INCLUDE_UNTRACKED | \\\r\n\tGIT_STATUS_OPT_RECURSE_UNTRACKED_DIRS)")]
+        [NativeTypeName("#define GIT_STATUS_OPT_DEFAULTS (GIT_STATUS_OPT_INCLUDE_IGNORED | \\\n\tGIT_STATUS_OPT_INCLUDE_UNTRACKED | \\\n\tGIT_STATUS_OPT_RECURSE_UNTRACKED_DIRS)")]
         public const git_status_opt_t GIT_STATUS_OPT_DEFAULTS = (GIT_STATUS_OPT_INCLUDE_IGNORED | GIT_STATUS_OPT_INCLUDE_UNTRACKED | GIT_STATUS_OPT_RECURSE_UNTRACKED_DIRS);
 
         [NativeTypeName("#define GIT_STATUS_OPTIONS_VERSION 1")]
@@ -2011,7 +2011,7 @@ namespace Lg2.Native
         [NativeTypeName("#define LIBGIT2_SOVERSION \"1.9\"")]
         public static ReadOnlySpan<byte> LIBGIT2_SOVERSION => "1.9"u8;
 
-        [NativeTypeName("#define LIBGIT2_VERSION_NUMBER (    \\\r\n    (LIBGIT2_VERSION_MAJOR * 1000000) + \\\r\n    (LIBGIT2_VERSION_MINOR * 10000) +   \\\r\n    (LIBGIT2_VERSION_REVISION * 100))")]
+        [NativeTypeName("#define LIBGIT2_VERSION_NUMBER (    \\\n    (LIBGIT2_VERSION_MAJOR * 1000000) + \\\n    (LIBGIT2_VERSION_MINOR * 10000) +   \\\n    (LIBGIT2_VERSION_REVISION * 100))")]
         public const int LIBGIT2_VERSION_NUMBER = ((1 * 1000000) + (9 * 10000) + (2 * 100));
 
         [NativeTypeName("#define GIT_CONFIG_BACKEND_VERSION 1")]

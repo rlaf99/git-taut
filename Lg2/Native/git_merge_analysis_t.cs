@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_merge_analysis_t
+    [NativeTypeName("unsigned int")]
+    public enum git_merge_analysis_t : uint
     {
         GIT_MERGE_ANALYSIS_NONE = 0,
         GIT_MERGE_ANALYSIS_NORMAL = (1 << 0),

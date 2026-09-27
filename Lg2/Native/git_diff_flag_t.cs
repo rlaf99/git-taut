@@ -1,6 +1,6 @@
 namespace Lg2.Native
 {
-    [NativeTypeName("int")]
+    [NativeTypeName("unsigned int")]
     public enum git_diff_flag_t : uint
     {
         GIT_DIFF_FLAG_BINARY = (1U << 0),

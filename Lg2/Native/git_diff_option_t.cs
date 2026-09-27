@@ -1,6 +1,6 @@
 namespace Lg2.Native
 {
-    [NativeTypeName("int")]
+    [NativeTypeName("unsigned int")]
     public enum git_diff_option_t : uint
     {
         GIT_DIFF_NORMAL = 0,

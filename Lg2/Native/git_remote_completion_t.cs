@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_remote_completion_t
+    [NativeTypeName("unsigned int")]
+    public enum git_remote_completion_t : uint
     {
         GIT_REMOTE_COMPLETION_DOWNLOAD,
         GIT_REMOTE_COMPLETION_INDEXING,

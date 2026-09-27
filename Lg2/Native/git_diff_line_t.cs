@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_diff_line_t
+    [NativeTypeName("unsigned int")]
+    public enum git_diff_line_t : uint
     {
         GIT_DIFF_LINE_CONTEXT = ' ',
         GIT_DIFF_LINE_ADDITION = '+',

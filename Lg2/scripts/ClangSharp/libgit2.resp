@@ -1,44 +1,30 @@
 # Run `dotnet ClangSharpPInvokeGenerator @path\to\this_file` at the project root
 
 --config
-preview-codegen
+codegen=preview
 # exclude-using-statics-for-enums
 # exclude-enum-operators
-generate-helper-types
-generate-macro-bindings
-generate-native-bitfield-attribute
+file=multi
+types=unix
+
+--generate
+helper-types
+macro-bindings
+native-bitfield-attribute
 # generate-generic-pointer-wrapper
 # generate-doc-includes
 # generate-tests-xunit
-multi-file
-unix-types
 
---libraryPath
+--library-path
 git2
-
 
 --language
 c
 
---with-using
-git_credential_username=System.Runtime.CompilerServices
+# --with-using
+# git_credential_username=System.Runtime.CompilerServices
 
 --with-type
-git_repository_init_flag_t=uint
-git_reference_format_t=uint
-git_pathspec_flag_t=uint
-git_diff_option_t=uint
-git_diff_format_t=uint
-git_diff_flag_t=uint
-git_diff_stats_format_t=uint
-git_diff_find_t=uint
-git_index_add_option_t=uint
-git_credential_t=uint
-git_repository_open_flag_t=uint
-git_status_t=uint
-git_status_opt_t=uint
-git_checkout_strategy_t=uint
-git_checkout_notify_t=uint
 GIT_STATUS_OPT_DEFAULTS=git_status_opt_t
 
 --traverse
@@ -93,7 +79,11 @@ Lg2/scripts/ClangSharp/git2headers.h
 
 --include-directory
 thirdparty/libgit2/include
-# /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/
+
+--additional
+-isysroot
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+
 
 # --std
 # c17
@@ -109,7 +99,7 @@ git_odb_write_pack
 # use Path.PathSeparator from .NET instead
 GIT_PATH_LIST_SEPARATOR
 
---methodClassName
+--method-class-name
 LibGit2Exports
 
 --namespace

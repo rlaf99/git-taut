@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_feature_t
+    [NativeTypeName("unsigned int")]
+    public enum git_feature_t : uint
     {
         GIT_FEATURE_THREADS = (1 << 0),
         GIT_FEATURE_HTTPS = (1 << 1),

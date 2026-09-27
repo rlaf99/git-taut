@@ -1,0 +1,12 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="Cli.Common/Cli.Common.csproj" />
+  <Project Path="Cli.Remote.Taut/Cli.Remote.Taut.csproj" />
+  <Project Path="Cli.Taut/Cli.Taut.csproj" />
+  <Project Path="Cli.Tests/Cli.Tests.csproj" />
+  <Project Path="Lg2/Lg2.csproj" />
+</Solution>

@@ -4,7 +4,7 @@ namespace Lg2.Native
     {
         public git_credential_t credtype;
 
-        [NativeTypeName("void (*)(git_credential *) __attribute__((cdecl))")]
+        [NativeTypeName("void (*)(git_credential *)")]
         public delegate* unmanaged[Cdecl]<git_credential*, void> free;
     }
 }

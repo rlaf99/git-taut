@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_proxy_t
+    [NativeTypeName("unsigned int")]
+    public enum git_proxy_t : uint
     {
         GIT_PROXY_NONE,
         GIT_PROXY_AUTO,

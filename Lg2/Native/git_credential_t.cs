@@ -1,6 +1,6 @@
 namespace Lg2.Native
 {
-    [NativeTypeName("int")]
+    [NativeTypeName("unsigned int")]
     public enum git_credential_t : uint
     {
         GIT_CREDENTIAL_USERPASS_PLAINTEXT = (1U << 0),

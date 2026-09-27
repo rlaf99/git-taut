@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_submodule_update_t
+    [NativeTypeName("unsigned int")]
+    public enum git_submodule_update_t : uint
     {
         GIT_SUBMODULE_UPDATE_CHECKOUT = 1,
         GIT_SUBMODULE_UPDATE_REBASE = 2,

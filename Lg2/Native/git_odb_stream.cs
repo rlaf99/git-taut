@@ -15,16 +15,16 @@ namespace Lg2.Native
         [NativeTypeName("git_object_size_t")]
         public ulong received_bytes;
 
-        [NativeTypeName("int (*)(git_odb_stream *, char *, size_t) __attribute__((cdecl))")]
+        [NativeTypeName("int (*)(git_odb_stream *, char *, size_t)")]
         public delegate* unmanaged[Cdecl]<git_odb_stream*, sbyte*, nuint, int> read;
 
-        [NativeTypeName("int (*)(git_odb_stream *, const char *, size_t) __attribute__((cdecl))")]
+        [NativeTypeName("int (*)(git_odb_stream *, const char *, size_t)")]
         public delegate* unmanaged[Cdecl]<git_odb_stream*, sbyte*, nuint, int> write;
 
-        [NativeTypeName("int (*)(git_odb_stream *, const git_oid *) __attribute__((cdecl))")]
+        [NativeTypeName("int (*)(git_odb_stream *, const git_oid *)")]
         public delegate* unmanaged[Cdecl]<git_odb_stream*, git_oid*, int> finalize_write;
 
-        [NativeTypeName("void (*)(git_odb_stream *) __attribute__((cdecl))")]
+        [NativeTypeName("void (*)(git_odb_stream *)")]
         public delegate* unmanaged[Cdecl]<git_odb_stream*, void> free;
     }
 }

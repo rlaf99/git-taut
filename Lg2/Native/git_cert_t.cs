@@ -1,6 +1,7 @@
 namespace Lg2.Native
 {
-    public enum git_cert_t
+    [NativeTypeName("unsigned int")]
+    public enum git_cert_t : uint
     {
         GIT_CERT_NONE,
         GIT_CERT_X509,

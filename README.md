@@ -1,4 +1,3 @@
-[中文](./README.zh-cn.md)
 
 ## git-taut (preview)
 

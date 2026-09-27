@@ -11,9 +11,9 @@
               ContinueOnError="true" />
         <Message Text="%0AInstall git-taut"
                  Importance="high" />
-        <Exec Command="dotnet tool install -g --source $(MSBuildThisFileDirectory) --prerelease git-taut" />
+        <Exec Command="dotnet tool install -g --source $(MSBuildThisFileDirectory)../nupkg --prerelease git-taut" />
         <Message Text="%0AInstall git-remote-taut"
                  Importance="high" />
-        <Exec Command="dotnet tool install -g --source $(MSBuildThisFileDirectory) --prerelease git-remote-taut" />
+        <Exec Command="dotnet tool install -g --source $(MSBuildThisFileDirectory)../nupkg --prerelease git-remote-taut" />
     </Target>
 </Project>
